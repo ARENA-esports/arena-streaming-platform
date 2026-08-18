@@ -97,3 +97,8 @@ Arena/
         ├── sprint1-coverage.html
         ├── sprint1-jmeter-results.html
         └── ...
+    └── commit-logs/               # One auto-generated log file per commit pushed to main — for QA traceability
+        ├── 20260824-a1b2c3d.md    # Named by date + short SHA: commit author, timestamp, service(s) touched,
+        │                          # commit message, linked story number, CI pass/fail status
+        ├── 20260825-e4f5g6h.md
+        └── ...
