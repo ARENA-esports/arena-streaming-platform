@@ -1,0 +1,12 @@
+D:\arena\codebase\arena-streaming-platform\Arena\shared\eventContracts\src\bin\Debug\net10.0\EventContracts.deps.json
+D:\arena\codebase\arena-streaming-platform\Arena\shared\eventContracts\src\bin\Debug\net10.0\EventContracts.dll
+D:\arena\codebase\arena-streaming-platform\Arena\shared\eventContracts\src\bin\Debug\net10.0\EventContracts.pdb
+D:\arena\codebase\arena-streaming-platform\Arena\shared\eventContracts\src\obj\Debug\net10.0\EventContracts.GeneratedMSBuildEditorConfig.editorconfig
+D:\arena\codebase\arena-streaming-platform\Arena\shared\eventContracts\src\obj\Debug\net10.0\EventContracts.AssemblyInfoInputs.cache
+D:\arena\codebase\arena-streaming-platform\Arena\shared\eventContracts\src\obj\Debug\net10.0\EventContracts.AssemblyInfo.cs
+D:\arena\codebase\arena-streaming-platform\Arena\shared\eventContracts\src\obj\Debug\net10.0\EventContracts.csproj.CoreCompileInputs.cache
+D:\arena\codebase\arena-streaming-platform\Arena\shared\eventContracts\src\obj\Debug\net10.0\EventContracts.sourcelink.json
+D:\arena\codebase\arena-streaming-platform\Arena\shared\eventContracts\src\obj\Debug\net10.0\EventContracts.dll
+D:\arena\codebase\arena-streaming-platform\Arena\shared\eventContracts\src\obj\Debug\net10.0\refint\EventContracts.dll
+D:\arena\codebase\arena-streaming-platform\Arena\shared\eventContracts\src\obj\Debug\net10.0\EventContracts.pdb
+D:\arena\codebase\arena-streaming-platform\Arena\shared\eventContracts\src\obj\Debug\net10.0\ref\EventContracts.dll

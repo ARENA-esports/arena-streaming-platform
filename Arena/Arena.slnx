@@ -1,0 +1,22 @@
+<Solution>
+  <Folder Name="/services/" />
+  <Folder Name="/services/stream/" />
+  <Folder Name="/services/stream/src/">
+    <Project Path="services/stream/src/StreamService.csproj" />
+  </Folder>
+  <Folder Name="/services/stream/tests/">
+    <Project Path="services/stream/tests/StreamService.Tests.csproj" />
+  </Folder>
+  <Folder Name="/services/user/" />
+  <Folder Name="/services/user/src/">
+    <Project Path="services/user/src/UserService.csproj" />
+  </Folder>
+  <Folder Name="/services/user/tests/">
+    <Project Path="services/user/tests/UserService.Tests.csproj" />
+  </Folder>
+  <Folder Name="/shared/" />
+  <Folder Name="/shared/eventContracts/" />
+  <Folder Name="/shared/eventContracts/src/">
+    <Project Path="shared/eventContracts/src/EventContracts.csproj" />
+  </Folder>
+</Solution>
