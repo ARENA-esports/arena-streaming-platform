@@ -25,6 +25,8 @@ Arena/
 │   │   ├── src/                  # Controllers, Data (ADO.NET raw SQL), Services, Kafka producers/consumers, Migrations
 │   │   ├── tests/                # xUnit unit tests for this service only
 │   │   ├── Dockerfile            # Container build definition for this service
+|   │   ├── .env                  # DB connection string, JWT signing secret
+│   |   |── .env.example          # same keys, placeholder values — committed to git
 │   │   └── UserService.csproj
 │   │
 │   ├── tournament/                # Tournament Service — tournaments, teams, team colors (CRUD-heavy)
@@ -37,6 +39,8 @@ Arena/
 │   │   ├── src/
 │   │   ├── tests/
 │   │   ├── Dockerfile
+|   │   ├── .env              # DB connection string, Twitch Client ID/Secret
+│   |   |── .env.example
 │   │   └── StreamService.csproj
 │   │
 │   ├── chat/                     # Chat Service — WebSocket faction rooms, battleground room, denormalized team color
