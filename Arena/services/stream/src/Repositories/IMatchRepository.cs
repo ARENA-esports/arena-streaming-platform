@@ -3,11 +3,11 @@
 */
 
 using StreamService.DTOs;
+namespace StreamService.Repositories;
 
-
-namespace interface IMatchRepository
+public interface IMatchRepository
 {
     Task<bool> BothTeamsExistAsync(int teamAId, int teamBId);
-    Task<int> CreateMatchAsync(int TournamentId, int TeamAId, int TeamBId, DateTimeOffset ScheduledTime);
+    Task<int> CreateMatchAsync(int tournamentId, int teamAId, int teamBId, DateTimeOffset scheduledTime);
     Task<MatchResponse?> GetMatchByIdAsync(int matchId);
 }
