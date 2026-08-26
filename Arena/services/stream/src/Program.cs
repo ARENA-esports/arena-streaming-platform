@@ -47,7 +47,7 @@ builder.Services.AddSwaggerGen(c =>         // register swagger generation servi
     If they are missing, use safe defaults.
 */
 var jwtSecret = builder.Configuration["JwtSettings:Secret"]
-    ?? "Arena_Secret_Key_For_Jwt_Token_Signing_Production_Grade!";      // look up for secret value under JwtSettings in config sources
+    ?? throw new InvalidOperationException("JwtSettings:Secret is not configured.");     // look up for secret value under JwtSettings in config sources
 var jwtIssuer = builder.Configuration["JwtSettings:Issuer"]
     ?? "Arena.UserService";                                             // read issuer from configuration or if key is missing go with default
 var jwtAudience = builder.Configuration["JwtSettings:Audience"]
@@ -84,15 +84,11 @@ builder.Services.AddAuthorization();    // register authorization services
 builder.Services.AddScoped<IMatchRepository, MatchRepository>();    // dependency injection
 
 
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddOpenApi();
-
 var app = builder.Build();      // compile service registrations and create runnable web application
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
     app.UseSwagger();       // enable API documentation endpoints in dev mode
     app.UseSwaggerUI();
 }

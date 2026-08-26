@@ -10,7 +10,7 @@ public record MatchResponse(
     int TeamAId,
     int TeamBId,
     DateTimeOffset ScheduledTime,
-    string status,
+    string Status,
     int? WinnerTeamId,  // nullable. when a match is just created, there is no winner yet
     DateTime CreatedAt
 );

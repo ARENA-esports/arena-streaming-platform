@@ -1,11 +1,11 @@
-## .NET Core / .NET
+## .NET Core / .NET Build Outputs
 [Bb]in/
 [Oo]bj/
 [Oo]ut/
 TestResults/
 *.log
 
-## Visual Studio
+## Visual Studio & Personal Settings
 .vs/
 *.user
 *.userosscache
@@ -14,6 +14,9 @@ TestResults/
 *.userprefs
 *.vsspell
 *.vssscc
+*.pubxml
+*.pubxml.user
+Properties/launchSettings.json
 
 ## JetBrains Rider / ReSharper
 .idea/
@@ -22,6 +25,25 @@ TestResults/
 *.ncrunchproject
 *.crunchersettings
 *.jfm
+
+## Environment Variables & AppSettings Secrets
+.env
+.env.*
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env.production
+!.env.example
+appsettings.Local.json
+appsettings.Development.json
+appsettings.Production.json
+
+## Private Keys & Certificates
+*.pfx
+*.p12
+*.pem
+*.key
 
 ## Node.js / Web Client
 node_modules/
@@ -37,15 +59,8 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 .pnp.*
-.env
-.env.local
-*.env.production
-appsettings.Production.json
-.env.development.local
-.env.test.local
-.env.production.local
 
-## OS generated files
+## OS Generated Files
 .DS_Store
 .DS_Store?
 ._*
