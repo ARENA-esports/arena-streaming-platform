@@ -18,11 +18,11 @@ jobs:
         with:
           filters: |
             user:
-              - 'services/user/**'
-              - 'shared/EventContracts/**'
+              - 'Arena/services/user/**'
+              - 'Arena/shared/EventContracts/**'
             stream:
-              - 'services/stream/**'
-              - 'shared/EventContracts/**'
+              - 'Arena/services/stream/**'
+              - 'Arena/shared/EventContracts/**'
 
   # Job 2: build + test User (only if changed)
   build-user:
@@ -35,11 +35,11 @@ jobs:
         with:
           dotnet-version: '10.0.x'
       - name: Restore
-        run: dotnet restore services/user/src/UserService.csproj
+        run: dotnet restore Arena/services/user/src/UserService.csproj
       - name: Build
-        run: dotnet build services/user/src/UserService.csproj --no-restore --configuration Release
+        run: dotnet build Arena/services/user/src/UserService.csproj --no-restore --configuration Release
       - name: Test
-        run: dotnet test services/user/tests/UserService.Tests.csproj --no-restore --configuration Release
+        run: dotnet test Arena/services/user/tests/UserService.Tests.csproj --no-restore --configuration Release
 
   # Job 3: build + test Stream (only if changed)
   build-stream:
@@ -52,8 +52,8 @@ jobs:
         with:
           dotnet-version: '10.0.x'
       - name: Restore
-        run: dotnet restore services/stream/src/StreamService.csproj
+        run: dotnet restore Arena/services/stream/src/StreamService.csproj
       - name: Build
-        run: dotnet build services/stream/src/StreamService.csproj --no-restore --configuration Release
+        run: dotnet build Arena/services/stream/src/StreamService.csproj --no-restore --configuration Release
       - name: Test
-        run: dotnet test services/stream/tests/StreamService.Tests.csproj --no-restore --configuration Release
+        run: dotnet test Arena/services/stream/tests/StreamService.Tests.csproj --no-restore --configuration Release
