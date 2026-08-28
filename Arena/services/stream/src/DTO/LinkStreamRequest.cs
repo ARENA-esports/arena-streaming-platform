@@ -10,7 +10,7 @@ public class LinkStreamRequest
     public string ChannelName {get; set;} =string.Empty;         // initialize property with not null default
 
     [Required(ErrorMessage = "Platform is required.")]      // guarantee property is present
-    [RegularExpression("^(Twitch|Youtube)$", ErrorMessage="Platform must be either 'Twitch' or 'YouTube'.")]    // restrict acceptable values to 'Twitch' or 'YouTube' to match enums.
+    [RegularExpression("^(Twitch|YouTube)$", ErrorMessage="Platform must be either 'Twitch' or 'YouTube'.")]    // restrict acceptable values to 'Twitch' or 'YouTube' to match enums.
     public string Platform {get; set;} = "Twitch";          // set default platform to twitch
 
     [StringLength(255, ErrorMessage="Stream title cannot exceed 255 characters.")]      // enforce db column limit

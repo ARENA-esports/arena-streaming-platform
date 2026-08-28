@@ -13,7 +13,7 @@ public record StreamResponse(
     int ViewerCount,      // current viewer metric
     DateTime? StartedAt,    // when live event triggered
     DateTime? EndedAt,
-    DateTime CreateAt       // UTC timestamp when record inserted
+    DateTime CreatedAt       // UTC timestamp when record inserted
 )
 
 
