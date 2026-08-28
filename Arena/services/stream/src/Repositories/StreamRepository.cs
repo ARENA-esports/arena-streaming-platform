@@ -137,4 +137,43 @@ public class StreamRepository : IStreamRepository
         }
         return null;    // if not found return null
     }
+
+    /* update Method */
+    public async Task<bool> UpdateStreamAsync(int streamId, UpdateStreamRequest request)
+    {
+        using var connection = new MySqlConnection(_connectionString);
+        await connection.OpenAsync();
+
+        const string sql = @"
+            UPDATE streams 
+            SET channel_name = @ChannelName,
+                platform = @Platform,
+                stream_title = @StreamTitle,
+                embed_parent_domain = @EmbedParentDomain
+            WHERE stream_id = @StreamId;";
+
+        using var command = new MySqlCommand(sql, connection);
+        command.Parameters.AddWithValue("@StreamId", streamId);
+        command.Parameters.AddWithValue("@ChannelName", request.ChannelName.Trim());
+        command.Parameters.AddWithValue("@Platform", request.Platform);
+        command.Parameters.AddWithValue("@StreamTitle", request.StreamTitle);
+        command.Parameters.AddWithValue("@EmbedParentDomain", request.EmbedParentDomain.Trim().ToLowerInvariant());
+
+        var rowsAffected = await command.ExecuteNonQueryAsync();
+        return rowsAffected > 0;
+    }
+
+    /* delete Method */
+    public async Task<bool> DeleteStreamAsync(int streamId)
+    {
+        using var connection = new MySqlConnection(_connectionString);
+        await connection.OpenAsync();
+
+        const string sql = "DELETE FROM streams WHERE stream_id = @StreamId;";
+        using var command = new MySqlCommand(sql, connection);
+        command.Parameters.AddWithValue("@StreamId", streamId);
+
+        var rowsAffected = await command.ExecuteNonQueryAsync();
+        return rowsAffected > 0;
+    }
 }

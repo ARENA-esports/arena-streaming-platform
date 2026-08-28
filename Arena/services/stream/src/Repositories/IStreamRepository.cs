@@ -17,4 +17,10 @@ public interface IStreamRepository
     */
     Task<StreamResponse?> GetStreamByIdAsync(int streamId);
     Task<StreamResponse?> GetStreamByMatchIdAsync(int matchId);
+
+    /*
+        update and delete methods
+    */
+    Task<bool> UpdateStreamAsync(int streamId, UpdateStreamRequest request);
+    Task<bool> DeleteStreamAsync(int streamId);
 }
