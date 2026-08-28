@@ -2,7 +2,7 @@ name: CD
 
 on:
   push:
-    branches: [main]
+    branches: [main,dev]
 
 jobs:
   # Job 1: detect which services changed
