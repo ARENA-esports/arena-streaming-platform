@@ -7,7 +7,7 @@ public class LinkStreamRequest
 {
     [Required(ErrorMessage = "Chanel name is required.")]   // ensure client can't pass null or empty string
     [StringLength(100, MinimumLength = 1, ErrorMessage="Channel name must between 1 and 100 characters.")]  //match database column length and prevent oversize
-    public string ChanelName {get; set;} =string.empty;         // initialize property with not null default
+    public string ChannelName {get; set;} =string.Empty;         // initialize property with not null default
 
     [Required(ErrorMessage = "Platform is required.")]      // guarantee property is present
     [RegularExpression("^(Twitch|Youtube)$", ErrorMessage="Platform must be either 'Twitch' or 'YouTube'.")]    // restrict acceptable values to 'Twitch' or 'YouTube' to match enums.
