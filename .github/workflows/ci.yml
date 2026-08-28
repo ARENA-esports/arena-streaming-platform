@@ -1,8 +1,8 @@
-name: CD
+name: CI
 
 on:
-  push:
-    branches: [main,dev]
+  pull_request:
+    branches: [main, dev]
 
 jobs:
   # Job 1: detect which services changed
@@ -24,72 +24,36 @@ jobs:
               - 'Arena/services/stream/**'
               - 'Arena/shared/EventContracts/**'
 
-  # Job 2: build, push, deploy User (only if changed)
-  deploy-user:
+  # Job 2: build + test User (only if changed)
+  build-user:
     needs: detect-changes
     if: needs.detect-changes.outputs.user == 'true'
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
     steps:
       - uses: actions/checkout@v4
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
+      - uses: actions/setup-dotnet@v4
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          dotnet-version: '10.0.x'
+      - name: Restore
+        run: dotnet restore Arena/services/user/src/UserService.csproj
+      - name: Build
+        run: dotnet build Arena/services/user/src/UserService.csproj --no-restore --configuration Release
+      - name: Test
+        run: dotnet test Arena/services/user/tests/UserService.Tests.csproj --no-restore --configuration Release
 
-      - name: Build and push image
-        uses: docker/build-push-action@v6
-        with:
-          context: ./Arena
-          file: ./Arena/services/user/Dockerfile
-          push: true
-          tags: |
-            ghcr.io/arena-esports/arena-user:latest
-            ghcr.io/arena-esports/arena-user:${{ github.sha }}
-
-      - name: Deploy to Azure App Service
-        uses: azure/webapps-deploy@v3
-        with:
-          app-name: arena-user
-          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE_USER }}
-          images: ghcr.io/arena-esports/arena-user:${{ github.sha }}
-
-  # Job 3: build, push, deploy Stream (only if changed)
-  deploy-stream:
+  # Job 3: build + test Stream (only if changed)
+  build-stream:
     needs: detect-changes
     if: needs.detect-changes.outputs.stream == 'true'
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
     steps:
       - uses: actions/checkout@v4
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
+      - uses: actions/setup-dotnet@v4
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and push image
-        uses: docker/build-push-action@v6
-        with:
-          context: ./Arena
-          file: ./Arena/services/stream/Dockerfile
-          push: true
-          tags: |
-            ghcr.io/arena-esports/arena-stream:latest
-            ghcr.io/arena-esports/arena-stream:${{ github.sha }}
-
-      - name: Deploy to Azure App Service
-        uses: azure/webapps-deploy@v3
-        with:
-          app-name: arena-stream
-          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE_STREAM }}
-          images: ghcr.io/arena-esports/arena-stream:${{ github.sha }}
+          dotnet-version: '10.0.x'
+      - name: Restore
+        run: dotnet restore Arena/services/stream/src/StreamService.csproj
+      - name: Build
+        run: dotnet build Arena/services/stream/src/StreamService.csproj --no-restore --configuration Release
+      - name: Test
+        run: dotnet test Arena/services/stream/tests/StreamService.Tests.csproj --no-restore --configuration Release
