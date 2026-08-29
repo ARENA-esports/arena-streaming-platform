@@ -11,7 +11,7 @@ public class TwitchEventSubValidator: ITwitchEventSubValidator
     public TwitchEventSubValidator(IConfiguration configuration)
     {
         _webhookSecret = configuration["TwitchSettings:EventSubSecret"]  // extract sign in secret
-        ?? throw new InvalidOperationException("Twitch:WebhookSecret is not configured.");  // ensure fail fast startup behavior
+        ?? throw new InvalidOperationException("TwitchSettings:EventSubSecret is not configured.");  // ensure fail fast startup behavior
     }
     
     /* Timestamp Verification */
