@@ -1,4 +1,6 @@
 using System;
+using System.IdentityModel.Tokens.Jwt;
+using System.Linq;
 using System.Threading.Tasks;
 using BCrypt.Net;
 using UserService.Entities;
@@ -11,11 +13,16 @@ public class AuthService : IAuthService
 {
     private readonly IUserRepository _userRepository;
     private readonly IJwtTokenGenerator _jwtTokenGenerator;
+    private readonly ITokenBlacklistService _tokenBlacklistService;
 
-    public AuthService(IUserRepository userRepository, IJwtTokenGenerator jwtTokenGenerator)
+    public AuthService(
+        IUserRepository userRepository,
+        IJwtTokenGenerator jwtTokenGenerator,
+        ITokenBlacklistService tokenBlacklistService)
     {
         _userRepository = userRepository;
         _jwtTokenGenerator = jwtTokenGenerator;
+        _tokenBlacklistService = tokenBlacklistService;
     }
 
     public async Task<SignupResponse> SignupAsync(SignupRequest request)
@@ -77,5 +84,37 @@ public class AuthService : IAuthService
             Email = user.Email,
             Role = user.Role
         };
+    }
+
+    public async Task LogoutAsync(string? tokenString)
+    {
+        if (string.IsNullOrWhiteSpace(tokenString))
+        {
+            return;
+        }
+
+        if (tokenString.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+        {
+            tokenString = tokenString.Substring("Bearer ".Length).Trim();
+        }
+
+        var handler = new JwtSecurityTokenHandler();
+        if (!handler.CanReadToken(tokenString))
+        {
+            return;
+        }
+
+        var jwtToken = handler.ReadJwtToken(tokenString);
+        var jti = jwtToken.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Jti)?.Value;
+        if (string.IsNullOrWhiteSpace(jti))
+        {
+            return;
+        }
+
+        var sub = jwtToken.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Sub)?.Value;
+        int? userId = int.TryParse(sub, out var parsedId) ? parsedId : null;
+        var expiresAt = jwtToken.ValidTo > DateTime.UtcNow ? jwtToken.ValidTo : DateTime.UtcNow.AddMinutes(120);
+
+        await _tokenBlacklistService.RevokeTokenAsync(jti, userId, expiresAt);
     }
 }

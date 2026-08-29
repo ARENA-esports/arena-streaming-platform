@@ -1,5 +1,8 @@
 using System;
+using System.Collections.Generic;
+using System.Security.Claims;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
 using UserService.Controllers;
@@ -118,5 +121,56 @@ public class AuthControllerTests
         // Assert
         var unauthorizedResult = Assert.IsType<UnauthorizedObjectResult>(result);
         Assert.Equal(401, unauthorizedResult.StatusCode);
+    }
+
+    [Fact]
+    public async Task Logout_ValidToken_CallsServiceAndReturnsOk()
+    {
+        // Arrange
+        var httpContext = new DefaultHttpContext();
+        httpContext.Request.Headers.Authorization = "Bearer valid.sample.jwt";
+        _controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = httpContext
+        };
+
+        // Act
+        var result = await _controller.Logout();
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(200, okResult.StatusCode);
+        _mockAuthService.Verify(s => s.LogoutAsync("Bearer valid.sample.jwt"), Times.Once);
+    }
+
+    [Fact]
+    public void GetMe_AuthenticatedUser_ReturnsUserProfile()
+    {
+        // Arrange
+        var claims = new List<Claim>
+        {
+            new("sub", "25"),
+            new("email", "viewer25@arena.gg"),
+            new("unique_name", "Viewer25"),
+            new(ClaimTypes.Role, "Viewer")
+        };
+        var identity = new ClaimsIdentity(claims, "TestAuth");
+        var claimsPrincipal = new ClaimsPrincipal(identity);
+
+        var httpContext = new DefaultHttpContext
+        {
+            User = claimsPrincipal
+        };
+        _controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = httpContext
+        };
+
+        // Act
+        var result = _controller.GetMe();
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(200, okResult.StatusCode);
     }
 }
