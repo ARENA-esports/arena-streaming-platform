@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;    // provide authenticatio
 using Microsoft.IdentityModel.Tokens;           // contain cryptographic keys, validation parameter
 using Microsoft.OpenApi;                 // provide types to configure swagger ui dialog interactive Bearer token testing
 using StreamService.Repositories;
-
+using StreamService.Services;
 
 var builder = WebApplication.CreateBuilder(args);   // initialize configuration sources
 
@@ -83,7 +83,8 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 builder.Services.AddAuthorization();    // register authorization services
 builder.Services.AddScoped<IMatchRepository, MatchRepository>();    // dependency injection
 builder.Services.AddScoped<IStreamRepository, StreamRepository>();    // dependency injection
-
+builder.Services.AddScoped<IWebhookLogRepository, WebhookLogRepository>();//di
+builder.Services.AddScoped<ITwitchEventSubValidator, TwitchEventSubValidator>();//di
 
 
 var app = builder.Build();      // compile service registrations and create runnable web application
