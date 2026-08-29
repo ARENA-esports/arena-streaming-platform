@@ -5,7 +5,7 @@ namespace StreamService.DTOs;   //use file scope
 
 public class LinkStreamRequest
 {
-    [Required(ErrorMessage = "Chanel name is required.")]   // ensure client can't pass null or empty string
+    [Required(ErrorMessage = "Channel name is required.")]   // ensure client can't pass null or empty string
     [StringLength(100, MinimumLength = 1, ErrorMessage="Channel name must between 1 and 100 characters.")]  //match database column length and prevent oversize
     public string ChannelName {get; set;} =string.Empty;         // initialize property with not null default
 
