@@ -23,4 +23,10 @@ public interface IStreamRepository
     */
     Task<bool> UpdateStreamAsync(int streamId, UpdateStreamRequest request);
     Task<bool> DeleteStreamAsync(int streamId);
+    /* webhook lifecycle transitions */
+    // update stream record to 'Live' and set started_at timestamp when broadcast begins
+    Task<int?> UpdateStreamLiveStatusAsync(string channelName, DateTimeOffset startedAt);
+
+    // update stream record to 'Ended' and set ended_at timestamp when broadcast terminates
+    Task<int?> UpdateStreamOfflineStatusAsync(string channelName);
 }

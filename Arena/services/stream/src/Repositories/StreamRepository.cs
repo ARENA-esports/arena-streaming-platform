@@ -176,4 +176,64 @@ public class StreamRepository : IStreamRepository
         var rowsAffected = await command.ExecuteNonQueryAsync();
         return rowsAffected > 0;
     }
+
+    /* Transition Stream Status to Live */
+    public async Task<int?> UpdateStreamLiveStatusAsync(string channelName, DateTimeOffset startedAt)
+    {
+        using var connection = new MySqlConnection(_connectionString); // instantiate db socket
+        await connection.OpenAsync();                                   // open async connection
+
+        /*
+            update matching twitch stream to Live and return the primary key id
+            for linkage inside webhook audit logs
+        */
+        const string sql = @"
+            UPDATE streams 
+            SET status = 'Live',
+                started_at = @StartedAt
+            WHERE LOWER(channel_name) = LOWER(@ChannelName)
+                AND platform = 'Twitch';
+
+            SELECT stream_id 
+            FROM streams 
+            WHERE LOWER(channel_name) = LOWER(@ChannelName) 
+                AND platform = 'Twitch' 
+            LIMIT 1;";
+
+        using var command = new MySqlCommand(sql, connection);
+        command.Parameters.AddWithValue("@ChannelName", channelName.Trim()); // bind parameter to prevent sql injection
+        command.Parameters.AddWithValue("@StartedAt", startedAt.UtcDateTime);      // persist as standard UTC datetime
+
+        var result = await command.ExecuteScalarAsync();
+        return result != null && result != DBNull.Value ? Convert.ToInt32(result) : null;
+    }
+
+    /* Transition Stream Status to Ended */
+    public async Task<int?> UpdateStreamOfflineStatusAsync(string channelName)
+    {
+        using var connection = new MySqlConnection(_connectionString);
+        await connection.OpenAsync();
+
+        /*
+            mark stream record as Ended and record current database UTC timestamp
+        */
+        const string sql = @"
+            UPDATE streams 
+            SET status = 'Ended',
+                ended_at = UTC_TIMESTAMP()
+            WHERE LOWER(channel_name) = LOWER(@ChannelName)
+                AND platform = 'Twitch';
+
+            SELECT stream_id 
+            FROM streams 
+            WHERE LOWER(channel_name) = LOWER(@ChannelName) 
+                AND platform = 'Twitch' 
+            LIMIT 1;";
+
+        using var command = new MySqlCommand(sql, connection);
+        command.Parameters.AddWithValue("@ChannelName", channelName.Trim());
+
+        var result = await command.ExecuteScalarAsync();
+        return result != null && result != DBNull.Value ? Convert.ToInt32(result) : null;
+    }
 }
