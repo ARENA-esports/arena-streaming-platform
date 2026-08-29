@@ -96,11 +96,22 @@ public class WebhooksController : ControllerBase
         /* Handle Notifications */
         if (messageType == "notification")
         {
-            /* Deduplicate incoming notifications */
-            if (await _webhookLogRepository.MessageExistsAsync(messageId))  // check if message_id has recorded
+            // Atomic insert-first deduplication pattern replacing the previous separate MessageExistsAsync check
+            // attempts immediate insertion so MySQL primary key constraint acts as the source of truth, preventing race conditions
+            var isNewDelivery = await _webhookLogRepository.TryLogMessageAsync(
+                messageId: messageId,
+                streamId: null,
+                messageType: messageType,
+                subscriptionType: envelope.Subscription.Type,
+                payloadHash: signature
+            );
+
+            // new: if insertion fails (MySQL 1062 ER_DUP_ENTRY), acknowledge receipt with 200 OK but halt further processing
+            if (!isNewDelivery)
             {
-                _logger.LogInformation("Duplicate webhook message {MessageId} ignored.", messageId);
-                return Ok();
+                // log diagnostic trace that a duplicate delivery was ignored
+                _logger.LogInformation("Duplicate webhook message {MessageId} ignored: delivery already recorded.", messageId);
+                return Ok(); // return 200 OK so Twitch marks delivery successful and stops retrying
             }
 
             // validate the event JSON
@@ -161,16 +172,6 @@ public class WebhooksController : ControllerBase
                         envelope.Subscription.Type);
                     break;
             }
-
-            /* insert the delivery audit record and claim the message ID */
-            await _webhookLogRepository.LogMessageAsync(
-                messageId: messageId,
-                streamId: affectedStreamId,
-                messageType: messageType,
-                subscriptionType: envelope.Subscription.Type,
-                payloadHash: signature
-            );
-
             return Ok();
         }
 
