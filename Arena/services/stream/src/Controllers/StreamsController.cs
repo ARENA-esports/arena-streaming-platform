@@ -27,6 +27,7 @@ public class StreamsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> LinkStreamToMatch(int matchId,[FromBody] LinkStreamRequest request)
     {
@@ -44,7 +45,7 @@ public class StreamsController : ControllerBase
         var match = await _matchRepository.GetMatchByIdAsync(matchId);
         if (match == null)
         {
-            return BadRequest(new {message=$"Match with ID {matchId} does not exist."});
+            return NotFound(new {message=$"Match with ID {matchId} does not exist."});
         }
         /* stream-to-match constraint */
         var alreadyLinked = await _streamRepository.StreamExistsForMatchAsync(matchId);
@@ -88,7 +89,7 @@ public class StreamsController : ControllerBase
     [AllowAnonymous]
     [ProducesResponseType(typeof(StreamResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetStreamByMatchIdAsync(int matchId)
+    public async Task<IActionResult> GetStreamByMatchId(int matchId)
     {
         var stream = await _streamRepository.GetStreamByMatchIdAsync(matchId);
         if (stream == null)
@@ -118,7 +119,8 @@ public class StreamsController : ControllerBase
         var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value 
                       ?? User.FindFirst("sub")?.Value;
         var isOrganizer = User.IsInRole("Organizer");
-        if (!isOrganizer && (userIdClaim == null || existingStream.StreamerId.ToString() != userIdClaim))
+        //safely parse integer user id for ownership equality comparison against StreamerId
+        if (!isOrganizer && (!int.TryParse(userIdClaim, out var currentUserId) || existingStream.StreamerId != currentUserId))
         {
             return Forbid();
         }
@@ -153,7 +155,7 @@ public class StreamsController : ControllerBase
         var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value 
                       ?? User.FindFirst("sub")?.Value;
         var isOrganizer = User.IsInRole("Organizer");
-        if (!isOrganizer && (userIdClaim == null || existingStream.StreamerId.ToString() != userIdClaim))
+        if (!isOrganizer && (!int.TryParse(userIdClaim, out var currentUserId) || existingStream.StreamerId != currentUserId))
         {
             return Forbid();
         }
