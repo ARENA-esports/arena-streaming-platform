@@ -48,4 +48,36 @@ public class AuthController : ControllerBase
             return StatusCode(500, new { message = "An error occurred while creating the account.", details = ex.Message });
         }
     }
+
+    /// <summary>
+    /// Authenticates a viewer and issues a signed JWT token.
+    /// </summary>
+    /// <param name="request">Login credentials with username/email and password</param>
+    /// <returns>The authenticated user information and signed JWT Bearer token</returns>
+    [HttpPost("login")]
+    [ProducesResponseType(typeof(LoginResponse), 200)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), 400)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(500)]
+    public async Task<IActionResult> Login([FromBody] LoginRequest request)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        try
+        {
+            var response = await _authService.LoginAsync(request);
+            return Ok(response);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return Unauthorized(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = "An error occurred while logging in.", details = ex.Message });
+        }
+    }
 }
