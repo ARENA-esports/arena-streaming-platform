@@ -5,6 +5,7 @@ using Microsoft.IdentityModel.Tokens;           // contain cryptographic keys, v
 using Microsoft.OpenApi;                 // provide types to configure swagger ui dialog interactive Bearer token testing
 using StreamService.Repositories;
 using StreamService.Services;
+using DbUp;
 
 var builder = WebApplication.CreateBuilder(args);   // initialize configuration sources
 
@@ -88,6 +89,23 @@ builder.Services.AddScoped<ITwitchEventSubValidator, TwitchEventSubValidator>();
 
 
 var app = builder.Build();      // compile service registrations and create runnable web application
+
+// Run DbUp migrations against the Stream database before accepting requests
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+    ?? throw new InvalidOperationException("DefaultConnection string is not configured.");
+
+var upgrader = DeployChanges.To
+    .MySqlDatabase(connectionString)
+    .WithScriptsEmbeddedInAssembly(System.Reflection.Assembly.GetExecutingAssembly())
+    .LogToConsole()
+    .Build();
+
+var result = upgrader.PerformUpgrade();
+
+if (!result.Successful)
+{
+    throw new Exception("Database migration failed: " + result.Error);
+}
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
