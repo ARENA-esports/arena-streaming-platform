@@ -10,10 +10,12 @@ namespace UserService.Services;
 public class AuthService : IAuthService
 {
     private readonly IUserRepository _userRepository;
+    private readonly IJwtTokenGenerator _jwtTokenGenerator;
 
-    public AuthService(IUserRepository userRepository)
+    public AuthService(IUserRepository userRepository, IJwtTokenGenerator jwtTokenGenerator)
     {
         _userRepository = userRepository;
+        _jwtTokenGenerator = jwtTokenGenerator;
     }
 
     public async Task<SignupResponse> SignupAsync(SignupRequest request)
@@ -48,6 +50,32 @@ public class AuthService : IAuthService
             Username = user.Username,
             Email = user.Email,
             Message = "Signup successful. Please verify your email."
+        };
+    }
+
+    public async Task<LoginResponse> LoginAsync(LoginRequest request)
+    {
+        // Try finding the user by email first, then by username
+        var user = await _userRepository.GetByEmailAsync(request.Identifier)
+            ?? await _userRepository.GetByUsernameAsync(request.Identifier);
+
+        // Generic error check: do not leak whether identifier or password was incorrect
+        if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
+        {
+            throw new UnauthorizedAccessException("Invalid username/email or password.");
+        }
+
+        var token = _jwtTokenGenerator.GenerateToken(user);
+
+        return new LoginResponse
+        {
+            Token = token,
+            TokenType = "Bearer",
+            ExpiresIn = _jwtTokenGenerator.ExpiryMinutes * 60,
+            UserId = user.UserId,
+            Username = user.Username,
+            Email = user.Email,
+            Role = user.Role
         };
     }
 }

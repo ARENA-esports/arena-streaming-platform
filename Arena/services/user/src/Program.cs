@@ -11,6 +11,7 @@ builder.Services.AddOpenApi();
 
 // Register Repositories & Services
 builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 
 // Configure Dapper to map snake_case columns to PascalCase properties
