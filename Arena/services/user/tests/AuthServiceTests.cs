@@ -1,5 +1,9 @@
 using System;
-using System.Threading.Tasks;
+using System.Collections.Generic;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
+using Microsoft.IdentityModel.Tokens;
 using Moq;
 using UserService.Entities;
 using UserService.Models;
@@ -13,15 +17,20 @@ public class AuthServiceTests
 {
     private readonly Mock<IUserRepository> _mockRepo;
     private readonly Mock<IJwtTokenGenerator> _mockJwtTokenGenerator;
+    private readonly Mock<ITokenBlacklistService> _mockTokenBlacklistService;
     private readonly AuthService _authService;
 
     public AuthServiceTests()
     {
         _mockRepo = new Mock<IUserRepository>();
         _mockJwtTokenGenerator = new Mock<IJwtTokenGenerator>();
+        _mockTokenBlacklistService = new Mock<ITokenBlacklistService>();
         _mockJwtTokenGenerator.Setup(g => g.ExpiryMinutes).Returns(120);
         _mockJwtTokenGenerator.Setup(g => g.GenerateToken(It.IsAny<User>())).Returns("mocked.jwt.token");
-        _authService = new AuthService(_mockRepo.Object, _mockJwtTokenGenerator.Object);
+        _authService = new AuthService(
+            _mockRepo.Object,
+            _mockJwtTokenGenerator.Object,
+            _mockTokenBlacklistService.Object);
     }
 
     [Fact]
@@ -189,5 +198,44 @@ public class AuthServiceTests
         var ex = await Assert.ThrowsAsync<UnauthorizedAccessException>(() => _authService.LoginAsync(request));
         Assert.Equal("Invalid username/email or password.", ex.Message);
         _mockJwtTokenGenerator.Verify(g => g.GenerateToken(It.IsAny<User>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task LogoutAsync_WithValidJwtToken_RevokesToken()
+    {
+        // Arrange
+        var expectedJti = Guid.NewGuid().ToString();
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("Arena_Secret_Key_For_Jwt_Token_Signing_2026_SE3022_Production_Grade!"));
+        var tokenHandler = new JwtSecurityTokenHandler();
+        var tokenDescriptor = new SecurityTokenDescriptor
+        {
+            Subject = new ClaimsIdentity(new[]
+            {
+                new Claim(JwtRegisteredClaimNames.Sub, "99"),
+                new Claim(JwtRegisteredClaimNames.Jti, expectedJti)
+            }),
+            Expires = DateTime.UtcNow.AddHours(2),
+            SigningCredentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256Signature)
+        };
+        var token = tokenHandler.CreateToken(tokenDescriptor);
+        var tokenString = $"Bearer {tokenHandler.WriteToken(token)}";
+
+        // Act
+        await _authService.LogoutAsync(tokenString);
+
+        // Assert
+        _mockTokenBlacklistService.Verify(b => b.RevokeTokenAsync(expectedJti, 99, It.IsAny<DateTime>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task LogoutAsync_WithNullOrEmptyToken_DoesNotCallRevocation()
+    {
+        // Act
+        await _authService.LogoutAsync(null);
+        await _authService.LogoutAsync(string.Empty);
+        await _authService.LogoutAsync("invalid.token");
+
+        // Assert
+        _mockTokenBlacklistService.Verify(b => b.RevokeTokenAsync(It.IsAny<string>(), It.IsAny<int?>(), It.IsAny<DateTime>()), Times.Never);
     }
 }

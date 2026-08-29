@@ -8,11 +8,12 @@ namespace UserService.Services;
 public class TokenBlacklistService : ITokenBlacklistService
 {
     private readonly ITokenBlacklistRepository _repository;
-    private readonly ConcurrentDictionary<string, DateTime> _inMemoryCache = new();
+    private readonly ConcurrentDictionary<string, DateTime> _inMemoryCache;
 
     public TokenBlacklistService(ITokenBlacklistRepository repository)
     {
         _repository = repository;
+        _inMemoryCache = new ConcurrentDictionary<string, DateTime>();
     }
 
     public async Task RevokeTokenAsync(string jti, int? userId, DateTime expiresAt)
