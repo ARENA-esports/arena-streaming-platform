@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using Moq;
 using UserService.Entities;
@@ -18,6 +19,8 @@ public class AuthServiceTests
     private readonly Mock<IUserRepository> _mockRepo;
     private readonly Mock<IJwtTokenGenerator> _mockJwtTokenGenerator;
     private readonly Mock<ITokenBlacklistService> _mockTokenBlacklistService;
+    private readonly Mock<IPasswordResetRepository> _mockPasswordResetRepo;
+    private readonly IConfiguration _configuration;
     private readonly AuthService _authService;
 
     public AuthServiceTests()
@@ -25,12 +28,26 @@ public class AuthServiceTests
         _mockRepo = new Mock<IUserRepository>();
         _mockJwtTokenGenerator = new Mock<IJwtTokenGenerator>();
         _mockTokenBlacklistService = new Mock<ITokenBlacklistService>();
+        _mockPasswordResetRepo = new Mock<IPasswordResetRepository>();
+
+        var inMemorySettings = new Dictionary<string, string?>
+        {
+            { "PasswordResetSettings:ExpiryMinutes", "15" },
+            { "JwtSettings:ExpiryMinutes", "120" }
+        };
+        _configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(inMemorySettings)
+            .Build();
+
         _mockJwtTokenGenerator.Setup(g => g.ExpiryMinutes).Returns(120);
         _mockJwtTokenGenerator.Setup(g => g.GenerateToken(It.IsAny<User>())).Returns("mocked.jwt.token");
+
         _authService = new AuthService(
             _mockRepo.Object,
             _mockJwtTokenGenerator.Object,
-            _mockTokenBlacklistService.Object);
+            _mockTokenBlacklistService.Object,
+            _mockPasswordResetRepo.Object,
+            _configuration);
     }
 
     [Fact]
@@ -237,5 +254,190 @@ public class AuthServiceTests
 
         // Assert
         _mockTokenBlacklistService.Verify(b => b.RevokeTokenAsync(It.IsAny<string>(), It.IsAny<int?>(), It.IsAny<DateTime>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ForgotPasswordAsync_WithRegisteredEmail_GeneratesResetTokenWithExpiry()
+    {
+        // Arrange
+        var user = new User
+        {
+            UserId = 5,
+            Email = "registered@arena.gg",
+            Username = "viewer05"
+        };
+        var request = new ForgotPasswordRequest { Email = "registered@arena.gg" };
+
+        _mockRepo.Setup(r => r.GetByEmailAsync(request.Email)).ReturnsAsync(user);
+        _mockPasswordResetRepo.Setup(r => r.CreateTokenAsync(It.IsAny<PasswordResetToken>())).ReturnsAsync(1);
+
+        // Act
+        var result = await _authService.ForgotPasswordAsync(request);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.NotNull(result.ResetToken);
+        Assert.NotEmpty(result.ResetToken);
+        Assert.NotNull(result.ExpiresAt);
+        Assert.True(result.ExpiresAt.Value > DateTime.UtcNow);
+        Assert.Equal("Password reset token generated successfully.", result.Message);
+
+        _mockPasswordResetRepo.Verify(r => r.InvalidateUserTokensAsync(5), Times.Once);
+        _mockPasswordResetRepo.Verify(r => r.CreateTokenAsync(It.Is<PasswordResetToken>(t =>
+            t.UserId == 5 &&
+            t.Token == result.ResetToken &&
+            !t.IsUsed &&
+            t.ExpiresAt > DateTime.UtcNow)), Times.Once);
+    }
+
+    [Fact]
+    public async Task ForgotPasswordAsync_WithUnregisteredEmail_ReturnsGenericMessageWithoutGeneratingToken()
+    {
+        // Arrange
+        var request = new ForgotPasswordRequest { Email = "unknown@arena.gg" };
+        _mockRepo.Setup(r => r.GetByEmailAsync(request.Email)).ReturnsAsync((User?)null);
+
+        // Act
+        var result = await _authService.ForgotPasswordAsync(request);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Null(result.ResetToken);
+        Assert.Null(result.ExpiresAt);
+        Assert.Equal("If the email is registered, a password reset link has been sent.", result.Message);
+
+        _mockPasswordResetRepo.Verify(r => r.CreateTokenAsync(It.IsAny<PasswordResetToken>()), Times.Never);
+        _mockPasswordResetRepo.Verify(r => r.InvalidateUserTokensAsync(It.IsAny<int>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ResetPasswordAsync_WithValidUnexpiredToken_UpdatesPasswordAndMarksTokenUsed()
+    {
+        // Arrange
+        var tokenString = "valid-reset-token-12345";
+        var resetToken = new PasswordResetToken
+        {
+            TokenId = 1,
+            UserId = 5,
+            Token = tokenString,
+            ExpiresAt = DateTime.UtcNow.AddMinutes(10),
+            IsUsed = false
+        };
+
+        var request = new ResetPasswordRequest
+        {
+            Token = tokenString,
+            NewPassword = "BrandNewPassword123!"
+        };
+
+        _mockPasswordResetRepo.Setup(r => r.GetByTokenAsync(tokenString)).ReturnsAsync(resetToken);
+        _mockRepo.Setup(r => r.UpdatePasswordAsync(5, It.IsAny<string>())).ReturnsAsync(true);
+        _mockPasswordResetRepo.Setup(r => r.MarkAsUsedAsync(tokenString)).ReturnsAsync(true);
+
+        // Act
+        var result = await _authService.ResetPasswordAsync(request);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal("Password has been successfully reset.", result.Message);
+
+        _mockRepo.Verify(r => r.UpdatePasswordAsync(5, It.Is<string>(hash => BCrypt.Net.BCrypt.Verify("BrandNewPassword123!", hash))), Times.Once);
+        _mockPasswordResetRepo.Verify(r => r.MarkAsUsedAsync(tokenString), Times.Once);
+    }
+
+    [Fact]
+    public async Task ResetPasswordAsync_WithExpiredToken_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        var tokenString = "expired-reset-token-12345";
+        var resetToken = new PasswordResetToken
+        {
+            TokenId = 2,
+            UserId = 5,
+            Token = tokenString,
+            ExpiresAt = DateTime.UtcNow.AddMinutes(-5), // Expired
+            IsUsed = false
+        };
+
+        var request = new ResetPasswordRequest
+        {
+            Token = tokenString,
+            NewPassword = "BrandNewPassword123!"
+        };
+
+        _mockPasswordResetRepo.Setup(r => r.GetByTokenAsync(tokenString)).ReturnsAsync(resetToken);
+
+        // Act & Assert
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => _authService.ResetPasswordAsync(request));
+        Assert.Equal("Invalid or expired reset token.", ex.Message);
+
+        _mockRepo.Verify(r => r.UpdatePasswordAsync(It.IsAny<int>(), It.IsAny<string>()), Times.Never);
+        _mockPasswordResetRepo.Verify(r => r.MarkAsUsedAsync(It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ResetPasswordAsync_WithReusedToken_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        var tokenString = "used-reset-token-12345";
+        var resetToken = new PasswordResetToken
+        {
+            TokenId = 3,
+            UserId = 5,
+            Token = tokenString,
+            ExpiresAt = DateTime.UtcNow.AddMinutes(10),
+            IsUsed = true // Already used
+        };
+
+        var request = new ResetPasswordRequest
+        {
+            Token = tokenString,
+            NewPassword = "BrandNewPassword123!"
+        };
+
+        _mockPasswordResetRepo.Setup(r => r.GetByTokenAsync(tokenString)).ReturnsAsync(resetToken);
+
+        // Act & Assert
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => _authService.ResetPasswordAsync(request));
+        Assert.Equal("Invalid or expired reset token.", ex.Message);
+
+        _mockRepo.Verify(r => r.UpdatePasswordAsync(It.IsAny<int>(), It.IsAny<string>()), Times.Never);
+        _mockPasswordResetRepo.Verify(r => r.MarkAsUsedAsync(It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ResetPasswordAsync_WithNonExistentToken_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        var tokenString = "non-existent-token";
+        var request = new ResetPasswordRequest
+        {
+            Token = tokenString,
+            NewPassword = "BrandNewPassword123!"
+        };
+
+        _mockPasswordResetRepo.Setup(r => r.GetByTokenAsync(tokenString)).ReturnsAsync((PasswordResetToken?)null);
+
+        // Act & Assert
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => _authService.ResetPasswordAsync(request));
+        Assert.Equal("Invalid or expired reset token.", ex.Message);
+
+        _mockRepo.Verify(r => r.UpdatePasswordAsync(It.IsAny<int>(), It.IsAny<string>()), Times.Never);
+        _mockPasswordResetRepo.Verify(r => r.MarkAsUsedAsync(It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ResetPasswordAsync_WithEmptyToken_ThrowsArgumentException()
+    {
+        // Arrange
+        var request = new ResetPasswordRequest
+        {
+            Token = "   ",
+            NewPassword = "BrandNewPassword123!"
+        };
+
+        // Act & Assert
+        var ex = await Assert.ThrowsAsync<ArgumentException>(() => _authService.ResetPasswordAsync(request));
+        Assert.Equal("Reset token is required.", ex.Message);
     }
 }

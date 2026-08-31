@@ -8,4 +8,6 @@ public interface IAuthService
     Task<SignupResponse> SignupAsync(SignupRequest request);
     Task<LoginResponse> LoginAsync(LoginRequest request);
     Task LogoutAsync(string? tokenString);
+    Task<ForgotPasswordResponse> ForgotPasswordAsync(ForgotPasswordRequest request);
+    Task<ResetPasswordResponse> ResetPasswordAsync(ResetPasswordRequest request);
 }

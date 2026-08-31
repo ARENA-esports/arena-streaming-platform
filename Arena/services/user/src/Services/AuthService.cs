@@ -1,8 +1,10 @@
 using System;
 using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Threading.Tasks;
 using BCrypt.Net;
+using Microsoft.Extensions.Configuration;
 using UserService.Entities;
 using UserService.Models;
 using UserService.Repositories;
@@ -14,15 +16,21 @@ public class AuthService : IAuthService
     private readonly IUserRepository _userRepository;
     private readonly IJwtTokenGenerator _jwtTokenGenerator;
     private readonly ITokenBlacklistService _tokenBlacklistService;
+    private readonly IPasswordResetRepository _passwordResetRepository;
+    private readonly IConfiguration _configuration;
 
     public AuthService(
         IUserRepository userRepository,
         IJwtTokenGenerator jwtTokenGenerator,
-        ITokenBlacklistService tokenBlacklistService)
+        ITokenBlacklistService tokenBlacklistService,
+        IPasswordResetRepository passwordResetRepository,
+        IConfiguration configuration)
     {
         _userRepository = userRepository;
         _jwtTokenGenerator = jwtTokenGenerator;
         _tokenBlacklistService = tokenBlacklistService;
+        _passwordResetRepository = passwordResetRepository;
+        _configuration = configuration;
     }
 
     public async Task<SignupResponse> SignupAsync(SignupRequest request)
@@ -116,5 +124,70 @@ public class AuthService : IAuthService
         var expiresAt = jwtToken.ValidTo > DateTime.UtcNow ? jwtToken.ValidTo : DateTime.UtcNow.AddMinutes(120);
 
         await _tokenBlacklistService.RevokeTokenAsync(jti, userId, expiresAt);
+    }
+
+    public async Task<ForgotPasswordResponse> ForgotPasswordAsync(ForgotPasswordRequest request)
+    {
+        var user = await _userRepository.GetByEmailAsync(request.Email);
+        if (user == null)
+        {
+            // Do not reveal whether email exists to prevent enumeration
+            return new ForgotPasswordResponse
+            {
+                Message = "If the email is registered, a password reset link has been sent."
+            };
+        }
+
+        int expiryMinutes = _configuration.GetValue<int>("PasswordResetSettings:ExpiryMinutes", 15);
+        if (expiryMinutes <= 0)
+        {
+            expiryMinutes = 15;
+        }
+
+        var tokenBytes = RandomNumberGenerator.GetBytes(32);
+        string token = Convert.ToHexString(tokenBytes).ToLowerInvariant();
+        var expiresAt = DateTime.UtcNow.AddMinutes(expiryMinutes);
+
+        await _passwordResetRepository.InvalidateUserTokensAsync(user.UserId);
+
+        var resetToken = new PasswordResetToken
+        {
+            UserId = user.UserId,
+            Token = token,
+            ExpiresAt = expiresAt,
+            IsUsed = false
+        };
+
+        await _passwordResetRepository.CreateTokenAsync(resetToken);
+
+        return new ForgotPasswordResponse
+        {
+            Message = "Password reset token generated successfully.",
+            ResetToken = token,
+            ExpiresAt = expiresAt
+        };
+    }
+
+    public async Task<ResetPasswordResponse> ResetPasswordAsync(ResetPasswordRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Token))
+        {
+            throw new ArgumentException("Reset token is required.");
+        }
+
+        var resetToken = await _passwordResetRepository.GetByTokenAsync(request.Token);
+        if (resetToken == null || resetToken.IsUsed || resetToken.ExpiresAt <= DateTime.UtcNow)
+        {
+            throw new InvalidOperationException("Invalid or expired reset token.");
+        }
+
+        string passwordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
+        await _userRepository.UpdatePasswordAsync(resetToken.UserId, passwordHash);
+        await _passwordResetRepository.MarkAsUsedAsync(resetToken.Token);
+
+        return new ResetPasswordResponse
+        {
+            Message = "Password has been successfully reset."
+        };
     }
 }
