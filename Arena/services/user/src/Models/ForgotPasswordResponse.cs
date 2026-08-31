@@ -1,5 +1,3 @@
-using System;
-
 namespace UserService.Models;
 
 public class ForgotPasswordResponse

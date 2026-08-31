@@ -144,6 +144,88 @@ public class AuthControllerTests
     }
 
     [Fact]
+    public async Task ForgotPassword_ValidRequest_ReturnsOk()
+    {
+        // Arrange
+        var request = new ForgotPasswordRequest { Email = "viewer@arena.gg" };
+        var response = new ForgotPasswordResponse
+        {
+            Message = "Password reset token generated successfully.",
+            ResetToken = "test-token-xyz",
+            ExpiresAt = DateTime.UtcNow.AddMinutes(15)
+        };
+        _mockAuthService.Setup(s => s.ForgotPasswordAsync(request)).ReturnsAsync(response);
+
+        // Act
+        var result = await _controller.ForgotPassword(request);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(200, okResult.StatusCode);
+        Assert.Equal(response, okResult.Value);
+    }
+
+    [Fact]
+    public async Task ForgotPassword_InvalidModelState_ReturnsBadRequest()
+    {
+        // Arrange
+        _controller.ModelState.AddModelError("Email", "Invalid email format.");
+        var request = new ForgotPasswordRequest { Email = "invalid" };
+
+        // Act
+        var result = await _controller.ForgotPassword(request);
+
+        // Assert
+        Assert.IsType<BadRequestObjectResult>(result);
+    }
+
+    [Fact]
+    public async Task ResetPassword_ValidRequest_ReturnsOk()
+    {
+        // Arrange
+        var request = new ResetPasswordRequest { Token = "token-123", NewPassword = "NewPassword123!" };
+        var response = new ResetPasswordResponse { Message = "Password has been successfully reset." };
+        _mockAuthService.Setup(s => s.ResetPasswordAsync(request)).ReturnsAsync(response);
+
+        // Act
+        var result = await _controller.ResetPassword(request);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(200, okResult.StatusCode);
+        Assert.Equal(response, okResult.Value);
+    }
+
+    [Fact]
+    public async Task ResetPassword_InvalidOrExpiredToken_ReturnsBadRequest()
+    {
+        // Arrange
+        var request = new ResetPasswordRequest { Token = "expired-token", NewPassword = "NewPassword123!" };
+        _mockAuthService.Setup(s => s.ResetPasswordAsync(request)).ThrowsAsync(new InvalidOperationException("Invalid or expired reset token."));
+
+        // Act
+        var result = await _controller.ResetPassword(request);
+
+        // Assert
+        var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
+        Assert.Equal(400, badRequestResult.StatusCode);
+    }
+
+    [Fact]
+    public async Task ResetPassword_InvalidModelState_ReturnsBadRequest()
+    {
+        // Arrange
+        _controller.ModelState.AddModelError("NewPassword", "Password must be at least 8 characters long.");
+        var request = new ResetPasswordRequest();
+
+        // Act
+        var result = await _controller.ResetPassword(request);
+
+        // Assert
+        Assert.IsType<BadRequestObjectResult>(result);
+    }
+
+    [Fact]
     public void GetMe_AuthenticatedUser_ReturnsUserProfile()
     {
         // Arrange

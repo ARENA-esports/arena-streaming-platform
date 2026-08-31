@@ -108,6 +108,68 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
+    /// Initiates password reset for a registered viewer account.
+    /// </summary>
+    /// <param name="request">Request containing the user's email</param>
+    /// <returns>Confirmation message and token if user is found</returns>
+    [HttpPost("forgot-password")]
+    [ProducesResponseType(typeof(ForgotPasswordResponse), 200)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), 400)]
+    [ProducesResponseType(500)]
+    public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        try
+        {
+            var response = await _authService.ForgotPasswordAsync(request);
+            return Ok(response);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = "An error occurred while processing the password reset request.", details = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Sets a new password using a valid reset token.
+    /// </summary>
+    /// <param name="request">Request containing reset token and new password</param>
+    /// <returns>Confirmation of password change</returns>
+    [HttpPost("reset-password")]
+    [ProducesResponseType(typeof(ResetPasswordResponse), 200)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), 400)]
+    [ProducesResponseType(500)]
+    public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        try
+        {
+            var response = await _authService.ResetPasswordAsync(request);
+            return Ok(response);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = "An error occurred while resetting the password.", details = ex.Message });
+        }
+    }
+
+    /// <summary>
     /// Retrieves current authenticated user profile.
     /// </summary>
     /// <returns>The authenticated user information</returns>
