@@ -44,7 +44,7 @@ public class StreamsController : ControllerBase
         var match = await _matchRepository.GetMatchByIdAsync(matchId);
         if (match == null)
         {
-            return BadRequest(new {message=$"Match with ID {matchId} does not exist."});
+            return NotFound(new { message = $"Match with ID {matchId} does not exist." });
         }
         /* stream-to-match constraint */
         var alreadyLinked = await _streamRepository.StreamExistsForMatchAsync(matchId);
