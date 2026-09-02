@@ -24,36 +24,70 @@ jobs:
               - 'Arena/services/stream/**'
               - 'Arena/shared/EventContracts/**'
 
-  # Job 2: build + test User (only if changed)
+  # Job 2: build + test + analyze User (only if changed)
   build-user:
     needs: detect-changes
     if: needs.detect-changes.outputs.user == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '10.0.x'
+          dotnet-version: "10.0.x"
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: csharp
+
       - name: Restore
         run: dotnet restore Arena/services/user/src/UserService.csproj
+
       - name: Build
         run: dotnet build Arena/services/user/src/UserService.csproj --no-restore --configuration Release
+
       - name: Test
         run: dotnet test Arena/services/user/tests/UserService.Tests.csproj --no-restore --configuration Release
 
-  # Job 3: build + test Stream (only if changed)
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:csharp"
+
+  # Job 3: build + test + analyze Stream
   build-stream:
     needs: detect-changes
     if: needs.detect-changes.outputs.stream == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '10.0.x'
+          dotnet-version: "10.0.x"
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: csharp
+
       - name: Restore
         run: dotnet restore Arena/services/stream/src/StreamService.csproj
+
       - name: Build
         run: dotnet build Arena/services/stream/src/StreamService.csproj --no-restore --configuration Release
+
       - name: Test
         run: dotnet test Arena/services/stream/tests/StreamService.Tests.csproj --no-restore --configuration Release
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:csharp"
