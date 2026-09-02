@@ -1,9 +1,10 @@
 name: CI
 
 on:
+  push:
+    branches: [dev]
   pull_request:
     branches: [main, dev]
-
 jobs:
   # Job 1: detect which services changed
   detect-changes:
