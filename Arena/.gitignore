@@ -3,9 +3,16 @@
 **/[Oo]bj/
 **/[Oo]ut/
 **/TestResults/
+## .NET / C# Build Outputs & Artifacts
+**/[Bb]in/
+**/[Oo]bj/
+**/[Oo]ut/
+**/TestResults/
 *.log
 *.trx
+*.trx
 
+## Visual Studio / Roslyn / User Cache
 ## Visual Studio / Roslyn / User Cache
 .vs/
 *.user
@@ -18,7 +25,14 @@
 *.pubxml
 *.pubxml.user
 **/Properties/launchSettings.json
+**/Properties/launchSettings.json
 
+## IDEs (VS Code & JetBrains Rider)
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
 ## IDEs (VS Code & JetBrains Rider)
 .vscode/*
 !.vscode/settings.json
@@ -32,6 +46,9 @@
 *.crunchersettings
 *.jfm
 
+## Secrets & Environment Configurations (Root & Nested Microservices)
+
+# Environment files
 ## Secrets & Environment Configurations (Root & Nested Microservices)
 
 # Environment files
@@ -51,12 +68,26 @@
 **/appsettings.secrets.json
 
 # Whitelist safe configuration templates
+
+# AppSettings secrets & local overrides
+**/appsettings.Development.json
+**/appsettings.Local.json
+**/appsettings.Production.json
+**/appsettings.*.local.json
+**/appsettings.secrets.json
+
+# Whitelist safe configuration templates
 !.env.example
 !**/.env.example
 !**/appsettings.json
 !**/appsettings.Development.json.example
 !**/appsettings.*.example.json
+!**/.env.example
+!**/appsettings.json
+!**/appsettings.Development.json.example
+!**/appsettings.*.example.json
 
+## Private Keys, Certificates & Tokens
 ## Private Keys, Certificates & Tokens
 *.pfx
 *.p12
@@ -64,7 +95,16 @@
 *.key
 *.crt
 *.cer
+*.crt
+*.cer
 
+## Node.js / Frontend Client (Next.js, Vite, etc.)
+**/node_modules/
+**/dist/
+**/build/
+**/.next/
+**/.nuxt/
+**/coverage/
 ## Node.js / Frontend Client (Next.js, Vite, etc.)
 **/node_modules/
 **/dist/
@@ -79,6 +119,7 @@ yarn-error.log*
 pnpm-debug.log*
 .pnp.*
 
+## Operating System & Temporary Files
 ## Operating System & Temporary Files
 .DS_Store
 .DS_Store?

@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;    // provide authenticatio
 using Microsoft.IdentityModel.Tokens;           // contain cryptographic keys, validation parameter
 using Microsoft.OpenApi;                 // provide types to configure swagger ui dialog interactive Bearer token testing
 using StreamService.Repositories;
+using StreamService.Services;
 using DbUp;
 
 var builder = WebApplication.CreateBuilder(args);   // initialize configuration sources
@@ -12,6 +13,25 @@ var builder = WebApplication.CreateBuilder(args);   // initialize configuration 
 
 builder.Services.AddControllers();      // register controller discovery and model binder to dependency injection container
 builder.Services.AddEndpointsApiExplorer();     // enable API metadata discovery to swagger/openAPI
+
+// Problem Details for RFC 7807 error responses
+builder.Services.AddProblemDetails();
+
+// Configure restrictive CORS policy for the frontend client
+var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
+    ?? new[] { "http://localhost:3000" };
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("ArenaClientCors", policy =>
+    {
+        policy.WithOrigins(allowedOrigins)
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials();
+    });
+});
+
 builder.Services.AddSwaggerGen(c =>         // register swagger generation services
 {
     c.SwaggerDoc("v1", new OpenApiInfo      // define version identifier and set human readable title appear top of swagger ui page
@@ -82,9 +102,16 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 builder.Services.AddAuthorization();    // register authorization services
 builder.Services.AddScoped<IMatchRepository, MatchRepository>();    // dependency injection
+builder.Services.AddScoped<IStreamRepository, StreamRepository>();    // dependency injection
+builder.Services.AddScoped<IWebhookLogRepository, WebhookLogRepository>();//di
+builder.Services.AddScoped<ITwitchEventSubValidator, TwitchEventSubValidator>();//di
+
+// Register Problem Details for RFC 7807 standardized error responses
+builder.Services.AddProblemDetails();
 
 
 var app = builder.Build();      // compile service registrations and create runnable web application
+
 
 // Run DbUp migrations against the Stream database before accepting requests
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
@@ -103,6 +130,18 @@ if (!result.Successful)
     throw new Exception("Database migration failed: " + result.Error);
 }
 
+
+// Exception Handling at the very top of the HTTP pipeline
+app.UseExceptionHandler();
+// Global Security Headers middleware
+app.Use(async (context, next) =>
+{
+    context.Response.Headers.Append("X-Content-Type-Options", "nosniff");
+    context.Response.Headers.Append("X-Frame-Options", "DENY");
+    context.Response.Headers.Append("Referrer-Policy", "strict-origin-when-cross-origin");
+    await next();
+});
+
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
@@ -111,6 +150,8 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+// UseCors must execute before Authentication and Authorization
+app.UseCors("ArenaClientCors");
 app.UseAuthentication();    // read jwt token from auth header, validate, assign authenticate identity ti http user
 app.UseAuthorization();     // evaluate endpoint authorization rules
 
