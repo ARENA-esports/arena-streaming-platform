@@ -62,7 +62,7 @@ public class StreamRepository : IStreamRepository
         command.Parameters.AddWithValue("@ChannelName", request.ChannelName.Trim());
         command.Parameters.AddWithValue("@Platform", request.Platform);
         command.Parameters.AddWithValue("@StreamTitle", request.StreamTitle);
-        command.Parameters.AddWithValue("@EmbedParentDomain", request.EmbedParentDomain.Trim());
+        command.Parameters.AddWithValue("@EmbedParentDomain", request.EmbedParentDomain.Trim().ToLowerInvariant());
         command.Parameters.AddWithValue("@Status", StreamStatus.Scheduled);
 
         var result = await command.ExecuteScalarAsync();
@@ -186,13 +186,15 @@ public class StreamRepository : IStreamRepository
         /*
             update matching twitch stream to Live and return the primary key id
             for linkage inside webhook audit logs
+            Enforce state transition: only 'Scheduled' streams can transition to 'Live'
         */
         const string sql = @"
             UPDATE streams 
             SET status = 'Live',
                 started_at = @StartedAt
             WHERE LOWER(channel_name) = LOWER(@ChannelName)
-                AND platform = 'Twitch';
+                AND platform = 'Twitch'
+                AND status = 'Scheduled';
 
             SELECT stream_id 
             FROM streams 
@@ -216,13 +218,15 @@ public class StreamRepository : IStreamRepository
 
         /*
             mark stream record as Ended and record current database UTC timestamp
+            Enforce state transition: only 'Live' streams can transition to 'Ended'
         */
         const string sql = @"
             UPDATE streams 
             SET status = 'Ended',
                 ended_at = UTC_TIMESTAMP()
             WHERE LOWER(channel_name) = LOWER(@ChannelName)
-                AND platform = 'Twitch';
+                AND platform = 'Twitch'
+                AND status = 'Live';
 
             SELECT stream_id 
             FROM streams 

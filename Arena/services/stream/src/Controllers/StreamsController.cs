@@ -41,6 +41,12 @@ public class StreamsController : ControllerBase
             return Unauthorized(new{message = "Invalid or missing user identity claim in token."});
         }
 
+        // Validate EmbedParentDomain security format
+        if(!IsValidEmbedDomain(request.EmbedParentDomain))
+        {
+            return BadRequest(new { message = "Invalid embed parent domain. Must be a valid hostname (e.g., 'localhost', 'arena.gg') without schemes, ports, or paths." });
+        }
+
         /* validate target match exists */
         var match = await _matchRepository.GetMatchByIdAsync(matchId);
         if (match == null)
@@ -68,6 +74,23 @@ public class StreamsController : ControllerBase
             createdStream
         );
 
+    }
+
+    /* Helper to validate embed parent domain format against XSS and injection */
+    private static bool IsValidEmbedDomain(String? domain)
+    {
+        if(string.IsNullOrWhiteSpace(domain))
+        {
+            return false;
+        }
+        var trimmed = domain.Trim();// remove leading/trailing whitespace
+        // Reject protocol schemes, port numbers, paths, queries, and fragment delimiters
+        if(trimmed.Contains('/') || trimmed.Contains(':') || trimmed.Contains('\\') || trimmed.Contains('?') || trimmed.Contains('#'))
+        {
+            return false;
+        }
+        var hostType = Uri.CheckHostName(trimmed);
+        return hostType == UriHostNameType.Dns || hostType == UriHostNameType.IPv4 || hostType == UriHostNameType.IPv6;
     }
 
     /* public lookup endpoints */
@@ -109,6 +132,11 @@ public class StreamsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdateStream(int streamId, [FromBody] UpdateStreamRequest request)
     {
+        // 1. Validate EmbedParentDomain security format
+        if (!IsValidEmbedDomain(request.EmbedParentDomain))
+        {
+            return BadRequest(new { message = "Invalid embed parent domain. Must be a valid hostname (e.g., 'localhost', 'arena.gg') without schemes, ports, or paths." });
+        }
         // Verify existence
         var existingStream = await _streamRepository.GetStreamByIdAsync(streamId);
         if (existingStream == null)
