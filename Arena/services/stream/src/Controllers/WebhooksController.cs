@@ -67,7 +67,7 @@ public class WebhooksController : ControllerBase
         var rawBody = memoryStream.ToArray();           // extract raw byte array
 
         /* reset stream pointer for downstream JSON */
-        Request.Body.Position = 0;
+        // Request.Body.Position = 0;
 
         /* Verify HMAC-SHA256 signature */
         if (!_validator.VerifySignature(messageId, timestamp, rawBody, signature))
@@ -78,7 +78,7 @@ public class WebhooksController : ControllerBase
 
         /* Deserialize verified JSON */
         var jsonOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = true }; // ensures snake_case or casing variances
-        var envelope = await JsonSerializer.DeserializeAsync<TwitchEventSubEnvelope>(Request.Body, jsonOptions); // read the rewinded request stream to memory
+        var envelope = JsonSerializer.Deserialize<TwitchEventSubEnvelope>(rawBody, jsonOptions); // read the rewinded request stream to memory
 
         if (envelope == null)
         {
