@@ -1,0 +1,23 @@
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "ConnectionStrings": {
+    "DefaultConnection": "Server=localhost;Port=3306;Database=arena_stream_db;User=root;Password=<your_local_db_password>;"
+  },
+  "JwtSettings": {
+    "Secret": "<generate_a_secure_256bit_secret_key_for_local_testing>",
+    "Issuer": "Arena.UserService",
+    "Audience": "Arena.Platform",
+    "ExpiryMinutes": 120
+  },
+  "TwitchSettings": {
+    "ClientId": "<your_twitch_developer_client_id>",
+    "ClientSecret": "<your_twitch_developer_client_secret>",
+    "EventSubSecret": "<your_hmac_secret_10_to_100_chars>",
+    "CallbackUrl": "https://<your_subdomain>.ngrok-free.app/api/webhooks/twitch"
+  }
+}
