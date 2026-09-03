@@ -1,0 +1,95 @@
+name: CD Staging
+
+on:
+  push:
+    branches: [dev]
+
+jobs:
+  # Job 1: detect which services changed
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      user: ${{ steps.filter.outputs.user }}
+      stream: ${{ steps.filter.outputs.stream }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            user:
+              - 'Arena/services/user/**'
+              - 'Arena/shared/EventContracts/**'
+            stream:
+              - 'Arena/services/stream/**'
+              - 'Arena/shared/EventContracts/**'
+
+  # Job 2: build, push, deploy User to staging (only if changed)
+  deploy-user-staging:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.user == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./Arena
+          file: ./Arena/services/user/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/arena-esports/arena-user:staging
+            ghcr.io/arena-esports/arena-user:staging-${{ github.sha }}
+
+      - name: Deploy to Azure App Service (staging)
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: arena-user-staging
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE_USER_STAGING }}
+          images: ghcr.io/arena-esports/arena-user:staging-${{ github.sha }}
+
+  # Job 3: build, push, deploy Stream to staging (only if changed)
+  deploy-stream-staging:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.stream == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./Arena
+          file: ./Arena/services/stream/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/arena-esports/arena-stream:staging
+            ghcr.io/arena-esports/arena-stream:staging-${{ github.sha }}
+
+      - name: Deploy to Azure App Service (staging)
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: arena-stream-staging
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE_STREAM_STAGING }}
+          images: ghcr.io/arena-esports/arena-stream:staging-${{ github.sha }}

@@ -1,11 +1,19 @@
-## .NET Core / .NET
-[Bb]in/
-[Oo]bj/
-[Oo]ut/
-TestResults/
+## .NET / C# Build Outputs & Artifacts
+**/[Bb]in/
+**/[Oo]bj/
+**/[Oo]ut/
+**/TestResults/
+## .NET / C# Build Outputs & Artifacts
+**/[Bb]in/
+**/[Oo]bj/
+**/[Oo]ut/
+**/TestResults/
 *.log
+*.trx
+*.trx
 
-## Visual Studio
+## Visual Studio / Roslyn / User Cache
+## Visual Studio / Roslyn / User Cache
 .vs/
 *.user
 *.userosscache
@@ -14,8 +22,23 @@ TestResults/
 *.userprefs
 *.vsspell
 *.vssscc
+*.pubxml
+*.pubxml.user
+**/Properties/launchSettings.json
+**/Properties/launchSettings.json
 
-## JetBrains Rider / ReSharper
+## IDEs (VS Code & JetBrains Rider)
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+## IDEs (VS Code & JetBrains Rider)
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
 .idea/
 *.sln.iml
 *.dotCover
@@ -23,27 +46,81 @@ TestResults/
 *.crunchersettings
 *.jfm
 
-## Node.js / Web Client
-node_modules/
-dist/
-build/
-.angular/
-.next/
-.nuxt/
-coverage/
+## Secrets & Environment Configurations (Root & Nested Microservices)
+
+# Environment files
+## Secrets & Environment Configurations (Root & Nested Microservices)
+
+# Environment files
+.env
+.env.*
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env.production
+
+# AppSettings secrets & local overrides
+**/appsettings.Development.json
+**/appsettings.Local.json
+**/appsettings.Production.json
+**/appsettings.*.local.json
+**/appsettings.secrets.json
+
+# Whitelist safe configuration templates
+
+# AppSettings secrets & local overrides
+**/appsettings.Development.json
+**/appsettings.Local.json
+**/appsettings.Production.json
+**/appsettings.*.local.json
+**/appsettings.secrets.json
+
+# Whitelist safe configuration templates
+!.env.example
+!**/.env.example
+!**/appsettings.json
+!**/appsettings.Development.json.example
+!**/appsettings.*.example.json
+!**/.env.example
+!**/appsettings.json
+!**/appsettings.Development.json.example
+!**/appsettings.*.example.json
+
+## Private Keys, Certificates & Tokens
+## Private Keys, Certificates & Tokens
+*.pfx
+*.p12
+*.pem
+*.key
+*.crt
+*.cer
+*.crt
+*.cer
+
+## Node.js / Frontend Client (Next.js, Vite, etc.)
+**/node_modules/
+**/dist/
+**/build/
+**/.next/
+**/.nuxt/
+**/coverage/
+## Node.js / Frontend Client (Next.js, Vite, etc.)
+**/node_modules/
+**/dist/
+**/build/
+**/.next/
+**/.nuxt/
+**/coverage/
 *.tsbuildinfo
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 .pnp.*
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
 
-## OS generated files
+## Operating System & Temporary Files
+## Operating System & Temporary Files
 .DS_Store
 .DS_Store?
 ._*
@@ -51,3 +128,4 @@ pnpm-debug.log*
 .Trashes
 ehthumbs.db
 Thumbs.db
+[Dd]esktop.ini
