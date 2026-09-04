@@ -82,6 +82,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 builder.Services.AddAuthorization();    // register authorization services
 builder.Services.AddScoped<IMatchRepository, MatchRepository>();    // dependency injection
+builder.Services.AddScoped<IStreamRepository, StreamRepository>();
 
 
 var app = builder.Build();      // compile service registrations and create runnable web application
