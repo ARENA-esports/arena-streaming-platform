@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { FC, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useFormik } from 'formik';
 import * as Yup from 'yup';
@@ -6,7 +6,7 @@ import { matchService } from '../api/matchService';
 import Input from '../components/common/Input';
 import Button from '../components/common/Button';
 
-export const ScheduleMatchView: React.FC = () => {
+export const ScheduleMatchView: FC = () => {
   const navigate = useNavigate();
   const [serverError, setServerError] = useState<string | null>(null);
 
@@ -27,15 +27,18 @@ export const ScheduleMatchView: React.FC = () => {
         .required('Start time is required')
         .min(new Date(), 'Scheduled time must be in the future'),
     }),
-    onSubmit: async (values, { setSubmitting }) => {
+    onSubmit: async (
+      values: { teamAId: string; teamBId: string; scheduledStartTime: string },
+      { setSubmitting }: { setSubmitting: (isSubmitting: boolean) => void }
+    ) => {
       setServerError(null);
       try {
         const response = await matchService.createMatch({
           teamAId: parseInt(values.teamAId),
           teamBId: parseInt(values.teamBId),
-          scheduledStartTime: new Date(values.scheduledStartTime).toISOString()
+          scheduledTime: new Date(values.scheduledStartTime).toISOString()
         });
-        navigate(`/matches/${response.id}`);
+        navigate(`/matches/${response.matchId}`);
       } catch (err: any) {
         setServerError(err.response?.data?.message || 'Failed to schedule match. Check validation rules.');
       } finally {

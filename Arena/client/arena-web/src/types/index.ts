@@ -55,14 +55,14 @@ export interface UserProfile {
 export interface CreateMatchRequest {
   teamAId: number;
   teamBId: number;
-  scheduledStartTime: string;
+  scheduledTime: string;
 }
 
 export interface MatchResponse {
-  id: number;
+  matchId: number;
   teamAId: number;
   teamBId: number;
-  scheduledStartTime: string;
+  scheduledTime: string;
   status: 'Scheduled' | 'Live' | 'Ended';
 }
 
