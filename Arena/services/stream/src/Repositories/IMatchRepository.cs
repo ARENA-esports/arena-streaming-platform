@@ -10,6 +10,7 @@ public interface IMatchRepository
     Task<bool> BothTeamsExistAsync(int teamAId, int teamBId);
     Task<int> CreateMatchAsync(int tournamentId, int teamAId, int teamBId, DateTimeOffset scheduledTime);
     Task<MatchResponse?> GetMatchByIdAsync(int matchId);
+    Task<IEnumerable<MatchResponse>> GetAllMatchesAsync();
     // Cascades status transitions (Scheduled -> Live, Live -> Ended) to the linked fixture
     Task<bool> UpdateMatchStatusAsync(int matchId, string newStatus, string expectedCurrentStatus);
 }
