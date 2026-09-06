@@ -148,7 +148,7 @@ public class WebhooksController : ControllerBase
                         // update database record to Live status and capture stream primary key
                         affectedStreamId = await _streamRepository.UpdateStreamLiveStatusAsync(
                             onlineEvent.BroadcasterUserName,
-                            onlineEvent.StartedAt);
+                            onlineEvent.StartedAt ?? DateTimeOffset.UtcNow);
                     }
                     break;
 
