@@ -4,6 +4,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
 using Moq;
 using UserService.Entities;
@@ -20,6 +21,7 @@ public class AuthServiceTests
     private readonly Mock<IJwtTokenGenerator> _mockJwtTokenGenerator;
     private readonly Mock<ITokenBlacklistService> _mockTokenBlacklistService;
     private readonly Mock<IPasswordResetRepository> _mockPasswordResetRepo;
+    private readonly Mock<IHostEnvironment> _mockEnvironment;
     private readonly IConfiguration _configuration;
     private readonly AuthService _authService;
 
@@ -29,6 +31,7 @@ public class AuthServiceTests
         _mockJwtTokenGenerator = new Mock<IJwtTokenGenerator>();
         _mockTokenBlacklistService = new Mock<ITokenBlacklistService>();
         _mockPasswordResetRepo = new Mock<IPasswordResetRepository>();
+        _mockEnvironment = new Mock<IHostEnvironment>();
 
         var inMemorySettings = new Dictionary<string, string?>
         {
@@ -41,13 +44,15 @@ public class AuthServiceTests
 
         _mockJwtTokenGenerator.Setup(g => g.ExpiryMinutes).Returns(120);
         _mockJwtTokenGenerator.Setup(g => g.GenerateToken(It.IsAny<User>())).Returns("mocked.jwt.token");
+        _mockEnvironment.Setup(e => e.EnvironmentName).Returns("Development");
 
         _authService = new AuthService(
             _mockRepo.Object,
             _mockJwtTokenGenerator.Object,
             _mockTokenBlacklistService.Object,
             _mockPasswordResetRepo.Object,
-            _configuration);
+            _configuration,
+            _mockEnvironment.Object);
     }
 
     [Fact]
@@ -280,7 +285,7 @@ public class AuthServiceTests
         Assert.NotEmpty(result.ResetToken);
         Assert.NotNull(result.ExpiresAt);
         Assert.True(result.ExpiresAt.Value > DateTime.UtcNow);
-        Assert.Equal("Password reset token generated successfully.", result.Message);
+        Assert.Equal("If the email is registered, a password reset link has been sent.", result.Message);
 
         _mockPasswordResetRepo.Verify(r => r.InvalidateUserTokensAsync(5), Times.Once);
         _mockPasswordResetRepo.Verify(r => r.CreateTokenAsync(It.Is<PasswordResetToken>(t =>
@@ -439,5 +444,49 @@ public class AuthServiceTests
         // Act & Assert
         var ex = await Assert.ThrowsAsync<ArgumentException>(() => _authService.ResetPasswordAsync(request));
         Assert.Equal("Reset token is required.", ex.Message);
+    }
+    [Fact]
+    public async Task RefreshTokenAsync_WithValidUser_ReturnsNewLoginResponseWithJwt()
+    {
+        // Arrange
+        var user = new User
+        {
+            UserId = 20,
+            Username = "refresh_user",
+            Email = "refresh@example.com",
+            Role = "Viewer"
+        };
+
+        _mockRepo.Setup(r => r.GetByIdAsync(20)).ReturnsAsync(user);
+
+        // Act
+        var result = await _authService.RefreshTokenAsync(20);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal("mocked.jwt.token", result.Token);
+        Assert.Equal("Bearer", result.TokenType);
+        Assert.Equal(7200, result.ExpiresIn);
+        Assert.Equal(20, result.UserId);
+        Assert.Equal("refresh_user", result.Username);
+        Assert.Equal("refresh@example.com", result.Email);
+        Assert.Equal("Viewer", result.Role);
+
+        _mockRepo.Verify(r => r.GetByIdAsync(20), Times.Once);
+        _mockJwtTokenGenerator.Verify(g => g.GenerateToken(user), Times.Once);
+    }
+
+    [Fact]
+    public async Task RefreshTokenAsync_WithNonExistentUser_ThrowsUnauthorizedException()
+    {
+        // Arrange
+        _mockRepo.Setup(r => r.GetByIdAsync(99)).ReturnsAsync((User?)null);
+
+        // Act & Assert
+        var ex = await Assert.ThrowsAsync<UnauthorizedAccessException>(() => _authService.RefreshTokenAsync(99));
+        Assert.Equal("User not found or has been deleted.", ex.Message);
+        
+        _mockRepo.Verify(r => r.GetByIdAsync(99), Times.Once);
+        _mockJwtTokenGenerator.Verify(g => g.GenerateToken(It.IsAny<User>()), Times.Never);
     }
 }

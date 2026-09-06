@@ -255,4 +255,55 @@ public class AuthControllerTests
         var okResult = Assert.IsType<OkObjectResult>(result);
         Assert.Equal(200, okResult.StatusCode);
     }
+    [Fact]
+    public async Task Refresh_ValidRequest_ReturnsOk()
+    {
+        // Arrange
+        var claims = new List<Claim>
+        {
+            new("sub", "42")
+        };
+        var identity = new ClaimsIdentity(claims, "TestAuth");
+        var claimsPrincipal = new ClaimsPrincipal(identity);
+
+        var httpContext = new DefaultHttpContext { User = claimsPrincipal };
+        _controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
+
+        var response = new LoginResponse
+        {
+            Token = "new.jwt.token",
+            ExpiresIn = 7200,
+            UserId = 42
+        };
+
+        _mockAuthService.Setup(s => s.RefreshTokenAsync(42)).ReturnsAsync(response);
+
+        // Act
+        var result = await _controller.Refresh();
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(200, okResult.StatusCode);
+        Assert.Equal(response, okResult.Value);
+    }
+
+    [Fact]
+    public async Task Refresh_InvalidClaims_ReturnsUnauthorized()
+    {
+        // Arrange
+        var claims = new List<Claim>(); // Missing "sub" claim
+        var identity = new ClaimsIdentity(claims, "TestAuth");
+        var claimsPrincipal = new ClaimsPrincipal(identity);
+
+        var httpContext = new DefaultHttpContext { User = claimsPrincipal };
+        _controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
+
+        // Act
+        var result = await _controller.Refresh();
+
+        // Assert
+        var unauthorizedResult = Assert.IsType<UnauthorizedObjectResult>(result);
+        Assert.Equal(401, unauthorizedResult.StatusCode);
+        _mockAuthService.Verify(s => s.RefreshTokenAsync(It.IsAny<int>()), Times.Never);
+    }
 }
