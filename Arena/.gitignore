@@ -3,11 +3,6 @@
 **/[Oo]bj/
 **/[Oo]ut/
 **/TestResults/
-## .NET / C# Build Outputs & Artifacts
-**/[Bb]in/
-**/[Oo]bj/
-**/[Oo]ut/
-**/TestResults/
 *.log
 *.trx
 *.trx

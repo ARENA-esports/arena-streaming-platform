@@ -5,9 +5,11 @@ using Microsoft.IdentityModel.Tokens;           // contain cryptographic keys, v
 using Microsoft.OpenApi;                 // provide types to configure swagger ui dialog interactive Bearer token testing
 using StreamService.Repositories;
 using StreamService.Services;
+using System.Security.Cryptography;
 using DbUp;
 
 var builder = WebApplication.CreateBuilder(args);   // initialize configuration sources
+builder.Services.AddApplicationInsightsTelemetry();
 
 // Add services to the container.
 
