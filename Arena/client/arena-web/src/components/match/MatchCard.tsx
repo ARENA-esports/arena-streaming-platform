@@ -1,4 +1,4 @@
-import React from 'react';
+import { FC } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MatchResponse } from '../../types';
 import Badge from '../common/Badge';
@@ -9,14 +9,14 @@ interface MatchCardProps {
   match: MatchResponse;
 }
 
-export const MatchCard: React.FC<MatchCardProps> = ({ match }) => {
+export const MatchCard: FC<MatchCardProps> = ({ match }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const date = new Date(match.scheduledStartTime);
+  const date = new Date(match.scheduledTime);
   
   return (
     <div 
-      onClick={() => navigate(`/matches/${match.id}`)}
+      onClick={() => navigate(`/matches/${match.matchId}`)}
       className="bg-arena-surface border border-arena-border rounded-sm p-5 hover:border-arena-cyan transition-all duration-200 cursor-pointer group hover:shadow-[0_0_20px_rgba(0,184,252,0.1)] relative overflow-hidden"
     >
       {/* Accent Line on hover */}
@@ -51,7 +51,7 @@ export const MatchCard: React.FC<MatchCardProps> = ({ match }) => {
           <button 
             onClick={(e) => {
               e.stopPropagation();
-              navigate(`/streamer/matches/${match.id}/link`);
+              navigate(`/streamer/matches/${match.matchId}/link`);
             }}
             className="text-xs flex items-center text-arena-textMuted hover:text-arena-cyan transition-colors"
           >

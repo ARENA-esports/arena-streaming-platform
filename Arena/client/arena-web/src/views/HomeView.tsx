@@ -33,7 +33,7 @@ export const HomeView: FC = () => {
       <section className="featured-match-section">
         <FeaturedMatchCarousel />
       </section>
-      
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {isLoading ? (
           <div className="flex justify-center py-20">
@@ -42,7 +42,7 @@ export const HomeView: FC = () => {
         ) : (
           <>
             {liveMatches.length > 0 && <MatchList title="Live Now" matches={liveMatches} />}
-            <MatchList title="Upcoming Fixtures" matches={upcomingMatches} />
+            <MatchList title="Upcoming Matches" matches={upcomingMatches} />
             {pastMatches.length > 0 && <MatchList title="Completed" matches={pastMatches} />}
           </>
         )}
