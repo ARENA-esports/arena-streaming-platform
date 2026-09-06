@@ -121,4 +121,26 @@ public class TwitchEventSubDtoTests
         Assert.Equal("p9gK23lP09mZ11qRsTuVwXyZ", envelope.Challenge);
         Assert.Equal("f3c4d-test-sub", envelope.Subscription?.Id);
     }
+
+    // FIX: Verify DTO parses safely without started_at present
+    [Fact]
+    public void Deserialize_StreamOnlinePayload_WhenStartedAtOmitted_LeavesStartedAtNull()
+    {
+        const string json = @"{
+            ""subscription"": { ""id"": ""sub-1"", ""type"": ""stream.online"" },
+            ""event"": {
+                ""id"": ""live_stream_999"",
+                ""broadcaster_user_name"": ""ESL_CSGO"",
+                ""type"": ""live""
+            }
+        }";
+
+        var envelope = JsonSerializer.Deserialize<TwitchEventSubEnvelope>(json, _jsonOptions);
+
+        Assert.NotNull(envelope);
+        Assert.True(envelope.Event.HasValue);
+        var onlineEvent = envelope.Event.Value.Deserialize<TwitchStreamOnlineEvent>(_jsonOptions);
+        Assert.NotNull(onlineEvent);
+        Assert.Null(onlineEvent.StartedAt);
+    }
 }

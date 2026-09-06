@@ -120,6 +120,67 @@ public class WebhooksControllerTests
         Assert.Equal("Invalid HMAC-SHA256 signature.", objectResult.Value);
     }
 
+    // FIX: Verify malformed signature headers return 400 Bad Request
+    [Fact]
+    public async Task ReceiveTwitchWebhook_WhenSignatureMalformed_Returns400BadRequest()
+    {
+        // Arrange
+        SetupRequestContext(signature: "invalid_prefix_without_sha256");
+
+        // Act
+        var result = await _controller.ReceiveTwitchWebhook();
+
+        // Assert
+        var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
+        Assert.Equal("Malformed Twitch signature header.", badRequestResult.Value);
+    }
+
+    // FIX: Verify that missing started_at falls back to UtcNow without throwing an exception
+    [Fact]
+    public async Task ReceiveTwitchWebhook_StreamOnlineEvent_WhenStartedAtOmitted_FallsBackToUtcNow()
+    {
+        // Arrange
+        const string messageId = "msg_no_started_at_001";
+        const string broadcasterLogin = "esl_csgo";
+
+        // JSON payload deliberately omitting started_at (reproducing QA defect)
+        var envelopeJson = $@"{{
+            ""subscription"": {{
+                ""id"": ""sub_live_no_start"",
+                ""type"": ""stream.online"",
+                ""version"": ""1""
+            }},
+            ""event"": {{
+                ""id"": ""stream_999"",
+                ""broadcaster_user_id"": ""123456"",
+                ""broadcaster_user_name"": ""{broadcasterLogin}"",
+                ""broadcaster_user_login"": ""{broadcasterLogin}"",
+                ""type"": ""live""
+            }}
+        }}";
+
+        SetupRequestContext(messageType: "notification", messageId: messageId, jsonPayload: envelopeJson);
+        _validatorMock.Setup(v => v.IsTimestampValid(It.IsAny<string>(), 10)).Returns(true);
+        _validatorMock.Setup(v => v.VerifySignature(
+            It.IsAny<string>(),
+            It.IsAny<string>(),
+            It.IsAny<byte[]>(),
+            It.IsAny<string>())).Returns(true);
+        _webhookLogRepoMock.Setup(w => w.MessageExistsAsync(messageId)).ReturnsAsync(false);
+        _streamRepoMock.Setup(s => s.UpdateStreamLiveStatusAsync(broadcasterLogin, It.IsAny<DateTimeOffset>()))
+            .ReturnsAsync(50);
+
+        // Act
+        var result = await _controller.ReceiveTwitchWebhook();
+
+        // Assert
+        Assert.IsType<OkResult>(result);
+        _streamRepoMock.Verify(s => s.UpdateStreamLiveStatusAsync(broadcasterLogin, It.IsAny<DateTimeOffset>()), Times.Once);
+        // Verify payload_hash strips 'sha256=' (mocked_signature is 16 chars, stripped is 16 chars)
+        _webhookLogRepoMock.Verify(w => w.LogMessageAsync(
+            messageId, 50, "notification", "stream.online", "mocked_signature"), Times.Once);
+    }
+
     /* ---------------- Handshake Verification ---------------- */
 
     [Fact]
