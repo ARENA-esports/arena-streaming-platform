@@ -89,7 +89,6 @@ public class WebhooksController : ControllerBase
             return BadRequest("Malformed Twitch signature header.");
         }
 
-        
         /* Validate Timestamp Against Replay Attacks */
         if (!_validator.IsTimestampValid(safeTimestamp))
         {
