@@ -105,6 +105,7 @@ builder.Services.AddScoped<IMatchRepository, MatchRepository>();    // dependenc
 builder.Services.AddScoped<IStreamRepository, StreamRepository>();    // dependency injection
 builder.Services.AddScoped<IWebhookLogRepository, WebhookLogRepository>();//di
 builder.Services.AddScoped<ITwitchEventSubValidator, TwitchEventSubValidator>();//di
+builder.Services.AddScoped<IStreamStatusService, StreamStatusService>(); //di
 
 // Register Problem Details for RFC 7807 standardized error responses
 builder.Services.AddProblemDetails();

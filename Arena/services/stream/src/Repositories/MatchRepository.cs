@@ -111,4 +111,25 @@ public class MatchRepository : IMatchRepository
         }
         return null;    // return null if record not found
     }
+
+    public async Task<bool> UpdateMatchStatusAsync(int matchId, string newStatus, string expectedCurrentStatus)
+    {
+        using var connection = new MySqlConnection(_connectionString);
+        await connection.OpenAsync();
+
+        const string sql = @"
+            UPDATE matches
+            SET status = @NewStatus
+            WHERE match_id = @MatchId
+                AND status = @ExpectedCurrentStatus;";
+        
+        using var command = new MySqlCommand(sql, connection);
+        command.Parameters.AddWithValue("@NewStatus",newStatus);
+        command.Parameters.AddWithValue("@MatchId",matchId);
+        command.Parameters.AddWithValue("@ExpectedCurrentStatus",expectedCurrentStatus);
+
+        var rowsAffected = await command.ExecuteNonQueryAsync();  // returns number of rows updated
+        return rowsAffected > 0;
+
+    }
 }
