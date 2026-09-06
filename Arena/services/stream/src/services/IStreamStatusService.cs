@@ -1,5 +1,7 @@
-/* 
-    A small dedicated service encapsulating "resolve stream_id from the webhook's broadcaster info → determine Live vs Ended from event type → call StreamRepository (and MatchRepository if cascading) with the conditional update." Keeps your webhook handler thin and makes this logic independently unit-testable, rather than burying it inline in the controller
+namespace StreamService.Services;
 
-
-*/
+public interface IStreamStatusService
+{
+    /* mapping incoming twitch subscription types to status transitions */
+    Task<int?> ProcessStreamStatusUpdateAsync(string subscriptionType,string channelName);
+}
