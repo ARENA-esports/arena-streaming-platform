@@ -120,7 +120,7 @@ public class WebhooksControllerTests
         Assert.Equal("Invalid HMAC-SHA256 signature.", objectResult.Value);
     }
 
-    // FIX: Verify malformed signature headers return 400 Bad Request
+    // Verify malformed signature headers return 400 Bad Request
     [Fact]
     public async Task ReceiveTwitchWebhook_WhenSignatureMalformed_Returns400BadRequest()
     {
@@ -135,7 +135,7 @@ public class WebhooksControllerTests
         Assert.Equal("Malformed Twitch signature header.", badRequestResult.Value);
     }
 
-    // FIX: Verify that missing started_at falls back to UtcNow without throwing an exception
+    // Verify that missing started_at falls back to UtcNow without throwing an exception
     [Fact]
     public async Task ReceiveTwitchWebhook_StreamOnlineEvent_WhenStartedAtOmitted_FallsBackToUtcNow()
     {

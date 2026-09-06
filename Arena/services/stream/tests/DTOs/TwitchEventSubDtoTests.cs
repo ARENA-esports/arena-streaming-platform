@@ -122,7 +122,7 @@ public class TwitchEventSubDtoTests
         Assert.Equal("f3c4d-test-sub", envelope.Subscription?.Id);
     }
 
-    // FIX: Verify DTO parses safely without started_at present
+    // Verify DTO parses safely without started_at present
     [Fact]
     public void Deserialize_StreamOnlinePayload_WhenStartedAtOmitted_LeavesStartedAtNull()
     {
