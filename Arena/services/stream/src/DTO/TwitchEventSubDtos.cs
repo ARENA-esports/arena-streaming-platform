@@ -106,7 +106,7 @@ public class TwitchStreamOnlineEvent
 
     // RFC 3339 UTC timestamp indicating the exact moment the broadcast started
     [JsonPropertyName("started_at")]
-    public DateTime StartedAt { get; set; }
+    public DateTimeOffset? StartedAt { get; set; }
 }
 
 /*
