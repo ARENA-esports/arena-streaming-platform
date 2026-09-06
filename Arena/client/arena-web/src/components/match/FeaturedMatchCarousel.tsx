@@ -13,7 +13,7 @@ export const FeaturedMatchCarousel: FC = () => {
               12.4K
             </div>
           </div>
-          
+
           <div className="video-controls">
             <div className="left">
               <button aria-label="Mute">
@@ -78,7 +78,7 @@ export const FeaturedMatchCarousel: FC = () => {
           </button>
         </div>
       </div>
-      
+
       <section className="live-event-banner">
         <span className="event-badge">LIVE</span>
         <button className="event-cta">Go to event</button>
