@@ -222,7 +222,7 @@ public class AuthServiceTests
     {
         // Arrange
         var expectedJti = Guid.NewGuid().ToString();
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("Arena_Secret_Key_For_Jwt_Token_Signing_2026_SE3022_Production_Grade!"));
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("Test_Only_Secret_Key_For_Unit_Testing_123456789_Min_32_Chars!"));
         var tokenHandler = new JwtSecurityTokenHandler();
         var tokenDescriptor = new SecurityTokenDescriptor
         {
