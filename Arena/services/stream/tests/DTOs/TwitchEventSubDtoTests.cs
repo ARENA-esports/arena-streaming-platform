@@ -58,7 +58,7 @@ public class TwitchEventSubDtoTests
         Assert.Equal("esl_csgo", onlineEvent.BroadcasterUserLogin);
         Assert.Equal("ESL_CSGO", onlineEvent.BroadcasterUserName);
         Assert.Equal("live", onlineEvent.Type);
-        Assert.Equal(DateTime.Parse("2026-09-02T10:00:00Z").ToUniversalTime(), onlineEvent.StartedAt.ToUniversalTime());
+        Assert.Equal(DateTimeOffset.Parse("2026-09-02T10:00:00Z"), onlineEvent.StartedAt);
     }
 
     [Fact]

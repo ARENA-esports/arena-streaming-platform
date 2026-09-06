@@ -23,6 +23,7 @@ public class WebhooksControllerTests
     private readonly Mock<ITwitchEventSubValidator> _validatorMock;
     private readonly Mock<IWebhookLogRepository> _webhookLogRepoMock;
     private readonly Mock<IStreamRepository> _streamRepoMock;
+    private readonly Mock<IStreamStatusService> _streamStatusServiceMock;
     private readonly Mock<ILogger<WebhooksController>> _loggerMock;
     private readonly WebhooksController _controller;
 
@@ -31,12 +32,14 @@ public class WebhooksControllerTests
         _validatorMock = new Mock<ITwitchEventSubValidator>();
         _webhookLogRepoMock = new Mock<IWebhookLogRepository>();
         _streamRepoMock = new Mock<IStreamRepository>();
+        _streamStatusServiceMock = new Mock<IStreamStatusService>();
         _loggerMock = new Mock<ILogger<WebhooksController>>();
 
         _controller = new WebhooksController(
             _validatorMock.Object,
             _webhookLogRepoMock.Object,
             _streamRepoMock.Object,
+            _streamStatusServiceMock.Object,
             _loggerMock.Object
         );
     }
@@ -255,18 +258,20 @@ public class WebhooksControllerTests
             "stream.online",
             It.IsAny<string>())).ReturnsAsync(true);
 
-        _streamRepoMock.Setup(s => s.UpdateStreamLiveStatusAsync(broadcasterName, It.IsAny<DateTimeOffset>()))
-            .ReturnsAsync(10);
+        const int generatedStreamId = 10;
+        _streamStatusServiceMock.Setup(s => s.ProcessStreamStatusUpdateAsync("stream.online", broadcasterName))
+            .ReturnsAsync(generatedStreamId);
 
         // Act
         var result = await _controller.ReceiveTwitchWebhook();
 
         // Assert
         Assert.IsType<OkResult>(result);
-        _streamRepoMock.Verify(s => s.UpdateStreamLiveStatusAsync(broadcasterName, It.IsAny<DateTimeOffset>()), Times.Once);
-        _streamRepoMock.Verify(s => s.UpdateStreamOfflineStatusAsync(It.IsAny<string>()), Times.Never);
+        _streamStatusServiceMock.Verify(s => s.ProcessStreamStatusUpdateAsync("stream.online", broadcasterName), Times.Once);
         _webhookLogRepoMock.Verify(w => w.TryLogMessageAsync(
             messageId, null, "notification", "stream.online", It.IsAny<string>()), Times.Once);
+        _webhookLogRepoMock.Verify(w => w.LogMessageAsync(
+            messageId, generatedStreamId, "notification", "stream.online", It.IsAny<string>()), Times.Once);
     }
 
     [Fact]
@@ -305,18 +310,20 @@ public class WebhooksControllerTests
             "stream.offline",
             It.IsAny<string>())).ReturnsAsync(true);
 
-        _streamRepoMock.Setup(s => s.UpdateStreamOfflineStatusAsync(broadcasterName))
-            .ReturnsAsync(10);
+        const int generatedStreamId = 10;
+        _streamStatusServiceMock.Setup(s => s.ProcessStreamStatusUpdateAsync("stream.offline", broadcasterName))
+            .ReturnsAsync(generatedStreamId);
 
         // Act
         var result = await _controller.ReceiveTwitchWebhook();
 
         // Assert
         Assert.IsType<OkResult>(result);
-        _streamRepoMock.Verify(s => s.UpdateStreamOfflineStatusAsync(broadcasterName), Times.Once);
-        _streamRepoMock.Verify(s => s.UpdateStreamLiveStatusAsync(It.IsAny<string>(), It.IsAny<DateTimeOffset>()), Times.Never);
+        _streamStatusServiceMock.Verify(s => s.ProcessStreamStatusUpdateAsync("stream.offline", broadcasterName), Times.Once);
         _webhookLogRepoMock.Verify(w => w.TryLogMessageAsync(
             messageId, null, "notification", "stream.offline", It.IsAny<string>()), Times.Once);
+        _webhookLogRepoMock.Verify(w => w.LogMessageAsync(
+            messageId, generatedStreamId, "notification", "stream.offline", It.IsAny<string>()), Times.Once);
     }
 
     [Fact]
