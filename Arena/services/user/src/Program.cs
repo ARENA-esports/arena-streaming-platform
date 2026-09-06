@@ -93,6 +93,25 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                 if (!string.IsNullOrEmpty(jti) && await blacklistService.IsTokenRevokedAsync(jti))
                 {
                     context.Fail("Token has been revoked.");
+                    return;
+                }
+
+                var sub = context.Principal?.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Sub)?.Value
+                    ?? context.Principal?.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
+
+                if (int.TryParse(sub, out var userId))
+                {
+                    var iatClaim = context.Principal?.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Iat)?.Value;
+                    DateTime? issuedAt = null;
+                    if (long.TryParse(iatClaim, out var iatSeconds))
+                    {
+                        issuedAt = DateTimeOffset.FromUnixTimeSeconds(iatSeconds).UtcDateTime;
+                    }
+
+                    if (await blacklistService.IsUserTokenRevokedAsync(userId, issuedAt))
+                    {
+                        context.Fail("User session has been revoked following a password reset.");
+                    }
                 }
             }
         };

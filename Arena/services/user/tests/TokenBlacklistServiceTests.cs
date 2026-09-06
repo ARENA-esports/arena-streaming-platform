@@ -61,4 +61,26 @@ public class TokenBlacklistServiceTests
         Assert.False(await _service.IsTokenRevokedAsync("   "));
         _mockRepo.Verify(r => r.IsTokenRevokedAsync(It.IsAny<string>()), Times.Never);
     }
+
+    [Fact]
+    public async Task RevokeUserTokensAsync_CallsRepositoryAndInvalidatesPriorIssuedTokens()
+    {
+        // Arrange
+        int userId = 42;
+        var tokenIssuedAt = DateTime.UtcNow.AddMinutes(-10);
+
+        // Act
+        await _service.RevokeUserTokensAsync(userId, DateTime.UtcNow.AddHours(2));
+
+        // Assert
+        _mockRepo.Verify(r => r.RevokeUserTokensAsync(userId, It.IsAny<DateTime>()), Times.Once);
+
+        // Token issued prior to revocation should be considered revoked
+        var isRevoked = await _service.IsUserTokenRevokedAsync(userId, tokenIssuedAt);
+        Assert.True(isRevoked);
+
+        // Token issued after revocation should NOT be revoked
+        var isNewTokenRevoked = await _service.IsUserTokenRevokedAsync(userId, DateTime.UtcNow.AddMinutes(5));
+        Assert.False(isNewTokenRevoked);
+    }
 }

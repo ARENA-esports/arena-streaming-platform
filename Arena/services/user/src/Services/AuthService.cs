@@ -5,6 +5,7 @@ using System.Security.Cryptography;
 using System.Threading.Tasks;
 using BCrypt.Net;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using UserService.Entities;
 using UserService.Models;
 using UserService.Repositories;
@@ -18,19 +19,22 @@ public class AuthService : IAuthService
     private readonly ITokenBlacklistService _tokenBlacklistService;
     private readonly IPasswordResetRepository _passwordResetRepository;
     private readonly IConfiguration _configuration;
+    private readonly IHostEnvironment _environment;
 
     public AuthService(
         IUserRepository userRepository,
         IJwtTokenGenerator jwtTokenGenerator,
         ITokenBlacklistService tokenBlacklistService,
         IPasswordResetRepository passwordResetRepository,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        IHostEnvironment environment)
     {
         _userRepository = userRepository;
         _jwtTokenGenerator = jwtTokenGenerator;
         _tokenBlacklistService = tokenBlacklistService;
         _passwordResetRepository = passwordResetRepository;
         _configuration = configuration;
+        _environment = environment;
     }
 
     public async Task<SignupResponse> SignupAsync(SignupRequest request)
@@ -131,7 +135,7 @@ public class AuthService : IAuthService
         var user = await _userRepository.GetByEmailAsync(request.Email);
         if (user == null)
         {
-            // Do not reveal whether email exists to prevent enumeration
+            // Indistinguishable generic response prevents account enumeration
             return new ForgotPasswordResponse
             {
                 Message = "If the email is registered, a password reset link has been sent."
@@ -160,12 +164,19 @@ public class AuthService : IAuthService
 
         await _passwordResetRepository.CreateTokenAsync(resetToken);
 
-        return new ForgotPasswordResponse
+        var response = new ForgotPasswordResponse
         {
-            Message = "Password reset token generated successfully.",
-            ResetToken = token,
-            ExpiresAt = expiresAt
+            Message = "If the email is registered, a password reset link has been sent."
         };
+
+        // Explicitly restrict returning the raw reset token to local development/testing environments
+        if (_environment.IsDevelopment())
+        {
+            response.ResetToken = token;
+            response.ExpiresAt = expiresAt;
+        }
+
+        return response;
     }
 
     public async Task<ResetPasswordResponse> ResetPasswordAsync(ResetPasswordRequest request)
@@ -184,6 +195,9 @@ public class AuthService : IAuthService
         string passwordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
         await _userRepository.UpdatePasswordAsync(resetToken.UserId, passwordHash);
         await _passwordResetRepository.MarkAsUsedAsync(resetToken.Token);
+
+        // Invalidate all existing active JWT sessions for this user after password change
+        await _tokenBlacklistService.RevokeUserTokensAsync(resetToken.UserId, DateTime.UtcNow.AddMinutes(120));
 
         return new ResetPasswordResponse
         {
