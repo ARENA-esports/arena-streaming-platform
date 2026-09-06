@@ -34,25 +34,38 @@ public class WebhooksController : ControllerBase
 
     [HttpPost("twitch")]
     [AllowAnonymous]
-    public async Task<IActionResult> ReceiveTwitchWebhook()
+    [RequestSizeLimit(1048576)] // Limit request size to 1 MB
+    public async Task<IActionResult> ReceiveTwitchWebhook(
+        [FromHeader(Name = "Twitch-Eventsub-Message-Id")] string? messageId = null, //bind Twitch headers as method parameters so Swagger UI renders input fields
+        [FromHeader(Name = "Twitch-Eventsub-Message-Timestamp")] string? timestamp = null,
+        [FromHeader(Name = "Twitch-Eventsub-Message-Signature")] string? signature = null,
+        [FromHeader(Name = "Twitch-Eventsub-Message-Type")] string? messageType = null)
     {
         Request.EnableBuffering();  // Enable stream buffering to read raw bytes
 
-        /* Extract required Twitch EventSub security headers */
-        if (!Request.Headers.TryGetValue("Twitch-Eventsub-Message-Id", out var messageIdHeader) ||
-            !Request.Headers.TryGetValue("Twitch-Eventsub-Message-Timestamp", out var timestampHeader) ||
-            !Request.Headers.TryGetValue("Twitch-Eventsub-Message-Signature", out var signatureHeader) ||
-            !Request.Headers.TryGetValue("Twitch-Eventsub-Message-Type", out var messageTypeHeader))
+        // /* Extract required Twitch EventSub security headers */
+        // if (!Request.Headers.TryGetValue("Twitch-Eventsub-Message-Id", out var messageIdHeader) ||
+        //     !Request.Headers.TryGetValue("Twitch-Eventsub-Message-Timestamp", out var timestampHeader) ||
+        //     !Request.Headers.TryGetValue("Twitch-Eventsub-Message-Signature", out var signatureHeader) ||
+        //     !Request.Headers.TryGetValue("Twitch-Eventsub-Message-Type", out var messageTypeHeader))
+        // {
+        //     _logger.LogWarning("Twitch EventSub webhook rejected: Missing required security headers.");
+        //     return StatusCode(StatusCodes.Status403Forbidden, "Missing required Twitch headers.");
+        // }
+        if (string.IsNullOrWhiteSpace(messageId)||
+            string.IsNullOrWhiteSpace(timestamp)||
+            string.IsNullOrWhiteSpace(signature)||
+            string.IsNullOrWhiteSpace(messageType))
         {
             _logger.LogWarning("Twitch EventSub webhook rejected: Missing required security headers.");
             return StatusCode(StatusCodes.Status403Forbidden, "Missing required Twitch headers.");
         }
 
-        /* Convert Headers to Strings */
-        string messageId = messageIdHeader.ToString();
-        string timestamp = timestampHeader.ToString();
-        string signature = signatureHeader.ToString();
-        string messageType = messageTypeHeader.ToString();
+        // /* Convert Headers to Strings */
+        // string messageId = messageIdHeader.ToString();
+        // string timestamp = timestampHeader.ToString();
+        // string signature = signatureHeader.ToString();
+        // string messageType = messageTypeHeader.ToString();
 
         /* Validate Timestamp Against Replay Attacks */
         if (!_validator.IsTimestampValid(timestamp))
@@ -122,6 +135,8 @@ public class WebhooksController : ControllerBase
                     var onlineEvent = envelope.Event.Value.Deserialize<TwitchStreamOnlineEvent>(jsonOptions); // convert json into strongly typed C# object
                     if (onlineEvent != null)    // null check
                     {
+                        // Fall back to UtcNow if started_at is omitted to prevent DateTime underflow exception
+                        var streamStartTime = onlineEvent.StartedAt.GetValueOrDefault(DateTimeOffset.UtcNow);
                         // Log Live Transition
                         _logger.LogInformation(
                             "Channel {BroadcasterName} (ID: {BroadcasterId}) went live at {StartedAt}. Stream ID: {StreamId}.",
@@ -162,6 +177,10 @@ public class WebhooksController : ControllerBase
                     break;
             }
 
+            // Normalize hash prefix to prevent overflow
+            var rawHash = signature.StartsWith("sha256=", StringComparison.OrdinalIgnoreCase)
+                ? signature[7..]
+                : signature;
             /* insert the delivery audit record and claim the message ID */
             await _webhookLogRepository.LogMessageAsync(
                 messageId: messageId,
