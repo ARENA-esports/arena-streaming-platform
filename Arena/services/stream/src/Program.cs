@@ -7,6 +7,7 @@ using StreamService.Repositories;
 using DbUp;
 
 var builder = WebApplication.CreateBuilder(args);   // initialize configuration sources
+builder.Services.AddApplicationInsightsTelemetry();
 
 // Add services to the container.
 
