@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using UserService.Repositories;
 using UserService.Services;
+using DbUp;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -87,6 +88,23 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 builder.Services.AddAuthorization();
 
 var app = builder.Build();
+
+// Run DbUp migrations against the User database before accepting requests
+var connectionString = builder.Configuration.GetConnectionString("UserDb")
+    ?? throw new InvalidOperationException("UserDb connection string is not configured.");
+
+var upgrader = DeployChanges.To
+    .MySqlDatabase(connectionString)
+    .WithScriptsEmbeddedInAssembly(System.Reflection.Assembly.GetExecutingAssembly())
+    .LogToConsole()
+    .Build();
+
+var result = upgrader.PerformUpgrade();
+if (!result.Successful)
+{
+    throw new Exception("Database migration failed: " + result.Error);
+}
+
 // Exception Handling at the very top of the HTTP pipeline
 app.UseExceptionHandler();
 
