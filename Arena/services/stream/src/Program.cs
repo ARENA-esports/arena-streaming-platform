@@ -8,8 +8,14 @@ using StreamService.Services;
 using System.Security.Cryptography;
 using DbUp;
 
-var builder = WebApplication.CreateBuilder(args);   // initialize configuration sources
-builder.Services.AddApplicationInsightsTelemetry();
+var builder = WebApplication.CreateBuilder(args);
+
+var appInsightsConnString = builder.Configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"] 
+    ?? builder.Configuration["ApplicationInsights:ConnectionString"];
+if (!string.IsNullOrEmpty(appInsightsConnString))
+{
+    builder.Services.AddApplicationInsightsTelemetry();
+}
 
 // Add services to the container.
 
