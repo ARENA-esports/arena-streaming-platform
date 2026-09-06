@@ -43,6 +43,7 @@ public class WebhookLogRepository : IWebhookLogRepository   // declare concrete 
         command.Parameters.AddWithValue("@MessageType",messageType);
         command.Parameters.AddWithValue("@SubscriptionType",(object?)subscriptionType ?? DBNull.Value);// handle nullable fields,prevent runtime null exception crashes
         command.Parameters.AddWithValue("@PayloadHash",(object?)payloadHash ?? DBNull.Value);
+        await command.ExecuteNonQueryAsync();
     }
 
 }
