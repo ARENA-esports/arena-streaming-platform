@@ -1,0 +1,44 @@
+# Build output
+**/bin/
+**/obj/
+**/out/
+**/TestResults/
+
+# IDE and editor files
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+
+# Frontend (not needed for backend service builds)
+client/
+
+# Tests (not needed in production images)
+**/tests/
+
+# Documentation
+docs/
+*.md
+!**/CHANGELOG.md
+
+# Git
+.git/
+.github/
+.gitignore
+
+# Environment and secrets
+.env
+.env.*
+**/appsettings.Development.json
+**/appsettings.Local.json
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Certificates
+*.pfx
+*.pem
+*.key

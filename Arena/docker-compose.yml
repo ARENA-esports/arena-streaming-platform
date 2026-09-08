@@ -5,15 +5,15 @@ services:
     ports:
       - "3307:3306"
     environment:
-      - MYSQL_ROOT_PASSWORD=rootpassword
-      - MYSQL_DATABASE=arena_user_db
-      - MYSQL_USER=arena
-      - MYSQL_PASSWORD=arena_password
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: arena_user_db
+      MYSQL_USER: arena
+      MYSQL_PASSWORD: ${MYSQL_USER_PASSWORD}
     volumes:
       - mysql-user-data:/var/lib/mysql
       - ./services/user/src/migrations:/docker-entrypoint-initdb.d
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-prootpassword"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD}"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -27,9 +27,30 @@ services:
       - "8080:8080"
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__UserDb=Server=mysql-user;Port=3306;Database=arena_user_db;Uid=arena;Pwd=${MYSQL_USER_PASSWORD};AllowUserVariables=True;
       - JwtSettings__Secret=${JWT_SECRET}
       - JwtSettings__Issuer=Arena.UserService
       - JwtSettings__Audience=Arena.Platform
+    depends_on:
+      mysql-user:
+        condition: service_healthy
+
+  mysql-stream:
+    image: mysql:8.0
+    container_name: arena-mysql-stream
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: arena_stream_db
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-stream-data:/var/lib/mysql
+      - ./infra/db-migrations/stream/0001_initial_schema.sql:/docker-entrypoint-initdb.d/0001_initial_schema.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   stream:
     build:
@@ -40,20 +61,14 @@ services:
       - "8081:8080"
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
-      - ConnectionStrings__DefaultConnection=Server=mysql;Port=3306;Database=arena_stream_db;Uid=root;Pwd=rootpassword;AllowUserVariables=True;
+      - ConnectionStrings__DefaultConnection=Server=mysql-stream;Port=3306;Database=arena_stream_db;Uid=root;Pwd=${MYSQL_ROOT_PASSWORD};AllowUserVariables=True;
       - JwtSettings__Secret=${JWT_SECRET}
       - JwtSettings__Issuer=Arena.UserService
       - JwtSettings__Audience=Arena.Platform
     depends_on:
-      - mysql
+      mysql-stream:
+        condition: service_healthy
 
-  mysql:
-    image: mysql:8.0
-    container_name: arena-mysql
-    environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      MYSQL_DATABASE: arena_stream_db
-    ports:
-      - "3306:3306"
-    volumes:
-      - ./infra/mysql/01_create_stream_db.sql:/docker-entrypoint-initdb.d/01_create_stream_db.sql
+volumes:
+  mysql-user-data:
+  mysql-stream-data:

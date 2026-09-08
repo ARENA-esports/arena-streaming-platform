@@ -9,6 +9,7 @@ RUN dotnet restore services/stream/src/StreamService.csproj
 
 COPY services/stream/src/ services/stream/src/
 COPY shared/EventContracts/src/ shared/EventContracts/src/
+COPY infra/db-migrations/ infra/db-migrations/
 
 RUN dotnet publish services/stream/src/StreamService.csproj -c Release -o /app/publish
 
