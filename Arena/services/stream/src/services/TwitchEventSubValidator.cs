@@ -32,7 +32,7 @@ public class TwitchEventSubValidator: ITwitchEventSubValidator
         /*
         ensure timestamp is'n future and not older than buffer
         */
-        return age >= TimeSpan.Zero && age <=TimeSpan.FromMinutes(maxAgeMinutes);
+        return age >= TimeSpan.FromMinutes(-5) && age <=TimeSpan.FromMinutes(maxAgeMinutes);// solve clock skew issue
     }
     /* HMAC-SHA256 Signature Verification */
     public bool VerifySignature(string? messageId,string? timestamp, byte[] rawBody, string? signatureHeader)

@@ -17,6 +17,7 @@ public class WebhooksController : ControllerBase
     private readonly ITwitchEventSubValidator _validator;
     private readonly IWebhookLogRepository _webhookLogRepository;
     private readonly IStreamRepository _streamRepository;
+    private readonly IStreamStatusService _streamStatusService;
     private readonly ILogger<WebhooksController> _logger;
 
     /* Constructor with Dependency Injection */
@@ -24,17 +25,19 @@ public class WebhooksController : ControllerBase
         ITwitchEventSubValidator validator,
         IWebhookLogRepository webhookLogRepository,
         IStreamRepository streamRepository,
+        IStreamStatusService streamStatusService,
         ILogger<WebhooksController> logger)
     {
         _validator = validator;
         _webhookLogRepository = webhookLogRepository;
         _streamRepository = streamRepository;
+        _streamStatusService = streamStatusService;
         _logger = logger;
     }
 
     [HttpPost("twitch")]
     [AllowAnonymous]
-    [RequestSizeLimit(1048576)] // Limit request size to 1 MB
+    [RequestSizeLimit(1048576)] // Enforce 1 MB maximum payload ceiling
     public async Task<IActionResult> ReceiveTwitchWebhook(
         [FromHeader(Name = "Twitch-Eventsub-Message-Id")] string? messageId = null, //bind Twitch headers as method parameters so Swagger UI renders input fields
         [FromHeader(Name = "Twitch-Eventsub-Message-Timestamp")] string? timestamp = null,
@@ -43,7 +46,7 @@ public class WebhooksController : ControllerBase
     {
         Request.EnableBuffering();  // Enable stream buffering to read raw bytes
 
-        /// /* Extract required Twitch EventSub security headers */
+        // /* Extract required Twitch EventSub security headers */
         // if (!Request.Headers.TryGetValue("Twitch-Eventsub-Message-Id", out var messageIdHeader) ||
         //     !Request.Headers.TryGetValue("Twitch-Eventsub-Message-Timestamp", out var timestampHeader) ||
         //     !Request.Headers.TryGetValue("Twitch-Eventsub-Message-Signature", out var signatureHeader) ||
@@ -57,7 +60,7 @@ public class WebhooksController : ControllerBase
         timestamp ??= Request.Headers["Twitch-Eventsub-Message-Timestamp"].FirstOrDefault();
         signature ??= Request.Headers["Twitch-Eventsub-Message-Signature"].FirstOrDefault();
         messageType ??= Request.Headers["Twitch-Eventsub-Message-Type"].FirstOrDefault();
-        
+
         if (string.IsNullOrWhiteSpace(messageId)||
             string.IsNullOrWhiteSpace(timestamp)||
             string.IsNullOrWhiteSpace(signature)||
@@ -71,13 +74,23 @@ public class WebhooksController : ControllerBase
         // string messageId = messageIdHeader.ToString();
         // string timestamp = timestampHeader.ToString();
         // string signature = signatureHeader.ToString();
-        // string messageType = messageTypeHeader.ToString()
+        // string messageType = messageTypeHeader.ToString();
 
         // Sanitize user input against Log Forging / Log Injection by stripping CR and LF characters
         var safeMessageId = messageId.Replace("\r", string.Empty).Replace("\n", string.Empty);
         var safeTimestamp = timestamp.Replace("\r", string.Empty).Replace("\n", string.Empty);
         var safeSignature = signature.Replace("\r", string.Empty).Replace("\n", string.Empty);
+        var safeMessageType = messageType.Replace("\r", string.Empty).Replace("\n", string.Empty);
 
+        /* Validate Signature Header Format (Malformed -> 400 Bad Request) */
+        if (!safeSignature.StartsWith("sha256=", StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.LogWarning("Twitch EventSub webhook rejected: Malformed signature header {Signature}.", safeSignature);
+            return BadRequest("Malformed Twitch signature header.");
+        }
+
+        // Sanitize user input against Log Forging / Log Injection by stripping CR and LF characters
+       
         // Restore Tier 1 check — malformed signature returns 400 Bad Request
         if (!signature.StartsWith("sha256=", StringComparison.OrdinalIgnoreCase))
         {
@@ -86,7 +99,7 @@ public class WebhooksController : ControllerBase
         }
         
         /* Validate Timestamp Against Replay Attacks */
-        if (!_validator.IsTimestampValid(timestamp))
+        if (!_validator.IsTimestampValid(safeTimestamp))
         {
             _logger.LogWarning("Twitch EventSub webhook rejected: Expired or invalid timestamp {Timestamp}.", safeTimestamp);
             return StatusCode(StatusCodes.Status403Forbidden, "Invalid or expired timestamp.");
@@ -97,7 +110,7 @@ public class WebhooksController : ControllerBase
         await Request.Body.CopyToAsync(memoryStream);   // copy entire stream asynchronously
         var rawBody = memoryStream.ToArray();           // extract raw byte array
 
-        /* reset stream pointer for downstream JSON */
+        // /* reset stream pointer for downstream JSON */
         // Request.Body.Position = 0;
 
         /* Verify HMAC-SHA256 signature */
@@ -129,99 +142,94 @@ public class WebhooksController : ControllerBase
         /* Handle Notifications */
         if (messageType == "notification")
         {
-            // Atomic insert-first deduplication pattern replacing the previous separate MessageExistsAsync check
-            // attempts immediate insertion so MySQL primary key constraint acts as the source of truth, preventing race conditions
-            var isNewDelivery = await _webhookLogRepository.TryLogMessageAsync(
-                messageId: messageId,
-                streamId: null,
-                messageType: messageType,
-                subscriptionType: envelope.Subscription.Type,
-                payloadHash: signature
-            );
-
-            // new: if insertion fails (MySQL 1062 ER_DUP_ENTRY), acknowledge receipt with 200 OK but halt further processing
-            if (!isNewDelivery)
+            try
             {
-                // log diagnostic trace that a duplicate delivery was ignored
-                _logger.LogInformation("Duplicate webhook message {MessageId} ignored: delivery already recorded.", safeMessageId);
-                return Ok(); // return 200 OK so Twitch marks delivery successful and stops retrying
-            }
+                // Strip 'sha256=' prefix upfront so only the 64-char hex digest is passed into MySQL
+                var rawHash = signature.StartsWith("sha256=", StringComparison.OrdinalIgnoreCase)
+                    ? signature[7..]
+                    : signature;
+                
+                // Atomic insert-first deduplication pattern replacing the previous separate MessageExistsAsync check
+                // attempts immediate insertion so MySQL primary key constraint acts as the source of truth, preventing race conditions
+                var isNewDelivery = await _webhookLogRepository.TryLogMessageAsync(
+                    messageId: messageId,
+                    streamId: null,
+                    messageType: messageType,
+                    subscriptionType: envelope.Subscription.Type,
+                    payloadHash: rawHash    // Use rawHash instead of raw signature
+                );
 
-            // validate the event JSON
-            if (!envelope.Event.HasValue ||                                  // checks whether the nullable json is populated
-                envelope.Event.Value.ValueKind == JsonValueKind.Null ||      // ensure the payload contains an actual JSON object
-                envelope.Event.Value.ValueKind == JsonValueKind.Undefined)
-            {
-                _logger.LogWarning("Twitch notification message {MessageId} contains an empty event node.", safeMessageId);
-                return Ok();
-            }
+                // new: if insertion fails (MySQL 1062 ER_DUP_ENTRY), acknowledge receipt with 200 OK but halt further processing
+                if (!isNewDelivery)
+                {
+                    // log diagnostic trace that a duplicate delivery was ignored
+                    _logger.LogInformation("Duplicate webhook message {MessageId} ignored: delivery already recorded.", safeMessageId);
+                    return Ok(); // return 200 OK so Twitch marks delivery successful and stops retrying
+                }
 
-            int? affectedStreamId = null;
+                // validate the event JSON
+                if (!envelope.Event.HasValue ||                                  // checks whether the nullable json is populated
+                    envelope.Event.Value.ValueKind == JsonValueKind.Null ||      // ensure the payload contains an actual JSON object
+                    envelope.Event.Value.ValueKind == JsonValueKind.Undefined)
+                {
+                    _logger.LogWarning("Twitch notification message {MessageId} contains an empty event node.", safeMessageId);
+                    return Ok();
+                }
 
-            /* Route event to corresponding handler */
-            switch (envelope.Subscription.Type)
-            {
-                // Route and Deserialize online event
-                case "stream.online":
+                int? affectedStreamId = null;
+
+                /* Route event to corresponding handler */
+                switch (envelope.Subscription.Type)
+                {
+                    // Route and Deserialize online event
+                    case "stream.online":
                     var onlineEvent = envelope.Event.Value.Deserialize<TwitchStreamOnlineEvent>(jsonOptions); // convert json into strongly typed C# object
                     if (onlineEvent != null)    // null check
                     {
-                        // Fall back to UtcNow if started_at is omitted to prevent DateTime underflow exception
-                        var streamStartTime = onlineEvent.StartedAt.GetValueOrDefault(DateTimeOffset.UtcNow);
-                        // Log Live Transition
-                        _logger.LogInformation(
-                            "Channel {BroadcasterName} (ID: {BroadcasterId}) went live at {StartedAt}. Stream ID: {StreamId}.",
-                            onlineEvent.BroadcasterUserName,    // channel name
-                            onlineEvent.BroadcasterUserId,      // Twitch user ID
-                            streamStartTime,              // exact UTC timestamp when the stream began
-                            onlineEvent.Id);                    // stream id
-
-                        // update database record to Live status and capture stream primary key
-                        affectedStreamId = await _streamRepository.UpdateStreamLiveStatusAsync(
-                            onlineEvent.BroadcasterUserName,
-                            streamStartTime);// fallback to UtcNow if started_at is null
+                        // delegate state machine transition to service and capture stream id
+                        affectedStreamId = await _streamStatusService.ProcessStreamStatusUpdateAsync(
+                            envelope.Subscription.Type,
+                            onlineEvent.BroadcasterUserName);
                     }
                     break;
 
-                // Route and Deserialize offline event
-                case "stream.offline":
-                    var offlineEvent = envelope.Event.Value.Deserialize<TwitchStreamOfflineEvent>(jsonOptions);
-                    if (offlineEvent != null)
-                    {
-                        // Log Offline Transition
+                    // Route and Deserialize offline event
+                    case "stream.offline":
+                        var offlineEvent = envelope.Event.Value.Deserialize<TwitchStreamOfflineEvent>(jsonOptions); // convert json into strongly typed C# object
+                        if (offlineEvent != null)   // null check
+                        {
+                            // delegate state machine transition to service and capture stream id
+                            affectedStreamId = await _streamStatusService.ProcessStreamStatusUpdateAsync(
+                                envelope.Subscription.Type,
+                                offlineEvent.BroadcasterUserName);
+                        }
+                        break;
+
+                    // unhandled event fallback
+                    default:
                         _logger.LogInformation(
-                            "Channel {BroadcasterName} (ID: {BroadcasterId}) went offline.",
-                            offlineEvent.BroadcasterUserName,
-                            offlineEvent.BroadcasterUserId);
-
-                        // update database record to Ended status
-                        affectedStreamId = await _streamRepository.UpdateStreamOfflineStatusAsync(
-                            offlineEvent.BroadcasterUserName);
+                            "Unhandled Twitch EventSub subscription type received: {SubscriptionType}",
+                            envelope.Subscription.Type);
+                        break;
                     }
-                    break;
 
-                // unhandled event fallback
-                default:
-                    _logger.LogInformation(
-                        "Unhandled Twitch EventSub subscription type received: {SubscriptionType}",
-                        envelope.Subscription.Type);
-                    break;
+                /* insert the delivery audit record and claim the message ID */
+                await _webhookLogRepository.LogMessageAsync(
+                    messageId: messageId,
+                    streamId: affectedStreamId,
+                    messageType: messageType,
+                    subscriptionType: envelope.Subscription.Type,
+                    payloadHash: rawHash    // pass rawHash instead of raw signature
+                );
+
+                return Ok();
             }
-            
-            // Normalize hash prefix to prevent overflow
-            var rawHash = signature.StartsWith("sha256=", StringComparison.OrdinalIgnoreCase)
-                ? signature[7..]
-                : signature;
-            /* insert the delivery audit record and claim the message ID */
-            await _webhookLogRepository.LogMessageAsync(
-                messageId: messageId,
-                streamId: affectedStreamId,
-                messageType: messageType,
-                subscriptionType: envelope.Subscription.Type,
-                payloadHash: rawHash    // pass rawHash instead of raw signature
-            );
-            
-            return Ok();
+            catch (Exception ex)
+            {
+                // Transient database deadlock/timeout: return 503 so Twitch retries delivery safely
+                _logger.LogError(ex, "Transient database error processing Twitch webhook {MessageId}.", safeMessageId);
+                return StatusCode(StatusCodes.Status503ServiceUnavailable, "Database unavailable. Retry later.");
+            }
         }
 
         /* Handle Revocations */

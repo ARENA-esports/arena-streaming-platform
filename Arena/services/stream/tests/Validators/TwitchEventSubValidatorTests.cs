@@ -37,6 +37,8 @@ public class TwitchEventSubValidatorTests
         return "sha256=" + Convert.ToHexStringLower(hashBytes);
     }
 
+    /* ---------------- Constructor Guard ---------------- */
+
     [Fact]
     public void Constructor_WhenSecretMissing_ThrowsInvalidOperationException()
     {
@@ -45,6 +47,8 @@ public class TwitchEventSubValidatorTests
 
         Assert.Throws<InvalidOperationException>(() => new TwitchEventSubValidator(emptyConfigMock.Object));
     }
+
+    /* ---------------- Timestamp Validation Tests ---------------- */
 
     [Fact]
     public void IsTimestampValid_WithCurrentTimestamp_ReturnsTrue()
@@ -63,12 +67,30 @@ public class TwitchEventSubValidatorTests
     }
 
     [Fact]
-    public void IsTimestampValid_WhenTimestampInFuture_ReturnsFalse()
-    {
-        var futureTimestamp = DateTimeOffset.UtcNow.AddMinutes(2).ToString("o");
-        var result = _validator.IsTimestampValid(futureTimestamp);
-        Assert.False(result);
-    }
+public void IsTimestampValid_WhenTimestampWithinFutureDriftTolerance_ReturnsTrue()
+{
+    // Arrange: 2 minutes into the future (within the 5-minute drift threshold)
+    var minorFutureTimestamp = DateTimeOffset.UtcNow.AddMinutes(2).ToString("o");
+
+    // Act
+    var result = _validator.IsTimestampValid(minorFutureTimestamp);
+
+    // Assert
+    Assert.True(result);
+}
+
+[Fact]
+public void IsTimestampValid_WhenTimestampExceedsFutureDriftLimit_ReturnsFalse()
+{
+    // Arrange: 6 minutes into the future (exceeds the 5-minute drift threshold)
+    var excessiveFutureTimestamp = DateTimeOffset.UtcNow.AddMinutes(6).ToString("o");
+
+    // Act
+    var result = _validator.IsTimestampValid(excessiveFutureTimestamp);
+
+    // Assert
+    Assert.False(result);
+}
 
     [Theory]
     [InlineData(null)]
@@ -80,6 +102,8 @@ public class TwitchEventSubValidatorTests
         var result = _validator.IsTimestampValid(timestamp);
         Assert.False(result);
     }
+
+    /* ---------------- Signature Verification Tests ---------------- */
 
     [Fact]
     public void VerifySignature_WithValidHMACSignature_ReturnsTrue()
