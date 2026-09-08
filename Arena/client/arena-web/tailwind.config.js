@@ -22,8 +22,8 @@ export default {
         }
       },
       fontFamily: {
-        display: ['Orbitron', 'Syne', 'sans-serif'],
-        sans: ['Inter', 'sans-serif'],
+        display: ['Roobert', 'Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Helvetica', 'Arial', 'sans-serif'],
+        sans: ['Roobert', 'Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Helvetica', 'Arial', 'sans-serif'],
         mono: ['JetBrains Mono', 'Space Mono', 'monospace'],
       }
     },

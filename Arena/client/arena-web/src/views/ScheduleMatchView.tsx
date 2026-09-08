@@ -50,7 +50,7 @@ export const ScheduleMatchView: FC = () => {
   return (
     <div className="max-w-2xl mx-auto px-4 py-12">
       <div className="bg-arena-surface border border-arena-border rounded-sm p-8 shadow-[0_0_50px_rgba(0,184,252,0.05)]">
-        <h1 className="text-3xl font-display font-black text-white tracking-widest uppercase mb-8">
+        <h1 className="text-3xl font-bold text-white mb-8">
           Schedule Match
         </h1>
 
@@ -88,7 +88,7 @@ export const ScheduleMatchView: FC = () => {
 
           <div className="pt-4">
             <Button type="submit" className="w-full" isLoading={formik.isSubmitting}>
-              Create Fixture
+              Create Match
             </Button>
           </div>
         </form>

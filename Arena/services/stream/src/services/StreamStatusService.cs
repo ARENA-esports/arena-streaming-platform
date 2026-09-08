@@ -60,7 +60,7 @@ public class StreamStatusService : IStreamStatusService
             stream.StreamId,
             expectedStatus,
             newStatus);
-        // Cascade transition to linked match fixture if present
+        // Cascade transition to linked match if present
         if (stream.MatchId.HasValue)
         {
             var matchUpdated = await _matchRepository.UpdateMatchStatusAsync(stream.MatchId.Value, newStatus, expectedStatus);

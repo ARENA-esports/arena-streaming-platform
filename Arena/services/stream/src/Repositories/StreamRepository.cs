@@ -16,7 +16,7 @@ public class StreamRepository : IStreamRepository
             ?? throw new InvalidOperationException("DefaultConnection string is not configured.");// fail fast if connection string in missing from config or env
     }
 
-    /* Fixture and Stream Existence Checks */
+    /* Match and Stream Existence Checks */
     public async Task<bool> MatchExistsAsync(int matchId)
     {
         using var connection = new MySqlConnection(_connectionString);   // instantiates ADO.NET socket

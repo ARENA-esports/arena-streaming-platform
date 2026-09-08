@@ -11,7 +11,7 @@ export const MatchList: React.FC<MatchListProps> = ({ matches, title }) => {
   return (
     <div className="mb-12">
       <div className="flex items-center mb-6">
-        <h2 className="text-2xl font-display font-black text-white tracking-widest uppercase">{title}</h2>
+        <h2 className="text-xl font-semibold text-white">{title}</h2>
         <div className="ml-4 h-[1px] bg-arena-border flex-grow"></div>
       </div>
       
@@ -22,7 +22,7 @@ export const MatchList: React.FC<MatchListProps> = ({ matches, title }) => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {matches.map((match) => (
-            <MatchCard key={match.id} match={match} />
+            <MatchCard key={match.matchId} match={match} />
           ))}
         </div>
       )}
