@@ -13,7 +13,7 @@ COPY shared/EventContracts/src/ shared/EventContracts/src/
 RUN dotnet publish services/user/src/UserService.csproj -c Release -o /app/publish
 
 # Stage 2: Runtime
-FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-jammy AS final
 WORKDIR /app
 COPY --from=build /app/publish .
 
