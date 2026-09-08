@@ -11,7 +11,7 @@ CREATE DATABASE IF NOT EXISTS arena_stream_db
 USE arena_stream_db;
 
 -- -----------------------------------------------------------------------------
--- 1. Table: teams (Sprint 1 Mock Store for Fixtures & Chat Factions)
+-- 1. Table: teams (Sprint 1 Mock Store for Matches & Chat Factions)
 -- TODO (Sprint 3): once Tournament Service is live, drop the FK constraints on
 -- matches.team_a_id / team_b_id below and convert them to synthetic references
 -- (same pattern as streams.streamer_id), OR keep a denormalized local copy
@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS teams (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- -----------------------------------------------------------------------------
--- 2. Table: matches (Tournament Fixtures Linking Teams)
+-- 2. Table: matches (Tournament Matches Linking Teams)
 -- Status vocabulary standardized to TitleCase across matches AND streams:
 -- 'Scheduled' | 'Live' | 'Ended' | 'Cancelled'
 -- -----------------------------------------------------------------------------

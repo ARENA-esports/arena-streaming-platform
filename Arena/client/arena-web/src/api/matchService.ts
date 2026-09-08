@@ -3,7 +3,9 @@ import {
   CreateMatchRequest,
   MatchResponse,
   LinkStreamRequest,
-  StreamResponse
+  StreamResponse,
+  UpdateMatchRequest,
+  UpdateMatchStatusRequest
 } from '../types';
 
 export const matchService = {
@@ -25,5 +27,16 @@ export const matchService = {
       params: { parentDomain: window.location.hostname }
     });
     return response.data;
+  },
+  updateMatch: async (id: number, data: UpdateMatchRequest) => {
+    const response = await apiClient.put<MatchResponse>(`/matches/${id}`, data);
+    return response.data;
+  },
+  updateMatchStatus: async (id: number, data: UpdateMatchStatusRequest) => {
+    const response = await apiClient.patch<MatchResponse>(`/matches/${id}/status`, data);
+    return response.data;
+  },
+  deleteMatch: async (id: number) => {
+    await apiClient.delete(`/matches/${id}`);
   }
 };

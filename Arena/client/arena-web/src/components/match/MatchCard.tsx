@@ -32,19 +32,19 @@ export const MatchCard: FC<MatchCardProps> = ({ match }) => {
       <div className="flex justify-center items-center space-x-4 my-6">
         <div className="flex flex-col items-center">
           <div className="w-16 h-16 rounded-full bg-arena-bg border border-arena-border flex items-center justify-center shadow-inner">
-            <span className="text-xl font-display font-bold text-white">T{match.teamAId}</span>
+            <span className="text-xl font-bold text-white">T{match.teamAId}</span>
           </div>
         </div>
-        <div className="text-arena-textMuted font-display font-black text-xl italic">VS</div>
+        <div className="text-arena-textMuted font-bold text-xl italic">VS</div>
         <div className="flex flex-col items-center">
           <div className="w-16 h-16 rounded-full bg-arena-bg border border-arena-border flex items-center justify-center shadow-inner">
-            <span className="text-xl font-display font-bold text-white">T{match.teamBId}</span>
+            <span className="text-xl font-bold text-white">T{match.teamBId}</span>
           </div>
         </div>
       </div>
 
       <div className="mt-4 pt-4 border-t border-arena-border flex justify-between items-center">
-        <span className="text-xs text-arena-cyan uppercase tracking-widest font-bold group-hover:text-white transition-colors">
+        <span className="text-sm font-semibold text-arena-cyan group-hover:text-white transition-colors">
           View Details
         </span>
         {(user?.role === 'Streamer' || user?.role === 'Organizer') && (
@@ -53,9 +53,9 @@ export const MatchCard: FC<MatchCardProps> = ({ match }) => {
               e.stopPropagation();
               navigate(`/streamer/matches/${match.matchId}/link`);
             }}
-            className="text-xs flex items-center text-arena-textMuted hover:text-arena-cyan transition-colors"
+            className="text-sm font-semibold flex items-center text-arena-textMuted hover:text-arena-cyan transition-colors"
           >
-            <Video size={14} className="mr-1" /> LINK STREAM
+            <Video size={14} className="mr-1" /> Link Stream
           </button>
         )}
       </div>
