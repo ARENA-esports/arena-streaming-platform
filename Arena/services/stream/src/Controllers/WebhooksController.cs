@@ -90,10 +90,7 @@ public class WebhooksController : ControllerBase
         }
 
         // Sanitize user input against Log Forging / Log Injection by stripping CR and LF characters
-        var safeMessageId = messageId.Replace("\r", string.Empty).Replace("\n", string.Empty);
-        var safeTimestamp = timestamp.Replace("\r", string.Empty).Replace("\n", string.Empty);
-        var safeSignature = signature.Replace("\r", string.Empty).Replace("\n", string.Empty);
-
+       
         // Restore Tier 1 check — malformed signature returns 400 Bad Request
         if (!signature.StartsWith("sha256=", StringComparison.OrdinalIgnoreCase))
         {
