@@ -1,4 +1,3 @@
-using System.Threading.Tasks;
 using UserService.Models;
 
 namespace UserService.Services;
@@ -11,4 +10,6 @@ public interface IAuthService
     Task<ForgotPasswordResponse> ForgotPasswordAsync(ForgotPasswordRequest request);
     Task<ResetPasswordResponse> ResetPasswordAsync(ResetPasswordRequest request);
     Task<UserProfileResponse?> GetProfileAsync(int userId);
+    Task<VerifyEmailResponse> VerifyEmailAsync(VerifyEmailRequest request);
+    Task<ResendVerificationEmailResponse> ResendVerificationEmailAsync(ResendVerificationEmailRequest request);
 }

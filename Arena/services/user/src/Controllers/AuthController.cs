@@ -1,7 +1,5 @@
-using System;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using UserService.Models;
@@ -166,6 +164,68 @@ public class AuthController : ControllerBase
         catch (Exception ex)
         {
             return StatusCode(500, new { message = "An error occurred while resetting the password.", details = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Verifies a user's email address using a verification token.
+    /// </summary>
+    /// <param name="request">Request containing the verification token</param>
+    /// <returns>Confirmation message on successful email verification</returns>
+    [HttpPost("verify-email")]
+    [ProducesResponseType(typeof(VerifyEmailResponse), 200)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), 400)]
+    [ProducesResponseType(500)]
+    public async Task<IActionResult> VerifyEmail([FromBody] VerifyEmailRequest request)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        try
+        {
+            var response = await _authService.VerifyEmailAsync(request);
+            return Ok(response);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = "An error occurred while verifying the email.", details = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Resends the email verification token to the specified email address.
+    /// </summary>
+    /// <param name="request">Request containing the user's email</param>
+    /// <returns>Confirmation message</returns>
+    [HttpPost("resend-verification")]
+    [ProducesResponseType(typeof(ResendVerificationEmailResponse), 200)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), 400)]
+    [ProducesResponseType(500)]
+    public async Task<IActionResult> ResendVerification([FromBody] ResendVerificationEmailRequest request)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        try
+        {
+            var response = await _authService.ResendVerificationEmailAsync(request);
+            return Ok(response);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = "An error occurred while processing the verification request.", details = ex.Message });
         }
     }
 

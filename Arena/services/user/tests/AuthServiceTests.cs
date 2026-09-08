@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
@@ -21,8 +19,8 @@ public class AuthServiceTests
     private readonly Mock<IJwtTokenGenerator> _mockJwtTokenGenerator;
     private readonly Mock<ITokenBlacklistService> _mockTokenBlacklistService;
     private readonly Mock<IPasswordResetRepository> _mockPasswordResetRepo;
+    private readonly Mock<IEmailVerificationRepository> _mockEmailVerificationRepo;
     private readonly Mock<IHostEnvironment> _mockEnvironment;
-    private readonly IConfiguration _configuration;
     private readonly AuthService _authService;
 
     public AuthServiceTests()
@@ -31,15 +29,17 @@ public class AuthServiceTests
         _mockJwtTokenGenerator = new Mock<IJwtTokenGenerator>();
         _mockTokenBlacklistService = new Mock<ITokenBlacklistService>();
         _mockPasswordResetRepo = new Mock<IPasswordResetRepository>();
+        _mockEmailVerificationRepo = new Mock<IEmailVerificationRepository>();
         _mockEnvironment = new Mock<IHostEnvironment>();
         _mockEnvironment.Setup(e => e.EnvironmentName).Returns(Environments.Development);
 
         var inMemorySettings = new Dictionary<string, string?>
         {
             { "PasswordResetSettings:ExpiryMinutes", "15" },
+            { "EmailVerificationSettings:ExpiryMinutes", "1440" },
             { "JwtSettings:ExpiryMinutes", "120" }
         };
-        _configuration = new ConfigurationBuilder()
+        var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(inMemorySettings)
             .Build();
 
@@ -51,12 +51,13 @@ public class AuthServiceTests
             _mockJwtTokenGenerator.Object,
             _mockTokenBlacklistService.Object,
             _mockPasswordResetRepo.Object,
-            _configuration,
+            _mockEmailVerificationRepo.Object,
+            configuration,
             _mockEnvironment.Object);
     }
 
     [Fact]
-    public async Task Signup_WithValidData_CreatesUserAndReturnsResponse()
+    public async Task Signup_WithValidData_CreatesUserAndReturnsResponseWithVerificationToken()
     {
         // Arrange
         var request = new SignupRequest
@@ -69,6 +70,7 @@ public class AuthServiceTests
         _mockRepo.Setup(r => r.GetByEmailAsync(request.Email)).ReturnsAsync((User?)null);
         _mockRepo.Setup(r => r.GetByUsernameAsync(request.Username)).ReturnsAsync((User?)null);
         _mockRepo.Setup(r => r.CreateUserAsync(It.IsAny<User>())).ReturnsAsync(1);
+        _mockEmailVerificationRepo.Setup(r => r.CreateTokenAsync(It.IsAny<EmailVerificationToken>())).ReturnsAsync(1);
 
         // Act
         var result = await _authService.SignupAsync(request);
@@ -78,10 +80,20 @@ public class AuthServiceTests
         Assert.Equal(1, result.UserId);
         Assert.Equal(request.Username, result.Username);
         Assert.Equal(request.Email, result.Email);
+        Assert.Equal("Signup successful. Please verify your email.", result.Message);
+        Assert.NotNull(result.VerificationToken);
+        Assert.NotEmpty(result.VerificationToken);
+
         _mockRepo.Verify(r => r.CreateUserAsync(It.Is<User>(u => 
             u.Username == request.Username && 
             u.Email == request.Email && 
             BCrypt.Net.BCrypt.Verify(request.Password, u.PasswordHash))), Times.Once);
+
+        _mockEmailVerificationRepo.Verify(r => r.CreateTokenAsync(It.Is<EmailVerificationToken>(t =>
+            t.UserId == 1 &&
+            t.Token == result.VerificationToken &&
+            !t.IsUsed &&
+            t.ExpiresAt > DateTime.UtcNow)), Times.Once);
     }
 
     [Fact]
@@ -513,5 +525,175 @@ public class AuthServiceTests
 
         // Assert
         Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task VerifyEmailAsync_WithValidUnexpiredToken_VerifiesUserEmailAndMarksTokenUsed()
+    {
+        // Arrange
+        var tokenString = "valid-verify-token-12345";
+        var verificationToken = new EmailVerificationToken
+        {
+            TokenId = 1,
+            UserId = 8,
+            Token = tokenString,
+            ExpiresAt = DateTime.UtcNow.AddHours(12),
+            IsUsed = false
+        };
+
+        var request = new VerifyEmailRequest { Token = tokenString };
+
+        _mockEmailVerificationRepo.Setup(r => r.GetByTokenAsync(tokenString)).ReturnsAsync(verificationToken);
+        _mockRepo.Setup(r => r.VerifyEmailAsync(8)).ReturnsAsync(true);
+        _mockEmailVerificationRepo.Setup(r => r.MarkAsUsedAsync(tokenString)).ReturnsAsync(true);
+
+        // Act
+        var result = await _authService.VerifyEmailAsync(request);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal("Email has been successfully verified.", result.Message);
+        _mockRepo.Verify(r => r.VerifyEmailAsync(8), Times.Once);
+        _mockEmailVerificationRepo.Verify(r => r.MarkAsUsedAsync(tokenString), Times.Once);
+    }
+
+    [Fact]
+    public async Task VerifyEmailAsync_WithExpiredToken_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        var tokenString = "expired-verify-token";
+        var verificationToken = new EmailVerificationToken
+        {
+            TokenId = 1,
+            UserId = 8,
+            Token = tokenString,
+            ExpiresAt = DateTime.UtcNow.AddMinutes(-5),
+            IsUsed = false
+        };
+
+        var request = new VerifyEmailRequest { Token = tokenString };
+
+        _mockEmailVerificationRepo.Setup(r => r.GetByTokenAsync(tokenString)).ReturnsAsync(verificationToken);
+
+        // Act & Assert
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => _authService.VerifyEmailAsync(request));
+        Assert.Equal("Invalid or expired verification token.", ex.Message);
+        _mockRepo.Verify(r => r.VerifyEmailAsync(It.IsAny<int>()), Times.Never);
+        _mockEmailVerificationRepo.Verify(r => r.MarkAsUsedAsync(It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task VerifyEmailAsync_WithUsedToken_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        var tokenString = "used-verify-token";
+        var verificationToken = new EmailVerificationToken
+        {
+            TokenId = 1,
+            UserId = 8,
+            Token = tokenString,
+            ExpiresAt = DateTime.UtcNow.AddHours(5),
+            IsUsed = true
+        };
+
+        var request = new VerifyEmailRequest { Token = tokenString };
+
+        _mockEmailVerificationRepo.Setup(r => r.GetByTokenAsync(tokenString)).ReturnsAsync(verificationToken);
+
+        // Act & Assert
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => _authService.VerifyEmailAsync(request));
+        Assert.Equal("Invalid or expired verification token.", ex.Message);
+        _mockRepo.Verify(r => r.VerifyEmailAsync(It.IsAny<int>()), Times.Never);
+        _mockEmailVerificationRepo.Verify(r => r.MarkAsUsedAsync(It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task VerifyEmailAsync_WithEmptyToken_ThrowsArgumentException()
+    {
+        // Arrange
+        var request = new VerifyEmailRequest { Token = "   " };
+
+        // Act & Assert
+        var ex = await Assert.ThrowsAsync<ArgumentException>(() => _authService.VerifyEmailAsync(request));
+        Assert.Equal("Verification token is required.", ex.Message);
+    }
+
+    [Fact]
+    public async Task ResendVerificationEmailAsync_WithUnverifiedUser_GeneratesTokenAndReturnsMessage()
+    {
+        // Arrange
+        var user = new User
+        {
+            UserId = 8,
+            Email = "unverified@arena.gg",
+            EmailVerified = false
+        };
+
+        var request = new ResendVerificationEmailRequest { Email = "unverified@arena.gg" };
+
+        _mockRepo.Setup(r => r.GetByEmailAsync(request.Email)).ReturnsAsync(user);
+        _mockEmailVerificationRepo.Setup(r => r.CreateTokenAsync(It.IsAny<EmailVerificationToken>())).ReturnsAsync(1);
+
+        // Act
+        var result = await _authService.ResendVerificationEmailAsync(request);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal("If the email is registered and unverified, a verification email has been sent.", result.Message);
+        Assert.NotNull(result.VerificationToken);
+        Assert.NotEmpty(result.VerificationToken);
+
+        _mockEmailVerificationRepo.Verify(r => r.InvalidateUserTokensAsync(8), Times.Once);
+        _mockEmailVerificationRepo.Verify(r => r.CreateTokenAsync(It.Is<EmailVerificationToken>(t =>
+            t.UserId == 8 &&
+            t.Token == result.VerificationToken &&
+            !t.IsUsed &&
+            t.ExpiresAt > DateTime.UtcNow)), Times.Once);
+    }
+
+    [Fact]
+    public async Task ResendVerificationEmailAsync_WithAlreadyVerifiedUser_ReturnsGenericMessageWithoutGeneratingToken()
+    {
+        // Arrange
+        var user = new User
+        {
+            UserId = 8,
+            Email = "verified@arena.gg",
+            EmailVerified = true
+        };
+
+        var request = new ResendVerificationEmailRequest { Email = "verified@arena.gg" };
+
+        _mockRepo.Setup(r => r.GetByEmailAsync(request.Email)).ReturnsAsync(user);
+
+        // Act
+        var result = await _authService.ResendVerificationEmailAsync(request);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal("If the email is registered and unverified, a verification email has been sent.", result.Message);
+        Assert.Null(result.VerificationToken);
+
+        _mockEmailVerificationRepo.Verify(r => r.CreateTokenAsync(It.IsAny<EmailVerificationToken>()), Times.Never);
+        _mockEmailVerificationRepo.Verify(r => r.InvalidateUserTokensAsync(It.IsAny<int>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ResendVerificationEmailAsync_WithNonExistentUser_ReturnsGenericMessageWithoutGeneratingToken()
+    {
+        // Arrange
+        var request = new ResendVerificationEmailRequest { Email = "unknown@arena.gg" };
+        _mockRepo.Setup(r => r.GetByEmailAsync(request.Email)).ReturnsAsync((User?)null);
+
+        // Act
+        var result = await _authService.ResendVerificationEmailAsync(request);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal("If the email is registered and unverified, a verification email has been sent.", result.Message);
+        Assert.Null(result.VerificationToken);
+
+        _mockEmailVerificationRepo.Verify(r => r.CreateTokenAsync(It.IsAny<EmailVerificationToken>()), Times.Never);
+        _mockEmailVerificationRepo.Verify(r => r.InvalidateUserTokensAsync(It.IsAny<int>()), Times.Never);
     }
 }

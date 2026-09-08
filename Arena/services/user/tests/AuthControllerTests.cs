@@ -1,7 +1,4 @@
-using System;
-using System.Collections.Generic;
 using System.Security.Claims;
-using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
@@ -220,6 +217,83 @@ public class AuthControllerTests
 
         // Act
         var result = await _controller.ResetPassword(request);
+
+        // Assert
+        Assert.IsType<BadRequestObjectResult>(result);
+    }
+
+    [Fact]
+    public async Task VerifyEmail_ValidToken_ReturnsOk()
+    {
+        // Arrange
+        var request = new VerifyEmailRequest { Token = "valid-token-xyz" };
+        var response = new VerifyEmailResponse { Message = "Email has been successfully verified." };
+        _mockAuthService.Setup(s => s.VerifyEmailAsync(request)).ReturnsAsync(response);
+
+        // Act
+        var result = await _controller.VerifyEmail(request);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(200, okResult.StatusCode);
+        Assert.Equal(response, okResult.Value);
+    }
+
+    [Fact]
+    public async Task VerifyEmail_InvalidOrExpiredToken_ReturnsBadRequest()
+    {
+        // Arrange
+        var request = new VerifyEmailRequest { Token = "invalid-token" };
+        _mockAuthService.Setup(s => s.VerifyEmailAsync(request)).ThrowsAsync(new InvalidOperationException("Invalid or expired verification token."));
+
+        // Act
+        var result = await _controller.VerifyEmail(request);
+
+        // Assert
+        var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
+        Assert.Equal(400, badRequestResult.StatusCode);
+    }
+
+    [Fact]
+    public async Task VerifyEmail_InvalidModelState_ReturnsBadRequest()
+    {
+        // Arrange
+        _controller.ModelState.AddModelError("Token", "Verification token is required.");
+        var request = new VerifyEmailRequest();
+
+        // Act
+        var result = await _controller.VerifyEmail(request);
+
+        // Assert
+        Assert.IsType<BadRequestObjectResult>(result);
+    }
+
+    [Fact]
+    public async Task ResendVerification_ValidEmail_ReturnsOk()
+    {
+        // Arrange
+        var request = new ResendVerificationEmailRequest { Email = "viewer@arena.gg" };
+        var response = new ResendVerificationEmailResponse { Message = "If the email is registered and unverified, a verification email has been sent." };
+        _mockAuthService.Setup(s => s.ResendVerificationEmailAsync(request)).ReturnsAsync(response);
+
+        // Act
+        var result = await _controller.ResendVerification(request);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(200, okResult.StatusCode);
+        Assert.Equal(response, okResult.Value);
+    }
+
+    [Fact]
+    public async Task ResendVerification_InvalidModelState_ReturnsBadRequest()
+    {
+        // Arrange
+        _controller.ModelState.AddModelError("Email", "Invalid email format.");
+        var request = new ResendVerificationEmailRequest { Email = "invalid-email" };
+
+        // Act
+        var result = await _controller.ResendVerification(request);
 
         // Assert
         Assert.IsType<BadRequestObjectResult>(result);

@@ -13,4 +13,5 @@ public interface IUserRepository
     Task<int> CreateUserAsync(User user);
     Task<bool> UpdatePasswordAsync(int userId, string passwordHash);
     Task<bool> UpdateProfileAsync(int userId, string username, string email, string? avatarUrl, bool emailVerified);
+    Task<bool> VerifyEmailAsync(int userId);
 }
