@@ -12,6 +12,7 @@ namespace UserService.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 public class AuthController : ControllerBase
+
 {
     private readonly IAuthService _authService;
 
@@ -195,5 +196,42 @@ public class AuthController : ControllerBase
             email = email ?? string.Empty,
             role = role ?? string.Empty
         });
+    }
+
+    /// <summary>
+    /// Refreshes the session by issuing a new JWT for an active, unexpired token.
+    /// </summary>
+    /// <returns>A new LoginResponse containing the refreshed JWT</returns>
+    [HttpPost("refresh")]
+    [Authorize]
+    [ProducesResponseType(typeof(LoginResponse), 200)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(500)]
+    public async Task<IActionResult> Refresh()
+    {
+        try
+        {
+            // extract user id from the valid jwt claims
+            var sub = User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value
+                ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+            // gracefully fail if sub claim is missing or malformed
+            if (string.IsNullOrWhiteSpace(sub) || !int.TryParse(sub, out var userId))
+            {
+                return Unauthorized(new { message = "Invalid token claims." });
+            }
+
+            // delegate token refresh to the auth service
+            var response = await _authService.RefreshTokenAsync(userId);
+            return Ok(response);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return Unauthorized(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = "An error occurred while refreshing the token.", details = ex.Message });
+        }
     }
 }

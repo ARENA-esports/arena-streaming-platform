@@ -34,6 +34,13 @@ public class UserRepository : IUserRepository
         return await connection.QueryFirstOrDefaultAsync<User>(sql, new { Username = username });
     }
 
+    public async Task<User?> GetByIdAsync(int userId)
+    {
+        using var connection = CreateConnection();
+        const string sql = "SELECT * FROM users WHERE user_id = @UserId LIMIT 1";
+        return await connection.QueryFirstOrDefaultAsync<User>(sql, new { UserId = userId });
+    }
+
     public async Task<int> CreateUserAsync(User user)
     {
         using var connection = CreateConnection();

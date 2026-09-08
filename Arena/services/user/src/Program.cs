@@ -4,33 +4,32 @@ using System.Text;
 using Dapper;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
-using Microsoft.OpenApi;
 using UserService.Repositories;
 using UserService.Services;
+using DbUp;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(c =>
+builder.Services.AddOpenApi();
+
+// Problem Details for RFC 7807 standardized error responses
+builder.Services.AddProblemDetails();
+
+// Configure restrictive CORS policy for client authentication
+var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
+    ?? new[] { "http://localhost:3000" };
+
+builder.Services.AddCors(options =>
 {
-    c.SwaggerDoc("v1", new OpenApiInfo
+    options.AddPolicy("ArenaClientCors", policy =>
     {
-        Title = "Arena User Service API",
-        Version = "v1"
-    });
-    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
-    {
-        Description = "Enter JWT Bearer token: Bearer {your_jwt_token}",
-        Name = "Authorization",
-        In = ParameterLocation.Header,
-        Type = SecuritySchemeType.ApiKey,
-        Scheme = "Bearer"
-    });
-    c.AddSecurityRequirement(document => new OpenApiSecurityRequirement
-    {
-        [new OpenApiSecuritySchemeReference("Bearer", document)] = new List<string>()
+        policy.WithOrigins(allowedOrigins)
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials();
     });
 });
 
@@ -46,20 +45,8 @@ builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 
 // JWT Authentication
-var jwtSecret = builder.Configuration["JwtSettings:Secret"];
-if (string.IsNullOrWhiteSpace(jwtSecret))
-{
-    if (builder.Environment.IsDevelopment())
-    {
-        // Development fallback when user-secrets or environment variables are not set
-        jwtSecret = "Arena_Rotated_Dev_Only_Secret_Key_Minimum_32_Chars_2026_Secure!";
-    }
-    else
-    {
-        throw new InvalidOperationException("JwtSettings:Secret is not configured.");
-    }
-}
-
+var jwtSecret = builder.Configuration["JwtSettings:Secret"]
+    ?? throw new InvalidOperationException("JwtSettings:Secret is not configured.");
 var jwtIssuer = builder.Configuration["JwtSettings:Issuer"]
     ?? "Arena.UserService";
 var jwtAudience = builder.Configuration["JwtSettings:Audience"]
@@ -93,25 +80,6 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                 if (!string.IsNullOrEmpty(jti) && await blacklistService.IsTokenRevokedAsync(jti))
                 {
                     context.Fail("Token has been revoked.");
-                    return;
-                }
-
-                var sub = context.Principal?.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Sub)?.Value
-                    ?? context.Principal?.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
-
-                if (int.TryParse(sub, out var userId))
-                {
-                    var iatClaim = context.Principal?.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Iat)?.Value;
-                    DateTime? issuedAt = null;
-                    if (long.TryParse(iatClaim, out var iatSeconds))
-                    {
-                        issuedAt = DateTimeOffset.FromUnixTimeSeconds(iatSeconds).UtcDateTime;
-                    }
-
-                    if (await blacklistService.IsUserTokenRevokedAsync(userId, issuedAt))
-                    {
-                        context.Fail("User session has been revoked following a password reset.");
-                    }
                 }
             }
         };
@@ -121,14 +89,45 @@ builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
+// Run DbUp migrations against the User database before accepting requests
+var connectionString = builder.Configuration.GetConnectionString("UserDb")
+    ?? throw new InvalidOperationException("UserDb connection string is not configured.");
+
+var upgrader = DeployChanges.To
+    .MySqlDatabase(connectionString)
+    .WithScriptsEmbeddedInAssembly(System.Reflection.Assembly.GetExecutingAssembly())
+    .LogToConsole()
+    .Build();
+
+var result = upgrader.PerformUpgrade();
+if (!result.Successful)
+{
+    throw new Exception("Database migration failed: " + result.Error);
+}
+
+// Exception Handling at the very top of the HTTP pipeline
+app.UseExceptionHandler();
+
+// Global Security Headers middleware
+app.Use(async (context, next) =>
+{
+    context.Response.Headers.Append("X-Content-Type-Options", "nosniff");
+    context.Response.Headers.Append("X-Frame-Options", "DENY");
+    context.Response.Headers.Append("Referrer-Policy", "strict-origin-when-cross-origin");
+    await next();
+});
+
+
 // Configure the HTTP request pipeline
 if (app.Environment.IsDevelopment())
 {
-    app.UseSwagger();
-    app.UseSwaggerUI();
+    app.MapOpenApi();
 }
 
 app.UseHttpsRedirection();
+
+// CORS must run before Authentication and Authorization
+app.UseCors("ArenaClientCors");
 
 app.UseAuthentication();
 app.UseAuthorization();
@@ -136,5 +135,3 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
-
-public partial class Program { }

@@ -111,4 +111,56 @@ public class MatchRepository : IMatchRepository
         }
         return null;    // return null if record not found
     }
+
+    public async Task<IEnumerable<MatchResponse>> GetAllMatchesAsync()
+    {
+        var matches = new List<MatchResponse>();
+        using var connection = new MySqlConnection(_connectionString);
+        await connection.OpenAsync();
+
+        const string sql = @"
+        SELECT match_id, tournament_id, team_a_id, team_b_id, scheduled_time, status, winner_team_id, created_at
+        FROM matches
+        ORDER BY scheduled_time ASC;
+        ";
+        using var command = new MySqlCommand(sql, connection);
+        using var reader = await command.ExecuteReaderAsync();
+
+        while (await reader.ReadAsync())
+        {
+            matches.Add(new MatchResponse(
+                reader.GetInt32("match_id"),
+                reader.GetInt32("tournament_id"),
+                reader.GetInt32("team_a_id"),
+                reader.GetInt32("team_b_id"),
+                new DateTimeOffset(reader.GetDateTime("scheduled_time"), TimeSpan.Zero),
+                reader.GetString("status"),
+                reader.IsDBNull(reader.GetOrdinal("winner_team_id")) ? null : reader.GetInt32("winner_team_id"),
+                reader.GetDateTime("created_at")
+            ));
+        }
+
+        return matches;
+    }
+
+    public async Task<bool> UpdateMatchStatusAsync(int matchId, string newStatus, string expectedCurrentStatus)
+    {
+        using var connection = new MySqlConnection(_connectionString);
+        await connection.OpenAsync();
+
+        const string sql = @"
+            UPDATE matches
+            SET status = @NewStatus
+            WHERE match_id = @MatchId
+                AND status = @ExpectedCurrentStatus;";
+        
+        using var command = new MySqlCommand(sql, connection);
+        command.Parameters.AddWithValue("@NewStatus",newStatus);
+        command.Parameters.AddWithValue("@MatchId",matchId);
+        command.Parameters.AddWithValue("@ExpectedCurrentStatus",expectedCurrentStatus);
+
+        var rowsAffected = await command.ExecuteNonQueryAsync();  // returns number of rows updated
+        return rowsAffected > 0;
+
+    }
 }

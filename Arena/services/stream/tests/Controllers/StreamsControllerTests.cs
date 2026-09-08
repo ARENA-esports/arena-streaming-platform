@@ -58,7 +58,7 @@ public class StreamsControllerTests
     {
         // Arrange
         SetUserContext(null, "Organizer");
-        var request = new LinkStreamRequest { ChannelName = "esl_csgo", Platform = "Twitch" };
+        var request = new LinkStreamRequest { ChannelName = "esl_csgo", Platform = "Twitch", EmbedParentDomain = "arena.gg" };
 
         // Act
         var result = await _controller.LinkStreamToMatch(1, request);
@@ -74,7 +74,7 @@ public class StreamsControllerTests
         // Arrange
         SetUserContext("42", "Organizer");
         _matchRepoMock.Setup(m => m.GetMatchByIdAsync(999)).ReturnsAsync((MatchResponse?)null);
-        var request = new LinkStreamRequest { ChannelName = "esl_csgo", Platform = "Twitch" };
+        var request = new LinkStreamRequest { ChannelName = "esl_csgo", Platform = "Twitch", EmbedParentDomain = "arena.gg" };
 
         // Act
         var result = await _controller.LinkStreamToMatch(999, request);
@@ -95,7 +95,7 @@ public class StreamsControllerTests
         _matchRepoMock.Setup(m => m.GetMatchByIdAsync(matchId)).ReturnsAsync(dummyMatch);
         _streamRepoMock.Setup(s => s.StreamExistsForMatchAsync(matchId)).ReturnsAsync(true);
 
-        var request = new LinkStreamRequest { ChannelName = "esl_csgo", Platform = "Twitch" };
+        var request = new LinkStreamRequest { ChannelName = "esl_csgo", Platform = "Twitch", EmbedParentDomain = "arena.gg" };
 
         // Act
         var result = await _controller.LinkStreamToMatch(matchId, request);
@@ -149,6 +149,27 @@ public class StreamsControllerTests
         Assert.Equal("esl_csgo", responseData.ChannelName);
     }
 
+    [Theory]
+    [InlineData("http://arena.gg")]
+    [InlineData("javascript:alert(1)")]
+    [InlineData("arena.gg/path")]
+    [InlineData("arena.gg:8080")]
+    public async Task LinkStreamToMatch_WhenEmbedParentDomainIsInvalid_Returns400BadRequest(string invalidDomain)
+    {
+        // Arrange
+        const int matchId = 10;
+        SetUserContext("42", "Streamer");
+
+        var request = new LinkStreamRequest { ChannelName = "esl_csgo", Platform = "Twitch", EmbedParentDomain = invalidDomain };
+
+        // Act
+        var result = await _controller.LinkStreamToMatch(matchId, request);
+
+        // Assert
+        var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
+        Assert.Equal(StatusCodes.Status400BadRequest, badRequestResult.StatusCode);
+    }
+
     /* ---------------- Public Lookup Tests ---------------- */
 
     [Fact]
@@ -188,8 +209,8 @@ public class StreamsControllerTests
         // Arrange
         _streamRepoMock.Setup(s => s.GetStreamByMatchIdAsync(999)).ReturnsAsync((StreamResponse?)null);
 
-        // Act - call GetStreamByMatchIdAsync to match the controller method name
-        var result = await _controller.GetStreamByMatchIdAsync(999);
+        // Act
+        var result = await _controller.GetStreamByMatchId(999);
 
         // Assert
         var notFoundResult = Assert.IsType<NotFoundObjectResult>(result);
@@ -198,17 +219,38 @@ public class StreamsControllerTests
 
     /* ---------------- Update & Delete Ownership Tests ---------------- */
 
+    [Theory]
+    [InlineData("http://arena.gg")]
+    [InlineData("javascript:alert(1)")]
+    [InlineData("arena.gg/path")]
+    [InlineData("arena.gg:8080")]
+    public async Task UpdateStream_WhenEmbedParentDomainIsInvalid_Returns400BadRequest(string invalidDomain)
+    {
+        // Arrange
+        const int streamId = 10;
+        SetUserContext("99", "Streamer");
+
+        var request = new UpdateStreamRequest { ChannelName = "new_channel", Platform = "Twitch", EmbedParentDomain = invalidDomain };
+
+        // Act
+        var result = await _controller.UpdateStream(streamId, request);
+
+        // Assert
+        var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
+        Assert.Equal(StatusCodes.Status400BadRequest, badRequestResult.StatusCode);
+    }
+
     [Fact]
     public async Task UpdateStream_WhenCallerIsNotOwnerNorOrganizer_Returns403Forbid()
     {
         // Arrange
         const int streamId = 10;
-        SetUserContext("99", "Streamer"); // logged in as user 99
+        SetUserContext("99", "Streamer");
 
-        var existingStream = new StreamResponse(streamId, 42, 1, 1, "owner_channel", "Twitch", "Title", "localhost", "Scheduled", 0, null, null, DateTime.UtcNow); // owned by user 42
+        var existingStream = new StreamResponse(streamId, 42, 1, 1, "owner_channel", "Twitch", "Title", "localhost", "Scheduled", 0, null, null, DateTime.UtcNow);
         _streamRepoMock.Setup(s => s.GetStreamByIdAsync(streamId)).ReturnsAsync(existingStream);
 
-        var request = new UpdateStreamRequest { ChannelName = "new_channel", Platform = "Twitch" };
+        var request = new UpdateStreamRequest { ChannelName = "new_channel", Platform = "Twitch", EmbedParentDomain = "arena.gg" };
 
         // Act
         var result = await _controller.UpdateStream(streamId, request);
@@ -222,7 +264,7 @@ public class StreamsControllerTests
     {
         // Arrange
         const int streamId = 10;
-        SetUserContext("999", "Organizer"); // Organizer role bypasses individual ownership
+        SetUserContext("999", "Organizer");
 
         var existingStream = new StreamResponse(streamId, 42, 1, 1, "owner_channel", "Twitch", "Title", "localhost", "Scheduled", 0, null, null, DateTime.UtcNow);
         _streamRepoMock.Setup(s => s.GetStreamByIdAsync(streamId)).ReturnsAsync(existingStream);
