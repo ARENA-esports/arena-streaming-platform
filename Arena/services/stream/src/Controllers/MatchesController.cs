@@ -27,7 +27,7 @@ public class MatchesController : ControllerBase
         {
             return BadRequest(new {message = "A match cannot be created between same teams."});
         }
-        if (request.ScheduledTime < DateTimeOffset.UtcNow.AddMinutes(-5))   // Prevents organizers from scheduling fixtures in the past. allow 5 min clock skew buffer
+        if (request.ScheduledTime < DateTimeOffset.UtcNow.AddMinutes(-5))   // Prevents organizers from scheduling matches in the past. allow 5 min clock skew buffer
         {
             return BadRequest(new {message = "Scheduled time cannot be in the past."});
         }
@@ -85,5 +85,122 @@ public class MatchesController : ControllerBase
             return NotFound(new {message = $"Match with ID {id} not found."});
         }
         return Ok(match);   // if match exist, return 200 OK with JSON object
+    }
+    
+    /* update endpoint for rescheduling or correcting a match */
+    [HttpPut("{id:int}")]   // map to PUT /api/matches/{id}
+    [Authorize(Roles = "Organizer")]    // only organizers can update matches
+    [ProducesResponseType(typeof(MatchResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateMatch(int id, [FromBody] UpdateMatchRequest request)
+    {
+        if(request.TeamAId == request.TeamBId)  // prevent identical teams
+        {
+            return BadRequest(new {message = "A match cannot be created between same teams."});
+        }
+        if (request.ScheduledTime < DateTimeOffset.UtcNow.AddMinutes(-5))  // prevent past scheduling
+        {
+            return BadRequest(new {message = "Scheduled time cannot be in the past."});
+        }
+        
+        // ensure teams exist
+        var teamsExist = await _matchRepository.BothTeamsExistAsync(request.TeamAId, request.TeamBId);
+        if(!teamsExist)
+        {
+            return BadRequest(new {message = "One or both specified teams do not exist."});
+        }
+
+        // ensure match exists before updating
+        var match = await _matchRepository.GetMatchByIdAsync(id);
+        if(match == null)
+        {
+            return NotFound(new {message = $"Match with ID {id} not found."});
+        }
+
+        // execute update query
+        var updated = await _matchRepository.UpdateMatchAsync(id, request.TeamAId, request.TeamBId, request.ScheduledTime);
+        if(!updated)
+        {
+            return StatusCode(500, new {message = "Failed to update match record."});
+        }
+
+        // return refreshed record
+        var updatedMatch = await _matchRepository.GetMatchByIdAsync(id);
+        return Ok(updatedMatch);
+    }
+
+    /* patch endpoint for administrative status override */
+    [HttpPatch("{id:int}/status")] // map to PATCH /api/matches/{id}/status
+    [Authorize(Roles = "Organizer")] // only organizers can force status updates
+    [ProducesResponseType(typeof(MatchResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateMatchStatus(int id, [FromBody] UpdateMatchStatusRequest request)
+    {
+        // ensure match exists
+        var match = await _matchRepository.GetMatchByIdAsync(id);
+        if(match == null)
+        {
+            return NotFound(new {message = $"Match with ID {id} not found."});
+        }
+
+        bool updated;
+        if (request.ForceOverride)
+        {
+            // force override ignores the state machine guard. 
+            // allows organizer to manually correct stream status if webhook fails.
+            updated = await _matchRepository.UpdateMatchStatusOverrideAsync(id, request.Status);
+        }
+        else
+        {
+            // use state machine guards by default
+            updated = await _matchRepository.UpdateMatchStatusAsync(id, request.Status, match.Status);
+        }
+
+        if(!updated)
+        {
+            if(!request.ForceOverride) 
+            {
+                // state machine guard blocked the transition
+                return BadRequest(new {message = $"Cannot transition match {id} from {match.Status} to {request.Status}."});
+            }
+            return StatusCode(500, new {message = "Failed to update match status."});
+        }
+
+        // return refreshed record
+        var updatedMatch = await _matchRepository.GetMatchByIdAsync(id);
+        return Ok(updatedMatch);
+    }
+
+    /* delete endpoint for match cancellation */
+    [HttpDelete("{id:int}")] // map to DELETE /api/matches/{id}
+    [Authorize(Roles = "Organizer")] // only organizers can delete matches
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DeleteMatch(int id)
+    {
+        // ensure match exists before deleting
+        var match = await _matchRepository.GetMatchByIdAsync(id);
+        if (match == null)
+        {
+            return NotFound(new { message = $"Match with ID {id} not found." });
+        }
+
+        // execute deletion
+        var deleted = await _matchRepository.DeleteMatchAsync(id);
+        if (!deleted)
+        {
+            return StatusCode(500, new { message = "Failed to delete match record." });
+        }
+
+        // return 204 no content on success
+        return NoContent();
     }
 }

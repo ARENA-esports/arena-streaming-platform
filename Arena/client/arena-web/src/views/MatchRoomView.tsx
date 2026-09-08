@@ -5,14 +5,22 @@ import { matchService } from '../api/matchService';
 import TwitchEmbed from '../components/player/TwitchEmbed';
 import FallbackAlert from '../components/player/FallbackAlert';
 import Badge from '../components/common/Badge';
+import Button from '../components/common/Button';
+import { useAuth } from '../context/AuthContext';
+import EditMatchModal from '../components/match/EditMatchModal';
+import DeleteMatchModal from '../components/match/DeleteMatchModal';
+import MatchSidePanel from '../components/match/MatchSidePanel';
 
 export const MatchRoomView: React.FC = () => {
   const { matchId } = useParams<{ matchId: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [match, setMatch] = useState<MatchResponse | null>(null);
   const [stream, setStream] = useState<StreamResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [is404, setIs404] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
   useEffect(() => {
     if (!matchId) return;
@@ -51,9 +59,9 @@ export const MatchRoomView: React.FC = () => {
   if (!match) {
     return (
       <div className="max-w-7xl mx-auto px-4 py-8">
-        <div className="bg-arena-surface border border-arena-border border-dashed p-12 text-center rounded-sm">
-          <h2 className="text-2xl font-display font-bold text-white mb-2 uppercase">Match Not Found</h2>
-          <button onClick={() => navigate('/')} className="text-arena-cyan hover:underline uppercase text-sm font-bold tracking-widest">Return Home</button>
+        <div className="bg-arena-surface border border-arena-border border-dashed p-12 text-center rounded-[14px]">
+          <h2 className="text-2xl font-bold text-white mb-2">Match Not Found</h2>
+          <button onClick={() => navigate('/')} className="text-arena-cyan hover:underline font-semibold text-sm">Return Home</button>
         </div>
       </div>
     );
@@ -63,20 +71,39 @@ export const MatchRoomView: React.FC = () => {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-6 flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-display font-black text-white tracking-widest uppercase mb-2">
-            Team {match.teamAId} <span className="text-arena-textMuted italic mx-2">VS</span> Team {match.teamBId}
+          <h1 className="text-3xl font-bold text-white mb-2">
+            Match Overview
           </h1>
           <div className="flex items-center space-x-4">
             <Badge status={match.status} />
             <span className="text-sm text-arena-textMuted font-mono">
-              Scheduled: {new Date(match.scheduledStartTime).toLocaleString()}
+              Scheduled: {new Date(match.scheduledTime).toLocaleString()}
             </span>
           </div>
         </div>
+
+        {user?.role === 'Organizer' && (
+          <div className="flex items-center space-x-4">
+            <Button 
+              variant="secondary"
+              size="md"
+              onClick={() => setIsEditModalOpen(true)}
+            >
+              EDIT
+            </Button>
+            <Button 
+              variant="danger"
+              size="md"
+              onClick={() => setIsDeleteModalOpen(true)}
+            >
+              DELETE
+            </Button>
+          </div>
+        )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:h-[600px]">
+        <div className="lg:col-span-8 flex flex-col justify-center">
           {stream ? (
             <TwitchEmbed url={stream.twitchUrl} />
           ) : is404 ? (
@@ -86,32 +113,32 @@ export const MatchRoomView: React.FC = () => {
           )}
         </div>
         
-        <div className="bg-arena-surface border border-arena-border p-6 rounded-sm">
-          <h3 className="text-lg font-display font-bold text-white tracking-widest uppercase border-b border-arena-border pb-4 mb-4">
-            Match Details
-          </h3>
-          <div className="space-y-4">
-            <div>
-              <p className="text-xs text-arena-textMuted uppercase tracking-widest mb-1">Status</p>
-              <p className="font-bold text-white uppercase">{match.status}</p>
-            </div>
-            {stream && (
-              <>
-                <div>
-                  <p className="text-xs text-arena-textMuted uppercase tracking-widest mb-1">Broadcaster</p>
-                  <p className="font-bold text-arena-cyan">{stream.channelName}</p>
-                </div>
-                {stream.startedAt && (
-                  <div>
-                    <p className="text-xs text-arena-textMuted uppercase tracking-widest mb-1">Started At</p>
-                    <p className="font-mono text-sm text-white">{new Date(stream.startedAt).toLocaleString()}</p>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
+        <div className="lg:col-span-4 h-full">
+          <MatchSidePanel match={match} stream={stream} />
         </div>
       </div>
+
+      {isEditModalOpen && (
+        <EditMatchModal
+          match={match}
+          onClose={() => setIsEditModalOpen(false)}
+          onSave={(updatedMatch) => {
+            setMatch(updatedMatch);
+            setIsEditModalOpen(false);
+          }}
+        />
+      )}
+
+      {isDeleteModalOpen && (
+        <DeleteMatchModal
+          match={match}
+          onClose={() => setIsDeleteModalOpen(false)}
+          onDelete={() => {
+            setIsDeleteModalOpen(false);
+            navigate('/matches');
+          }}
+        />
+      )}
     </div>
   );
 };

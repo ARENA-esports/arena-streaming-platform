@@ -40,5 +40,3 @@ All six Arena microservices (User, Tournament, Stream, Chat, Battle/Economy, Ana
 ## 5. Team Sign-Off
 
 This spec must be reviewed and agreed on by all 4 team members before Story 5 (per-service JWT middleware implementation) begins. Record the sign-off date and confirmation in the daily standup log once reviewed — this spec document alone does not satisfy that acceptance criterion.
-
-*Sign-off status: pending — update this line once confirmed in the standup log.*

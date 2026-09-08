@@ -163,4 +163,63 @@ public class MatchRepository : IMatchRepository
         return rowsAffected > 0;
 
     }
+
+    public async Task<bool> UpdateMatchAsync(int matchId, int teamAId, int teamBId, DateTimeOffset scheduledTime)
+    {
+        using var connection = new MySqlConnection(_connectionString);
+        await connection.OpenAsync();
+
+        const string sql = @"
+            UPDATE matches
+            SET team_a_id = @TeamA,
+                team_b_id = @TeamB,
+                scheduled_time = @ScheduledTime
+            WHERE match_id = @MatchId;";
+        
+        using var command = new MySqlCommand(sql, connection);
+        command.Parameters.AddWithValue("@TeamA", teamAId);
+        command.Parameters.AddWithValue("@TeamB", teamBId);
+        command.Parameters.AddWithValue("@ScheduledTime", scheduledTime.UtcDateTime);
+        command.Parameters.AddWithValue("@MatchId", matchId);
+
+        var rowsAffected = await command.ExecuteNonQueryAsync();
+        return rowsAffected > 0;
+    }
+
+    public async Task<bool> UpdateMatchStatusOverrideAsync(int matchId, string newStatus)
+    {
+        using var connection = new MySqlConnection(_connectionString);
+        await connection.OpenAsync();
+
+        // This deliberately lacks the expectedCurrentStatus guard to allow administrative override
+        const string sql = @"
+            UPDATE matches
+            SET status = @NewStatus
+            WHERE match_id = @MatchId;";
+        
+        using var command = new MySqlCommand(sql, connection);
+        command.Parameters.AddWithValue("@NewStatus", newStatus);
+        command.Parameters.AddWithValue("@MatchId", matchId);
+
+        var rowsAffected = await command.ExecuteNonQueryAsync();
+        return rowsAffected > 0;
+    }
+
+    public async Task<bool> DeleteMatchAsync(int matchId)
+    {
+        using var connection = new MySqlConnection(_connectionString);
+        await connection.OpenAsync();
+
+        // Foreign key constraint `fk_streams_match` is configured with ON DELETE SET NULL,
+        // so streams linked to this match will automatically be orphaned cleanly.
+        const string sql = @"
+            DELETE FROM matches 
+            WHERE match_id = @MatchId;";
+        
+        using var command = new MySqlCommand(sql, connection);
+        command.Parameters.AddWithValue("@MatchId", matchId);
+
+        var rowsAffected = await command.ExecuteNonQueryAsync();
+        return rowsAffected > 0;
+    }
 }

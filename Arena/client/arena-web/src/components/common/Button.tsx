@@ -21,7 +21,7 @@ export const Button: FC<ButtonProps> = ({
   disabled,
   ...props
 }) => {
-  const baseStyles = 'inline-flex items-center justify-center rounded-sm font-bold uppercase transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-arena-bg';
+  const baseStyles = 'inline-flex items-center justify-center rounded-[14px] font-bold uppercase transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-arena-bg';
   
   const variants: Record<NonNullable<ButtonProps['variant']>, string> = {
     primary: 'bg-arena-cyan text-black hover:bg-arena-cyanHover active:bg-arena-cyanActive focus:ring-arena-cyan',

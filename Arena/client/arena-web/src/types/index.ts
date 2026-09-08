@@ -80,3 +80,14 @@ export interface StreamResponse {
   startedAt?: string | null;
   endedAt?: string | null;
 }
+
+export interface UpdateMatchRequest {
+  teamAId: number;
+  teamBId: number;
+  scheduledTime: string;
+}
+
+export interface UpdateMatchStatusRequest {
+  status: 'Scheduled' | 'Live' | 'Ended' | 'Cancelled';
+  forceOverride: boolean;
+}
