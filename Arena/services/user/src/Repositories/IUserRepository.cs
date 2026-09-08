@@ -5,6 +5,7 @@ namespace UserService.Repositories;
 
 public interface IUserRepository
 {
+    Task<User?> GetByIdAsync(int userId);
     Task<User?> GetByEmailAsync(string email);
     Task<User?> GetByUsernameAsync(string username);
     Task<int> CreateUserAsync(User user);

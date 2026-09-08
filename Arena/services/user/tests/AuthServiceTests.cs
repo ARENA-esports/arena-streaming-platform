@@ -466,4 +466,52 @@ public class AuthServiceTests
         var ex = await Assert.ThrowsAsync<ArgumentException>(() => _authService.ResetPasswordAsync(request));
         Assert.Equal("Reset token is required.", ex.Message);
     }
+
+    [Fact]
+    public async Task GetProfileAsync_UserExists_ReturnsFreshUserProfile()
+    {
+        // Arrange
+        var created = DateTime.UtcNow.AddMonths(-1);
+        var updated = DateTime.UtcNow.AddDays(-2);
+        var user = new User
+        {
+            UserId = 42,
+            Username = "pro_streamer",
+            Email = "pro@arena.gg",
+            Role = "Streamer",
+            EmailVerified = true,
+            AvatarUrl = "https://cdn.arena.gg/avatars/42.png",
+            CreatedAt = created,
+            UpdatedAt = updated
+        };
+
+        _mockRepo.Setup(r => r.GetByIdAsync(42)).ReturnsAsync(user);
+
+        // Act
+        var result = await _authService.GetProfileAsync(42);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(42, result.UserId);
+        Assert.Equal("pro_streamer", result.Username);
+        Assert.Equal("pro@arena.gg", result.Email);
+        Assert.Equal("Streamer", result.Role);
+        Assert.True(result.EmailVerified);
+        Assert.Equal("https://cdn.arena.gg/avatars/42.png", result.AvatarUrl);
+        Assert.Equal(created, result.CreatedAt);
+        Assert.Equal(updated, result.UpdatedAt);
+    }
+
+    [Fact]
+    public async Task GetProfileAsync_UserDoesNotExist_ReturnsNull()
+    {
+        // Arrange
+        _mockRepo.Setup(r => r.GetByIdAsync(999)).ReturnsAsync((User?)null);
+
+        // Act
+        var result = await _authService.GetProfileAsync(999);
+
+        // Assert
+        Assert.Null(result);
+    }
 }

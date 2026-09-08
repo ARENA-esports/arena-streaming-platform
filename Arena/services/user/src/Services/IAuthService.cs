@@ -10,4 +10,5 @@ public interface IAuthService
     Task LogoutAsync(string? tokenString);
     Task<ForgotPasswordResponse> ForgotPasswordAsync(ForgotPasswordRequest request);
     Task<ResetPasswordResponse> ResetPasswordAsync(ResetPasswordRequest request);
+    Task<UserProfileResponse?> GetProfileAsync(int userId);
 }

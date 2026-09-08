@@ -204,4 +204,25 @@ public class AuthService : IAuthService
             Message = "Password has been successfully reset."
         };
     }
+
+    public async Task<UserProfileResponse?> GetProfileAsync(int userId)
+    {
+        var user = await _userRepository.GetByIdAsync(userId);
+        if (user == null)
+        {
+            return null;
+        }
+
+        return new UserProfileResponse
+        {
+            UserId = user.UserId,
+            Username = user.Username,
+            Email = user.Email,
+            Role = user.Role,
+            EmailVerified = user.EmailVerified,
+            AvatarUrl = user.AvatarUrl,
+            CreatedAt = user.CreatedAt,
+            UpdatedAt = user.UpdatedAt
+        };
+    }
 }

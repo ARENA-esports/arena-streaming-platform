@@ -226,7 +226,7 @@ public class AuthControllerTests
     }
 
     [Fact]
-    public void GetMe_AuthenticatedUser_ReturnsUserProfile()
+    public async Task GetMe_AuthenticatedUser_ReturnsUserProfile()
     {
         // Arrange
         var claims = new List<Claim>
@@ -248,11 +248,83 @@ public class AuthControllerTests
             HttpContext = httpContext
         };
 
+        var expectedProfile = new UserProfileResponse
+        {
+            UserId = 25,
+            Username = "Viewer25",
+            Email = "viewer25@arena.gg",
+            Role = "Viewer",
+            EmailVerified = true,
+            AvatarUrl = "https://cdn.arena.gg/avatars/25.png",
+            CreatedAt = DateTime.UtcNow.AddDays(-10),
+            UpdatedAt = DateTime.UtcNow
+        };
+        _mockAuthService.Setup(s => s.GetProfileAsync(25)).ReturnsAsync(expectedProfile);
+
         // Act
-        var result = _controller.GetMe();
+        var result = await _controller.GetMe();
 
         // Assert
         var okResult = Assert.IsType<OkObjectResult>(result);
         Assert.Equal(200, okResult.StatusCode);
+        Assert.Equal(expectedProfile, okResult.Value);
+    }
+
+    [Fact]
+    public async Task GetMe_UserNotFound_ReturnsNotFound()
+    {
+        // Arrange
+        var claims = new List<Claim>
+        {
+            new("sub", "99")
+        };
+        var identity = new ClaimsIdentity(claims, "TestAuth");
+        var claimsPrincipal = new ClaimsPrincipal(identity);
+
+        var httpContext = new DefaultHttpContext
+        {
+            User = claimsPrincipal
+        };
+        _controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = httpContext
+        };
+
+        _mockAuthService.Setup(s => s.GetProfileAsync(99)).ReturnsAsync((UserProfileResponse?)null);
+
+        // Act
+        var result = await _controller.GetMe();
+
+        // Assert
+        var notFoundResult = Assert.IsType<NotFoundObjectResult>(result);
+        Assert.Equal(404, notFoundResult.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetMe_InvalidSubClaim_ReturnsUnauthorized()
+    {
+        // Arrange
+        var claims = new List<Claim>
+        {
+            new("sub", "not-a-number")
+        };
+        var identity = new ClaimsIdentity(claims, "TestAuth");
+        var claimsPrincipal = new ClaimsPrincipal(identity);
+
+        var httpContext = new DefaultHttpContext
+        {
+            User = claimsPrincipal
+        };
+        _controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = httpContext
+        };
+
+        // Act
+        var result = await _controller.GetMe();
+
+        // Assert
+        var unauthorizedResult = Assert.IsType<UnauthorizedObjectResult>(result);
+        Assert.Equal(401, unauthorizedResult.StatusCode);
     }
 }

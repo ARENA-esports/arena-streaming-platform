@@ -20,6 +20,13 @@ public class UserRepository : IUserRepository
 
     private IDbConnection CreateConnection() => new MySqlConnection(ConnectionString);
 
+    public async Task<User?> GetByIdAsync(int userId)
+    {
+        using var connection = CreateConnection();
+        const string sql = "SELECT * FROM users WHERE user_id = @UserId LIMIT 1";
+        return await connection.QueryFirstOrDefaultAsync<User>(sql, new { UserId = userId });
+    }
+
     public async Task<User?> GetByEmailAsync(string email)
     {
         using var connection = CreateConnection();

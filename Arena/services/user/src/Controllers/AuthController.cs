@@ -170,30 +170,30 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
-    /// Retrieves current authenticated user profile.
+    /// Retrieves current authenticated user profile from the database.
     /// </summary>
-    /// <returns>The authenticated user information</returns>
+    /// <returns>The authenticated user profile information</returns>
     [HttpGet("me")]
     [Authorize]
-    [ProducesResponseType(200)]
+    [ProducesResponseType(typeof(UserProfileResponse), 200)]
     [ProducesResponseType(401)]
-    public IActionResult GetMe()
+    [ProducesResponseType(404)]
+    public async Task<IActionResult> GetMe()
     {
         var sub = User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value
             ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        var email = User.FindFirst(JwtRegisteredClaimNames.Email)?.Value
-            ?? User.FindFirst(ClaimTypes.Email)?.Value;
-        var username = User.Identity?.Name
-            ?? User.FindFirst("unique_name")?.Value;
-        var role = User.FindFirst(ClaimTypes.Role)?.Value
-            ?? User.FindFirst("role")?.Value;
 
-        return Ok(new
+        if (!int.TryParse(sub, out var userId))
         {
-            userId = int.TryParse(sub, out var id) ? id : 0,
-            username = username ?? string.Empty,
-            email = email ?? string.Empty,
-            role = role ?? string.Empty
-        });
+            return Unauthorized(new { message = "Invalid user identifier claim." });
+        }
+
+        var profile = await _authService.GetProfileAsync(userId);
+        if (profile == null)
+        {
+            return NotFound(new { message = "User not found." });
+        }
+
+        return Ok(profile);
     }
 }
