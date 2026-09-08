@@ -59,6 +59,16 @@ public class MatchesController : ControllerBase
         );
     }
 
+    /* get endpoint for fetching all matches */
+    [HttpGet]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(IEnumerable<MatchResponse>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetMatches()
+    {
+        var matches = await _matchRepository.GetAllMatchesAsync();
+        return Ok(matches);
+    }
+
     /* get endpoint for lookup and location routing */
     [HttpGet("{id:int}")]   // map to GET /api/matches/{id} with inline route constraint to ensure {id} is valid int
     [AllowAnonymous]        // match view is publicly accessible to viewers and downstream microservices

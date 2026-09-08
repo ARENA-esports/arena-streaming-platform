@@ -27,6 +27,7 @@ public class StreamsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> LinkStreamToMatch(int matchId,[FromBody] LinkStreamRequest request)
     {
@@ -40,11 +41,17 @@ public class StreamsController : ControllerBase
             return Unauthorized(new{message = "Invalid or missing user identity claim in token."});
         }
 
+        // Validate EmbedParentDomain security format
+        if(!IsValidEmbedDomain(request.EmbedParentDomain))
+        {
+            return BadRequest(new { message = "Invalid embed parent domain. Must be a valid hostname (e.g., 'localhost', 'arena.gg') without schemes, ports, or paths." });
+        }
+
         /* validate target match exists */
         var match = await _matchRepository.GetMatchByIdAsync(matchId);
         if (match == null)
         {
-            return NotFound(new { message = $"Match with ID {matchId} does not exist." });
+            return NotFound(new {message=$"Match with ID {matchId} does not exist."});
         }
         /* stream-to-match constraint */
         var alreadyLinked = await _streamRepository.StreamExistsForMatchAsync(matchId);
@@ -69,6 +76,23 @@ public class StreamsController : ControllerBase
 
     }
 
+    /* Helper to validate embed parent domain format against XSS and injection */
+    private static bool IsValidEmbedDomain(String? domain)
+    {
+        if(string.IsNullOrWhiteSpace(domain))
+        {
+            return false;
+        }
+        var trimmed = domain.Trim();// remove leading/trailing whitespace
+        // Reject protocol schemes, port numbers, paths, queries, and fragment delimiters
+        if(trimmed.Contains('/') || trimmed.Contains(':') || trimmed.Contains('\\') || trimmed.Contains('?') || trimmed.Contains('#'))
+        {
+            return false;
+        }
+        var hostType = Uri.CheckHostName(trimmed);
+        return hostType == UriHostNameType.Dns || hostType == UriHostNameType.IPv4 || hostType == UriHostNameType.IPv6;
+    }
+
     /* public lookup endpoints */
     [HttpGet("streams/{streamId:int}")]
     [AllowAnonymous]
@@ -88,7 +112,7 @@ public class StreamsController : ControllerBase
     [AllowAnonymous]
     [ProducesResponseType(typeof(StreamResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetStreamByMatchIdAsync(int matchId)
+    public async Task<IActionResult> GetStreamByMatchId(int matchId)
     {
         var stream = await _streamRepository.GetStreamByMatchIdAsync(matchId);
         if (stream == null)
@@ -108,6 +132,11 @@ public class StreamsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdateStream(int streamId, [FromBody] UpdateStreamRequest request)
     {
+        // 1. Validate EmbedParentDomain security format
+        if (!IsValidEmbedDomain(request.EmbedParentDomain))
+        {
+            return BadRequest(new { message = "Invalid embed parent domain. Must be a valid hostname (e.g., 'localhost', 'arena.gg') without schemes, ports, or paths." });
+        }
         // Verify existence
         var existingStream = await _streamRepository.GetStreamByIdAsync(streamId);
         if (existingStream == null)
@@ -118,7 +147,8 @@ public class StreamsController : ControllerBase
         var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value 
                       ?? User.FindFirst("sub")?.Value;
         var isOrganizer = User.IsInRole("Organizer");
-        if (!isOrganizer && (userIdClaim == null || existingStream.StreamerId.ToString() != userIdClaim))
+        //safely parse integer user id for ownership equality comparison against StreamerId
+        if (!isOrganizer && (!int.TryParse(userIdClaim, out var currentUserId) || existingStream.StreamerId != currentUserId))
         {
             return Forbid();
         }
@@ -153,7 +183,7 @@ public class StreamsController : ControllerBase
         var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value 
                       ?? User.FindFirst("sub")?.Value;
         var isOrganizer = User.IsInRole("Organizer");
-        if (!isOrganizer && (userIdClaim == null || existingStream.StreamerId.ToString() != userIdClaim))
+        if (!isOrganizer && (!int.TryParse(userIdClaim, out var currentUserId) || existingStream.StreamerId != currentUserId))
         {
             return Forbid();
         }

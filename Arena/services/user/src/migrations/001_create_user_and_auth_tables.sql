@@ -39,4 +39,3 @@ CREATE TABLE IF NOT EXISTS user_auth_providers (
     INDEX idx_auth_providers_user (user_id),
     INDEX idx_auth_lookup (provider, provider_user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-

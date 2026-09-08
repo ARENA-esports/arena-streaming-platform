@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
-using System.Linq;
 using System.Security.Claims;
 using System.Text;
 using Microsoft.Extensions.Configuration;
@@ -15,7 +14,7 @@ namespace UserService.Tests;
 public class JwtTokenGeneratorTests
 {
     private readonly IConfiguration _configuration;
-    private readonly string _secret = "Test_Only_Secret_Key_For_Unit_Testing_123456789_Min_32_Chars!";
+    private readonly string _secret = "Arena_Secret_Key_For_Jwt_Token_Signing_2026_SE3022_Production_Grade!";
     private readonly string _issuer = "Arena.UserService";
     private readonly string _audience = "Arena.Platform";
 

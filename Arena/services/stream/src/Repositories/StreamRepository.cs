@@ -62,7 +62,7 @@ public class StreamRepository : IStreamRepository
         command.Parameters.AddWithValue("@ChannelName", request.ChannelName.Trim());
         command.Parameters.AddWithValue("@Platform", request.Platform);
         command.Parameters.AddWithValue("@StreamTitle", request.StreamTitle);
-        command.Parameters.AddWithValue("@EmbedParentDomain", request.EmbedParentDomain.Trim());
+        command.Parameters.AddWithValue("@EmbedParentDomain", request.EmbedParentDomain.Trim().ToLowerInvariant());
         command.Parameters.AddWithValue("@Status", StreamStatus.Scheduled);
 
         var result = await command.ExecuteScalarAsync();
@@ -163,6 +163,52 @@ public class StreamRepository : IStreamRepository
         return rowsAffected > 0;
     }
 
+    /* resolve stream record by twitch channel name */
+    public async Task<StreamResponse?> GetStreamByChannelNameAsync(string channelName)
+    {
+        using var connection = new MySqlConnection(_connectionString);  // instantiate ADO.NET socket connection
+        await connection.OpenAsync();   // open async connection to db
+
+        const string sql = @"
+            SELECT stream_id, streamer_id, tournament_id, match_id, channel_name, platform,
+                stream_title, embed_parent_domain, status, viewer_count, started_at, ended_at, created_at
+                FROM streams
+            WHERE LOWER(channel_name) = LOWER(@ChannelName)
+            AND platform = 'Twitch'
+            LIMIT 1;";
+
+        using var command = new MySqlCommand(sql, connection);
+        command.Parameters.AddWithValue("@ChannelName", channelName.Trim()); // bind parameter to prevent sql injection
+
+        using var reader = await command.ExecuteReaderAsync(); // execute query and get mysql data reader
+        if(await reader.ReadAsync())
+        {
+            return MapReaderToStreamResponse(reader); // if found map row into stream response
+        }
+        return null;
+    }
+
+    /* conditional state machine status update */
+    public async Task<bool> UpdateStreamStatusAsync(int StreamId, string newStatus, string expectedCurrentStatus)
+    {
+        using var connection = new MySqlConnection(_connectionString);
+        await connection.OpenAsync();
+
+        const string sql = @"
+            UPDATE streams
+            SET status = @NewStatus,
+                started_at = CASE WHEN @NewStatus = 'Live' THEN UTC_TIMESTAMP() ELSE started_at END,
+                ended_at = CASE WHEN @NewStatus = 'Ended' THEN UTC_TIMESTAMP() ELSE ended_at END
+            WHERE stream_id = @StreamId
+            AND status = @ExpectedCurrentStatus;";
+        using var command = new MySqlCommand(sql, connection);
+        command.Parameters.AddWithValue("@StreamId",StreamId);
+        command.Parameters.AddWithValue("@NewStatus",newStatus);
+        command.Parameters.AddWithValue("@ExpectedCurrentStatus",expectedCurrentStatus);
+        var rowsAffected = await command.ExecuteNonQueryAsync();    // execute the update query and get number of rows affected
+        return rowsAffected > 0; // return true if at least one row was updated, else false
+    }
+
     /* delete Method */
     public async Task<bool> DeleteStreamAsync(int streamId)
     {
@@ -175,5 +221,69 @@ public class StreamRepository : IStreamRepository
 
         var rowsAffected = await command.ExecuteNonQueryAsync();
         return rowsAffected > 0;
+    }
+
+    /* Transition Stream Status to Live */
+    public async Task<int?> UpdateStreamLiveStatusAsync(string channelName, DateTimeOffset startedAt)
+    {
+        using var connection = new MySqlConnection(_connectionString); // instantiate db socket
+        await connection.OpenAsync();                                   // open async connection
+
+        /*
+            update matching twitch stream to Live and return the primary key id
+            for linkage inside webhook audit logs
+            Enforce state transition: only 'Scheduled' streams can transition to 'Live'
+        */
+        const string sql = @"
+            UPDATE streams 
+            SET status = 'Live',
+                started_at = @StartedAt
+            WHERE LOWER(channel_name) = LOWER(@ChannelName)
+                AND platform = 'Twitch'
+                AND status = 'Scheduled';
+
+            SELECT stream_id 
+            FROM streams 
+            WHERE LOWER(channel_name) = LOWER(@ChannelName) 
+                AND platform = 'Twitch' 
+            LIMIT 1;";
+
+        using var command = new MySqlCommand(sql, connection);
+        command.Parameters.AddWithValue("@ChannelName", channelName.Trim()); // bind parameter to prevent sql injection
+        command.Parameters.AddWithValue("@StartedAt", startedAt.UtcDateTime);      // persist as standard UTC datetime
+
+        var result = await command.ExecuteScalarAsync();
+        return result != null && result != DBNull.Value ? Convert.ToInt32(result) : null;
+    }
+
+    /* Transition Stream Status to Ended */
+    public async Task<int?> UpdateStreamOfflineStatusAsync(string channelName)
+    {
+        using var connection = new MySqlConnection(_connectionString);
+        await connection.OpenAsync();
+
+        /*
+            mark stream record as Ended and record current database UTC timestamp
+            Enforce state transition: only 'Live' streams can transition to 'Ended'
+        */
+        const string sql = @"
+            UPDATE streams 
+            SET status = 'Ended',
+                ended_at = UTC_TIMESTAMP()
+            WHERE LOWER(channel_name) = LOWER(@ChannelName)
+                AND platform = 'Twitch'
+                AND status = 'Live';
+
+            SELECT stream_id 
+            FROM streams 
+            WHERE LOWER(channel_name) = LOWER(@ChannelName) 
+                AND platform = 'Twitch' 
+            LIMIT 1;";
+
+        using var command = new MySqlCommand(sql, connection);
+        command.Parameters.AddWithValue("@ChannelName", channelName.Trim());
+
+        var result = await command.ExecuteScalarAsync();
+        return result != null && result != DBNull.Value ? Convert.ToInt32(result) : null;
     }
 }

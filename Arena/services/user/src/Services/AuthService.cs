@@ -320,3 +320,29 @@ public class AuthService : IAuthService
         return response;
     }
 }
+    public async Task<LoginResponse> RefreshTokenAsync(int userId)
+    {
+        // retrieve user from database to ensure they still exist
+        var user = await _userRepository.GetByIdAsync(userId);
+        
+        // null check for deleted user
+        if (user == null)
+        {
+            throw new UnauthorizedAccessException("User not found or has been deleted.");
+        }
+
+        // issue fresh jwt to extend session
+        var token = _jwtTokenGenerator.GenerateToken(user);
+
+        return new LoginResponse
+        {
+            Token = token,
+            TokenType = "Bearer",
+            ExpiresIn = _jwtTokenGenerator.ExpiryMinutes * 60,
+            UserId = user.UserId,
+            Username = user.Username,
+            Email = user.Email,
+            Role = user.Role
+        };
+    }
+}

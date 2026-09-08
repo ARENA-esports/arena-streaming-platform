@@ -18,6 +18,12 @@
     <PackageReference Include="MySqlConnector" Version="2.6.2" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="10.2.3" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.22.0" />
+    <PackageReference Include="Dapper" Version="2.1.35" />
+    <PackageReference Include="dbup-mysql" Version="5.0.40" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="migrations\**\*.sql" />
   </ItemGroup>
 
   <ItemGroup>

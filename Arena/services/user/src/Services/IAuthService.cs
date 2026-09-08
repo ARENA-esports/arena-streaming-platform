@@ -13,3 +13,5 @@ public interface IAuthService
     Task<VerifyEmailResponse> VerifyEmailAsync(VerifyEmailRequest request);
     Task<ResendVerificationEmailResponse> ResendVerificationEmailAsync(ResendVerificationEmailRequest request);
 }
+    Task<LoginResponse> RefreshTokenAsync(int userId);
+}
