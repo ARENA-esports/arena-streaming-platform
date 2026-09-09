@@ -2,13 +2,20 @@ import axios from 'axios';
 import { LoginResponse } from '../types';
 
 export const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
+  baseURL: '/api', // Default fallback, dynamically overridden in interceptor
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
 apiClient.interceptors.request.use((config) => {
+  // Dynamically set baseURL based on the requested endpoint
+  if (config.url?.startsWith('/Auth')) {
+    config.baseURL = import.meta.env.VITE_USER_API_URL || '/api';
+  } else {
+    config.baseURL = import.meta.env.VITE_STREAM_API_URL || '/api';
+  }
+
   const token = localStorage.getItem('arena_access_token');
   if (token && config.headers) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -30,10 +37,10 @@ apiClient.interceptors.response.use(
       originalRequest._retry = true;
       try {
         const { data } = await axios.post<LoginResponse>(
-          '/api/Auth/refresh',
+          '/Auth/refresh',
           {},
           {
-            baseURL: apiClient.defaults.baseURL,
+            baseURL: import.meta.env.VITE_USER_API_URL || '/api',
             headers: {
               Authorization: `Bearer ${localStorage.getItem('arena_access_token')}`,
             },
