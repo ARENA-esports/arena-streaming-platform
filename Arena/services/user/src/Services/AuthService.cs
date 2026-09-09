@@ -1,4 +1,6 @@
+using System;
 using System.IdentityModel.Tokens.Jwt;
+using System.Linq;
 using System.Security.Cryptography;
 using UserService.Entities;
 using UserService.Models;
@@ -319,7 +321,7 @@ public class AuthService : IAuthService
 
         return response;
     }
-}
+
     public async Task<LoginResponse> RefreshTokenAsync(int userId)
     {
         // retrieve user from database to ensure they still exist
