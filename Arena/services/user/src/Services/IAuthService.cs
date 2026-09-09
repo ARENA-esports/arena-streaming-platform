@@ -12,6 +12,5 @@ public interface IAuthService
     Task<UserProfileResponse?> GetProfileAsync(int userId);
     Task<VerifyEmailResponse> VerifyEmailAsync(VerifyEmailRequest request);
     Task<ResendVerificationEmailResponse> ResendVerificationEmailAsync(ResendVerificationEmailRequest request);
-}
     Task<LoginResponse> RefreshTokenAsync(int userId);
 }
