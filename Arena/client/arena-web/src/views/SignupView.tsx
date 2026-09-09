@@ -26,7 +26,7 @@ export const SignupView: React.FC = () => {
         .oneOf([Yup.ref('password')], 'Passwords must match')
         .required('Confirm Password is required'),
     }),
-    onSubmit: async (values, { setSubmitting }) => {
+    onSubmit: async (values: any, { setSubmitting }: any) => {
       setServerError(null);
       try {
         await authService.signup({

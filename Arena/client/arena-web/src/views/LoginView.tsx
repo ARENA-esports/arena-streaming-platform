@@ -24,7 +24,7 @@ export const LoginView: React.FC = () => {
       identifier: Yup.string().required('Username or Email is required'),
       password: Yup.string().required('Password is required'),
     }),
-    onSubmit: async (values, { setSubmitting }) => {
+    onSubmit: async (values: any, { setSubmitting }: any) => {
       setServerError(null);
       try {
         await login(values);

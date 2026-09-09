@@ -26,7 +26,7 @@ export const ResetPasswordView: React.FC = () => {
         .oneOf([Yup.ref('password')], 'Passwords must match')
         .required('Confirm Password is required'),
     }),
-    onSubmit: async (values, { setSubmitting }) => {
+    onSubmit: async (values: any, { setSubmitting }: any) => {
       setStatusMessage(null);
       if (!token) {
         setStatusMessage({ type: 'error', text: 'Reset token is missing from the URL.' });
