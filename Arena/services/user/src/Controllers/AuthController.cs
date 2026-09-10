@@ -1,7 +1,5 @@
-using System;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using UserService.Models;
@@ -171,31 +169,93 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
-    /// Retrieves current authenticated user profile.
+    /// Verifies a user's email address using a verification token.
     /// </summary>
-    /// <returns>The authenticated user information</returns>
+    /// <param name="request">Request containing the verification token</param>
+    /// <returns>Confirmation message on successful email verification</returns>
+    [HttpPost("verify-email")]
+    [ProducesResponseType(typeof(VerifyEmailResponse), 200)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), 400)]
+    [ProducesResponseType(500)]
+    public async Task<IActionResult> VerifyEmail([FromBody] VerifyEmailRequest request)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        try
+        {
+            var response = await _authService.VerifyEmailAsync(request);
+            return Ok(response);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = "An error occurred while verifying the email.", details = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Resends the email verification token to the specified email address.
+    /// </summary>
+    /// <param name="request">Request containing the user's email</param>
+    /// <returns>Confirmation message</returns>
+    [HttpPost("resend-verification")]
+    [ProducesResponseType(typeof(ResendVerificationEmailResponse), 200)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), 400)]
+    [ProducesResponseType(500)]
+    public async Task<IActionResult> ResendVerification([FromBody] ResendVerificationEmailRequest request)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        try
+        {
+            var response = await _authService.ResendVerificationEmailAsync(request);
+            return Ok(response);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = "An error occurred while processing the verification request.", details = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Retrieves current authenticated user profile from the database.
+    /// </summary>
+    /// <returns>The authenticated user profile information</returns>
     [HttpGet("me")]
     [Authorize]
-    [ProducesResponseType(200)]
+    [ProducesResponseType(typeof(UserProfileResponse), 200)]
     [ProducesResponseType(401)]
-    public IActionResult GetMe()
+    [ProducesResponseType(404)]
+    public async Task<IActionResult> GetMe()
     {
         var sub = User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value
             ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        var email = User.FindFirst(JwtRegisteredClaimNames.Email)?.Value
-            ?? User.FindFirst(ClaimTypes.Email)?.Value;
-        var username = User.Identity?.Name
-            ?? User.FindFirst("unique_name")?.Value;
-        var role = User.FindFirst(ClaimTypes.Role)?.Value
-            ?? User.FindFirst("role")?.Value;
 
-        return Ok(new
+        if (!int.TryParse(sub, out var userId))
         {
-            userId = int.TryParse(sub, out var id) ? id : 0,
-            username = username ?? string.Empty,
-            email = email ?? string.Empty,
-            role = role ?? string.Empty
-        });
+            return Unauthorized(new { message = "Invalid user identifier claim." });
+        }
+
+        var profile = await _authService.GetProfileAsync(userId);
+        if (profile == null)
+        {
+            return NotFound(new { message = "User not found." });
+        }
+
+        return Ok(profile);
     }
 
     /// <summary>
