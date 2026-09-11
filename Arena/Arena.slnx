@@ -11,6 +11,9 @@
   <Folder Name="/services/tournament/src/">
     <Project Path="services/tournament/src/TournamentService.csproj" />
   </Folder>
+  <Folder Name="/services/tournament/tests/">
+    <Project Path="services/tournament/tests/TournamentService.Tests.csproj" />
+  </Folder>
   <Folder Name="/services/user/" />
   <Folder Name="/services/user/src/">
     <Project Path="services/user/src/UserService.csproj" />
