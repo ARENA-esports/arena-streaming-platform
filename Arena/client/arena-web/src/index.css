@@ -71,9 +71,21 @@ select:-webkit-autofill:focus {
   /* arena-primary-hover */
   --live: #FF2B56;
   --error: #FF3B30;
-  --shadow-cyan: 0 0 20px -5px rgba(0, 184, 252, 0.4);
   --shadow-live: 0 0 16px -3px rgba(255, 43, 86, 0.5);
   --stream-thumb: url("/league-of-legends.jpg");
+}
+
+:root.light {
+  --bg: #ffffff;
+  --panel: #f3f4f6;
+  --panel-2: #e5e7eb;
+  --line: #d1d5db;
+  --line-active: #00B8FC;
+  --text: #111827;
+  --subtext: #4b5563;
+  --muted: #6b7280;
+  --shadow-cyan: 0 0 20px -5px rgba(0, 184, 252, 0.4);
+  --shadow-live: 0 0 16px -3px rgba(255, 43, 86, 0.5);
 }
 
 .focus-ring {
