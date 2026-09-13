@@ -14,7 +14,7 @@ export const MatchList: React.FC<MatchListProps> = ({ matches, title }) => {
         <h2 className="text-xl font-semibold text-white">{title}</h2>
         <div className="ml-4 h-[1px] bg-arena-border flex-grow"></div>
       </div>
-      
+
       {matches.length === 0 ? (
         <div className="bg-arena-surface border border-arena-border border-dashed rounded-sm p-12 text-center">
           <p className="text-arena-textMuted font-sans">No matches found for this category.</p>

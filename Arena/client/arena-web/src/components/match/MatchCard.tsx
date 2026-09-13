@@ -13,22 +13,22 @@ export const MatchCard: FC<MatchCardProps> = ({ match }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const date = new Date(match.scheduledTime);
-  
+
   return (
-    <div 
+    <div
       onClick={() => navigate(`/matches/${match.matchId}`)}
       className="bg-arena-surface border border-arena-border rounded-sm p-5 hover:border-arena-cyan transition-all duration-200 cursor-pointer group hover:shadow-[0_0_20px_rgba(0,184,252,0.1)] relative overflow-hidden"
     >
       {/* Accent Line on hover */}
       <div className="absolute top-0 left-0 w-1 h-full bg-arena-cyan scale-y-0 group-hover:scale-y-100 transition-transform duration-300 origin-bottom"></div>
-      
+
       <div className="flex justify-between items-start mb-4">
         <Badge status={match.status} />
         <span className="text-xs text-arena-textMuted font-mono">
           {date.toLocaleDateString()} • {date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </span>
       </div>
-      
+
       <div className="flex justify-center items-center space-x-4 my-6">
         <div className="flex flex-col items-center">
           <div className="w-16 h-16 rounded-full bg-arena-bg border border-arena-border flex items-center justify-center shadow-inner">
@@ -48,7 +48,7 @@ export const MatchCard: FC<MatchCardProps> = ({ match }) => {
           View Details
         </span>
         {(user?.role === 'Streamer' || user?.role === 'Organizer') && (
-          <button 
+          <button
             onClick={(e) => {
               e.stopPropagation();
               navigate(`/streamer/matches/${match.matchId}/link`);
@@ -64,3 +64,4 @@ export const MatchCard: FC<MatchCardProps> = ({ match }) => {
 };
 
 export default MatchCard;
+// single match card
