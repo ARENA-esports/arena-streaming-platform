@@ -16,6 +16,7 @@ import ResetPasswordView from '../views/ResetPasswordView';
 import ScheduleMatchView from '../views/ScheduleMatchView';
 import LinkStreamView from '../views/LinkStreamView';
 import ForbiddenView from '../views/ForbiddenView';
+import ProfileSettingsView from '../views/ProfileSettingsView';
 
 export const AppRoutes: FC = () => {
   return (
@@ -45,6 +46,14 @@ export const AppRoutes: FC = () => {
           element={
             <ProtectedRoute allowedRoles={['Streamer', 'Organizer']}>
               <LinkStreamView />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/settings/profile"
+          element={
+            <ProtectedRoute allowedRoles={['Viewer', 'Streamer', 'Organizer']}>
+              <ProfileSettingsView />
             </ProtectedRoute>
           }
         />
