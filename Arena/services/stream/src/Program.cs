@@ -114,6 +114,7 @@ builder.Services.AddScoped<IStreamRepository, StreamRepository>();    // depende
 builder.Services.AddScoped<IWebhookLogRepository, WebhookLogRepository>();//di
 builder.Services.AddScoped<ITwitchEventSubValidator, TwitchEventSubValidator>();//di
 builder.Services.AddScoped<IStreamStatusService, StreamStatusService>(); //di
+builder.Services.AddHostedService<WebhookLogPrunerService>();
 
 // Register Problem Details for RFC 7807 standardized error responses
 builder.Services.AddProblemDetails();
