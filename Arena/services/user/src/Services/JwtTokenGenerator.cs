@@ -21,6 +21,11 @@ public class JwtTokenGenerator : IJwtTokenGenerator
     {
         _secret = configuration["JwtSettings:Secret"]
             ?? throw new InvalidOperationException("JwtSettings:Secret is not configured.");
+        //hard: Enforce high-entropy symmetric key constraint (minimum 256 bits / 32 bytes)
+        if (Encoding.UTF8.GetByteCount(_secret) < 32)
+        {
+            throw new InvalidOperationException("JwtSettings:Secret must be at least 256 bits (32 bytes) long.");
+        }
         _issuer = configuration["JwtSettings:Issuer"]
             ?? "Arena.UserService";
         _audience = configuration["JwtSettings:Audience"]
@@ -43,7 +48,7 @@ public class JwtTokenGenerator : IJwtTokenGenerator
             new(JwtRegisteredClaimNames.Email, user.Email),
             new(ClaimTypes.Name, user.Username),
             new(ClaimTypes.Role, user.Role),
-            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())// hard: Enforce unique GUID for every minted token to ensure unambiguous tracking in the blacklist
         };
 
         var tokenDescriptor = new SecurityTokenDescriptor
