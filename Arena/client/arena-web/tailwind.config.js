@@ -9,17 +9,18 @@ export default {
     extend: {
       colors: {
         arena: {
-          bg: '#000000', // OLED Void
-          surface: '#0D1117', // Deep Carbon
-          surfaceHover: '#161B22', // Midnight Tint
-          border: '#2A2F38', // Gunmetal Stroke
-          borderFocus: '#00B8FC', // Cyan Focus
-          cyan: '#00B8FC', // Logitech Cyan
-          cyanHover: '#009ADB',
+          bg: 'var(--bg)', // OLED Void
+          surface: 'var(--panel)', // Deep Carbon
+          surfaceHover: 'var(--panel-2)', // Midnight Tint
+          border: 'var(--line)', // Gunmetal Stroke
+          borderFocus: 'var(--line-active)', // Cyan Focus
+          cyan: 'var(--prime)', // Logitech Cyan
+          cyanHover: 'var(--prime-dim)',
           cyanActive: '#007BB0',
-          crimson: '#FF2B56', // Crimson Pulse
+          crimson: 'var(--live)', // Crimson Pulse
           crimsonHover: '#E0224A',
-          textMuted: '#71717A'
+          textMuted: 'var(--muted)',
+          text: 'var(--text)',
         }
       },
       fontFamily: {
