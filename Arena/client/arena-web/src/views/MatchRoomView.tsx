@@ -22,6 +22,7 @@ export const MatchRoomView: React.FC = () => {
   const [, setIs404] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState('team');
 
   useEffect(() => {
     if (!matchId) return;
@@ -103,21 +104,44 @@ export const MatchRoomView: React.FC = () => {
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 w-full h-full py-4">
-        {/* Video Player Section (Span 3 Columns) */}
-        <div className="lg:col-span-3 flex flex-col gap-3 min-w-0">
-          <BattleBar matchId={match.matchId} />
+      <div className="grid grid-cols-1 lg:grid-cols-[3fr_1fr] gap-4 w-full h-full py-4">
+        {/* Video Player Section - Always mounted in left column */}
+        <div className="lg:col-start-1 flex flex-col gap-3 min-w-0">
           {isLoading ? (
-            <div className="w-full aspect-video bg-arena-surface border border-arena-border animate-pulse"></div>
+            <div className="w-full aspect-video bg-arena-surface border border-arena-border animate-pulse rounded-sm"></div>
           ) : (
             <StreamContainer apiChannelName={stream?.channelName} />
           )}
-          <TeamSelector matchId={match.matchId} />
         </div>
 
-        {/* Chat Sidebar (Span 1 Column) */}
-        <div className="lg:col-span-1 h-[600px] lg:h-auto min-w-0">
-          <FactionChat matchId={match.matchId} />
+        {/* Panel Group - Always mounted in right column, visibility toggled on mobile */}
+        <div className="lg:col-start-2 flex flex-col gap-4 min-w-0">
+          {/* Tab switcher - mobile only */}
+          <div className="flex lg:hidden border-b border-arena-border mb-2">
+            {['team', 'chat', 'battle'].map(tab => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`px-4 py-3 flex-1 text-sm font-bold uppercase tracking-wider transition-colors duration-200 ${
+                  activeTab === tab 
+                    ? 'border-b-2 border-arena-cyan text-arena-text' 
+                    : 'text-arena-textMuted hover:text-arena-text'
+                }`}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
+
+          <div className={activeTab === 'team' ? 'block' : 'hidden lg:block'}>
+            <TeamSelector matchId={match.matchId} />
+          </div>
+          <div className={`h-[600px] lg:h-auto min-w-0 ${activeTab === 'chat' ? 'block' : 'hidden lg:block'}`}>
+            <FactionChat matchId={match.matchId} />
+          </div>
+          <div className={activeTab === 'battle' ? 'block' : 'hidden lg:block'}>
+            <BattleBar matchId={match.matchId} />
+          </div>
         </div>
       </div>
 
