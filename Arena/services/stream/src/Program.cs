@@ -3,6 +3,8 @@ using System.Text;      // provides character encoding tool to convert strings i
 using Microsoft.AspNetCore.Authentication.JwtBearer;    // provide authentication scheme constants, JWT options
 using Microsoft.IdentityModel.Tokens;           // contain cryptographic keys, validation parameter
 using Microsoft.OpenApi;                 // provide types to configure swagger ui dialog interactive Bearer token testing
+using Microsoft.AspNetCore.RateLimiting;
+using System.Threading.RateLimiting;
 using StreamService.Repositories;
 using StreamService.Services;
 using System.Security.Cryptography;
@@ -119,6 +121,21 @@ builder.Services.AddHostedService<WebhookLogPrunerService>();
 // Register Problem Details for RFC 7807 standardized error responses
 builder.Services.AddProblemDetails();
 
+// Add IP-based Rate Limiting to mitigate endpoint flooding
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy("StreamIpLimiter", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "anonymous",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = builder.Environment.IsDevelopment() ? 100 : 30,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
+});
+
 
 var app = builder.Build();      // compile service registrations and create runnable web application
 
@@ -149,6 +166,7 @@ app.Use(async (context, next) =>
     context.Response.Headers.Append("X-Content-Type-Options", "nosniff");
     context.Response.Headers.Append("X-Frame-Options", "DENY");
     context.Response.Headers.Append("Referrer-Policy", "strict-origin-when-cross-origin");
+    context.Response.Headers.Append("Content-Security-Policy", "default-src 'self'; frame-src https://player.twitch.tv; img-src 'self' data: https:;");
     await next();
 });
 
@@ -160,6 +178,8 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+// Rate limiter pipeline placed prior to routing to drop abusive floods at the ingress boundary
+app.UseRateLimiter();
 // UseCors must execute before Authentication and Authorization
 app.UseCors("ArenaClientCors");
 app.UseAuthentication();    // read jwt token from auth header, validate, assign authenticate identity ti http user

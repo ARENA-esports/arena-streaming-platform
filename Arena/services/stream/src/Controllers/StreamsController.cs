@@ -5,10 +5,13 @@ using StreamService.DTOs;
 using StreamService.Repositories;
 
 
+using Microsoft.AspNetCore.RateLimiting;
+
 namespace StreamService.Controllers;
 
 [ApiController]
 [Route("api")]
+[EnableRateLimiting("StreamIpLimiter")]
 public class StreamsController : ControllerBase
 {
     private readonly IStreamRepository _streamRepository;
