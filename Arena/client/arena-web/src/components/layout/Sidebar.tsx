@@ -57,17 +57,25 @@ export const Sidebar: FC<SidebarProps> = ({ isExpanded = false, toggleSidebar })
         <div className={`rail-divider ${isExpanded ? 'w-full' : ''}`}></div>
         
         <div className={`rail-avatars ${isExpanded ? 'w-full px-2' : ''}`}>
-          {['HV', 'AR', 'CV', 'FX', 'WC', 'SI', 'EA'].map((initials, idx) => (
-            <div 
-              key={idx} 
-              className={`rail-avatar ${['HV', 'AR', 'FX'].includes(initials) ? 'live' : ''} ${isExpanded ? 'w-full justify-start px-3 gap-3 rounded-md' : ''}`}
-              style={isExpanded ? { width: '100%', borderRadius: '8px' } : undefined}
-            >
-              <span className={isExpanded ? '' : 'hidden'}>{['HV', 'AR', 'FX'].includes(initials) ? '🔴' : ''}</span>
-              {initials}
-              {isExpanded && <span className="font-sans text-xs capitalize text-arena-subtext ml-2">Channel</span>}
-            </div>
-          ))}
+          {['HV', 'AR', 'CV', 'FX', 'WC', 'SI', 'EA'].map((initials, idx) => {
+            const isLive = ['HV', 'AR', 'FX'].includes(initials);
+            return (
+              <div 
+                key={idx} 
+                className={`rail-avatar ${isLive ? 'live' : ''} ${isExpanded ? 'w-full justify-start px-3 gap-3 rounded-md' : ''}`}
+                style={{
+                  ...(isExpanded ? { width: '100%', borderRadius: '8px' } : {}),
+                  borderColor: isLive ? 'var(--live)' : 'transparent',
+                  borderWidth: '2px',
+                  borderStyle: 'solid'
+                }}
+              >
+                <span className={isExpanded ? '' : 'hidden'}>{isLive ? '🔴' : ''}</span>
+                {initials}
+                {isExpanded && <span className="font-sans text-xs capitalize text-arena-subtext ml-2">Channel</span>}
+              </div>
+            );
+          })}
         </div>
       </aside>
 
