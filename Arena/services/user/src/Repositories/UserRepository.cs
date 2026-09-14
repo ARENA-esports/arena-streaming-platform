@@ -20,6 +20,13 @@ public class UserRepository : IUserRepository
 
     private IDbConnection CreateConnection() => new MySqlConnection(ConnectionString);
 
+    public async Task<User?> GetByIdAsync(int userId)
+    {
+        using var connection = CreateConnection();
+        const string sql = "SELECT * FROM users WHERE user_id = @UserId LIMIT 1";
+        return await connection.QueryFirstOrDefaultAsync<User>(sql, new { UserId = userId });
+    }
+
     public async Task<User?> GetByEmailAsync(string email)
     {
         using var connection = CreateConnection();
@@ -34,11 +41,18 @@ public class UserRepository : IUserRepository
         return await connection.QueryFirstOrDefaultAsync<User>(sql, new { Username = username });
     }
 
-    public async Task<User?> GetByIdAsync(int userId)
+    public async Task<User?> GetByEmailExcludingUserAsync(string email, int userId)
     {
         using var connection = CreateConnection();
-        const string sql = "SELECT * FROM users WHERE user_id = @UserId LIMIT 1";
-        return await connection.QueryFirstOrDefaultAsync<User>(sql, new { UserId = userId });
+        const string sql = "SELECT * FROM users WHERE email = @Email AND user_id != @UserId LIMIT 1";
+        return await connection.QueryFirstOrDefaultAsync<User>(sql, new { Email = email, UserId = userId });
+    }
+
+    public async Task<User?> GetByUsernameExcludingUserAsync(string username, int userId)
+    {
+        using var connection = CreateConnection();
+        const string sql = "SELECT * FROM users WHERE username = @Username AND user_id != @UserId LIMIT 1";
+        return await connection.QueryFirstOrDefaultAsync<User>(sql, new { Username = username, UserId = userId });
     }
 
     public async Task<int> CreateUserAsync(User user)
@@ -71,6 +85,36 @@ public class UserRepository : IUserRepository
             PasswordHash = passwordHash
         });
 
+        return rowsAffected > 0;
+    }
+
+    public async Task<bool> UpdateProfileAsync(int userId, string username, string email, string? avatarUrl, bool emailVerified)
+    {
+        using var connection = CreateConnection();
+        const string sql = @"
+            UPDATE users 
+            SET username = @Username,
+                email = @Email,
+                avatar_url = @AvatarUrl,
+                email_verified = @EmailVerified
+            WHERE user_id = @UserId";
+        var rowsAffected = await connection.ExecuteAsync(sql, new
+        {
+            UserId = userId,
+            Username = username,
+            Email = email,
+            AvatarUrl = avatarUrl,
+            EmailVerified = emailVerified
+        });
+
+        return rowsAffected > 0;
+    }
+
+    public async Task<bool> VerifyEmailAsync(int userId)
+    {
+        using var connection = CreateConnection();
+        const string sql = "UPDATE users SET email_verified = TRUE WHERE user_id = @UserId";
+        var rowsAffected = await connection.ExecuteAsync(sql, new { UserId = userId });
         return rowsAffected > 0;
     }
 }
