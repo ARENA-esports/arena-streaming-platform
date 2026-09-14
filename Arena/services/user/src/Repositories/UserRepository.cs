@@ -87,21 +87,6 @@ public class UserRepository : IUserRepository
 
         return rowsAffected > 0;
     }
-
-    public async Task<User?> GetByUsernameExcludingUserAsync(string username, int userId)
-    {
-        using var connection = CreateConnection();
-        const string sql = "SELECT * FROM users WHERE username = @Username AND user_id != @UserId LIMIT 1";
-        return await connection.QueryFirstOrDefaultAsync<User>(sql, new { Username = username, UserId = userId });
-    }
-
-    public async Task<User?> GetByEmailExcludingUserAsync(string email, int userId)
-    {
-        using var connection = CreateConnection();
-        const string sql = "SELECT * FROM users WHERE email = @Email AND user_id != @UserId LIMIT 1";
-        return await connection.QueryFirstOrDefaultAsync<User>(sql, new { Email = email, UserId = userId });
-    }
-
     public async Task<bool> UpdateProfileAsync(int userId, string username, string email, string? avatarUrl, string? displayName, string? bio, string? bannerUrl, bool emailVerified)
     {
         using var connection = CreateConnection();
