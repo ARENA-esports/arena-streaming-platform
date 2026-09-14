@@ -1,0 +1,21 @@
+# Git & GitHub
+**/.git
+**/.github
+**/.gitignore
+
+# Build outputs & caches
+**/bin/
+**/obj/
+**/TestResults/
+**/.vs/
+**/.idea/
+*.user
+
+# Frontend / non-backend files
+client/
+docs/
+**/node_modules/
+
+# OS files
+.DS_Store
+Thumbs.db

@@ -59,18 +59,29 @@ public class TournamentRepository : ITournamentRepository
         return null;
     }
 
-    public async Task<IEnumerable<TournamentResponse>> GetAllTournamentsAsync()
+    public async Task<IEnumerable<TournamentResponse>> GetAllTournamentsAsync(string? status = null)
     {
         var tournaments = new List<TournamentResponse>();
         using var connection = new MySqlConnection(_connectionString);
         await connection.OpenAsync();
 
-        const string sql = @"
-            SELECT id, name, season_identifier, start_date, end_date, status, created_at, updated_at
-            FROM tournaments
-            ORDER BY start_date ASC;";
+        string sql = string.IsNullOrWhiteSpace(status)
+            ? @"
+                SELECT id, name, season_identifier, start_date, end_date, status, created_at, updated_at
+                FROM tournaments
+                ORDER BY start_date ASC;"
+            : @"
+                SELECT id, name, season_identifier, start_date, end_date, status, created_at, updated_at
+                FROM tournaments
+                WHERE status = @Status
+                ORDER BY start_date ASC;";
 
         using var command = new MySqlCommand(sql, connection);
+        if (!string.IsNullOrWhiteSpace(status))
+        {
+            command.Parameters.AddWithValue("@Status", status);
+        }
+
         using var reader = await command.ExecuteReaderAsync();
 
         while (await reader.ReadAsync())

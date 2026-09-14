@@ -27,9 +27,12 @@ services:
       - "8080:8080"
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
-      - JwtSettings__Secret=${JWT_SECRET}
+      - JwtSettings__Secret=${JWT_SECRET:-Arena_Secret_Key_For_Jwt_Token_Signing_2026_SE3022_Production_Grade!}
       - JwtSettings__Issuer=Arena.UserService
       - JwtSettings__Audience=Arena.Platform
+    depends_on:
+      mysql-user:
+        condition: service_healthy
 
   stream:
     build:
@@ -41,11 +44,47 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ConnectionStrings__DefaultConnection=Server=mysql;Port=3306;Database=arena_stream_db;Uid=root;Pwd=rootpassword;AllowUserVariables=True;
-      - JwtSettings__Secret=${JWT_SECRET}
+      - JwtSettings__Secret=${JWT_SECRET:-Arena_Secret_Key_For_Jwt_Token_Signing_2026_SE3022_Production_Grade!}
       - JwtSettings__Issuer=Arena.UserService
       - JwtSettings__Audience=Arena.Platform
     depends_on:
-      - mysql
+      mysql:
+        condition: service_healthy
+
+  mysql:
+    image: mysql:8.0
+    container_name: arena-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
+      MYSQL_DATABASE: arena_stream_db
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./services/stream/src/Migrations/01_create_stream_db.sql:/docker-entrypoint-initdb.d/01_create_stream_db.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-prootpassword"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  mysql-tournament:
+    image: mysql:8.0
+    container_name: arena-mysql-tournament
+    ports:
+      - "3308:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=rootpassword
+      - MYSQL_DATABASE=arena_tournament_db
+      - MYSQL_USER=arena
+      - MYSQL_PASSWORD=arena_password
+    volumes:
+      - mysql-tournament-data:/var/lib/mysql
+      - ./services/tournament/src/Migrations:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-prootpassword"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   tournament:
     build:
@@ -56,20 +95,14 @@ services:
       - "8082:8080"
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
-      - ConnectionStrings__DefaultConnection=Server=mysql;Port=3306;Database=arena_tournament_db;Uid=root;Pwd=rootpassword;AllowUserVariables=True;
-      - JwtSettings__Secret=${JWT_SECRET}
+      - ConnectionStrings__DefaultConnection=Server=mysql-tournament;Port=3306;Database=arena_tournament_db;Uid=root;Pwd=rootpassword;AllowUserVariables=True;
+      - JwtSettings__Secret=${JWT_SECRET:-Arena_Secret_Key_For_Jwt_Token_Signing_2026_SE3022_Production_Grade!}
       - JwtSettings__Issuer=Arena.UserService
       - JwtSettings__Audience=Arena.Platform
     depends_on:
-      - mysql
+      mysql-tournament:
+        condition: service_healthy
 
-  mysql:
-    image: mysql:8.0
-    container_name: arena-mysql
-    environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      MYSQL_DATABASE: arena_stream_db
-    ports:
-      - "3306:3306"
-    volumes:
-      - ./infra/mysql/01_create_stream_db.sql:/docker-entrypoint-initdb.d/01_create_stream_db.sql
+volumes:
+  mysql-user-data:
+  mysql-tournament-data:

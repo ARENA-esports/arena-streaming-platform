@@ -116,6 +116,8 @@ if (!string.IsNullOrEmpty(connectionString))
 {
     try
     {
+        EnsureDatabase.For.MySqlDatabase(connectionString);
+
         var upgrader = DeployChanges.To
             .MySqlDatabase(connectionString)
             .WithScriptsEmbeddedInAssembly(System.Reflection.Assembly.GetExecutingAssembly())
