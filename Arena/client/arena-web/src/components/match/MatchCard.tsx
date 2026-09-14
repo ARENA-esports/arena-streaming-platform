@@ -1,9 +1,17 @@
-import { FC } from 'react';
+import { FC, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MatchResponse } from '../../types';
 import Badge from '../common/Badge';
 import { useAuth } from '../../context/AuthContext';
 import { Video } from 'lucide-react';
+
+const ACCENT_PALETTE = [
+  '#00F5FF', // Electric Cyan
+  '#FF0000', // Vivid Crimson
+  '#9146FF', // Twitch Purple
+  '#1F69FF', // Royal Blue
+  '#00FF00', // Neon Lime
+] as const;
 
 interface MatchCardProps {
   match: MatchResponse;
@@ -13,14 +21,21 @@ export const MatchCard: FC<MatchCardProps> = ({ match }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const date = new Date(match.scheduledTime);
+  const [accentColor] = useState(() => ACCENT_PALETTE[Math.floor(Math.random() * ACCENT_PALETTE.length)]);
 
   return (
     <div
       onClick={() => navigate(`/matches/${match.matchId}`)}
-      className="bg-arena-surface border border-arena-border rounded-sm p-5 hover:border-arena-cyan transition-all duration-200 cursor-pointer group hover:shadow-[0_0_20px_rgba(0,184,252,0.1)] relative overflow-hidden"
+      className="group relative w-full cursor-pointer rounded-sm mb-4"
     >
-      {/* Accent Line on hover */}
-      <div className="absolute top-0 left-0 w-1 h-full bg-arena-cyan scale-y-0 group-hover:scale-y-100 transition-transform duration-300 origin-bottom"></div>
+      {/* Underlay Container */}
+      <div 
+        className="absolute inset-0 rounded-sm"
+        style={{ backgroundColor: accentColor }}
+      />
+      
+      {/* Thumbnail Surface */}
+      <div className="relative z-10 w-full h-full bg-[#0D1117] border border-arena-border rounded-sm p-5 transition-transform duration-150 ease-out group-hover:-translate-y-1.5 group-hover:translate-x-1.5 flex flex-col justify-between overflow-hidden">
 
       <div className="flex justify-between items-start mb-4">
         <Badge status={match.status} />
@@ -58,6 +73,7 @@ export const MatchCard: FC<MatchCardProps> = ({ match }) => {
             <Video size={14} className="mr-1" /> Link Stream
           </button>
         )}
+      </div>
       </div>
     </div>
   );
