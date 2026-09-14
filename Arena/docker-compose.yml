@@ -47,6 +47,22 @@ services:
     depends_on:
       - mysql
 
+  tournament:
+    build:
+      context: .
+      dockerfile: services/tournament/Dockerfile
+    container_name: arena-tournament
+    ports:
+      - "8082:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__DefaultConnection=Server=mysql;Port=3306;Database=arena_tournament_db;Uid=root;Pwd=rootpassword;AllowUserVariables=True;
+      - JwtSettings__Secret=${JWT_SECRET}
+      - JwtSettings__Issuer=Arena.UserService
+      - JwtSettings__Audience=Arena.Platform
+    depends_on:
+      - mysql
+
   mysql:
     image: mysql:8.0
     container_name: arena-mysql
