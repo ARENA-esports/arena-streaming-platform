@@ -47,6 +47,35 @@ public class TournamentAuthorizationTests
     }
 
     [Fact]
+    public void TeamsController_CreateTeam_RequiresOrganizerRole()
+    {
+        // Arrange
+        var method = typeof(TeamsController).GetMethod("CreateTeam");
+        Assert.NotNull(method);
+
+        // Assert HTTP Method attribute is HttpPost
+        var httpAttr = method.GetCustomAttribute<HttpPostAttribute>();
+        Assert.NotNull(httpAttr);
+
+        // Assert Authorize attribute is present with Roles = "Organizer"
+        var authAttr = method.GetCustomAttribute<AuthorizeAttribute>();
+        Assert.NotNull(authAttr);
+        Assert.Equal("Organizer", authAttr.Roles);
+    }
+
+    [Fact]
+    public void TeamsController_GetTeamById_AllowsAnonymousAccess()
+    {
+        // Arrange
+        var method = typeof(TeamsController).GetMethod("GetTeamById");
+        Assert.NotNull(method);
+
+        // Assert AllowAnonymous attribute is present
+        var allowAnonymousAttr = method.GetCustomAttribute<AllowAnonymousAttribute>();
+        Assert.NotNull(allowAnonymousAttr);
+    }
+
+    [Fact]
     public void Rs256JwtValidation_ValidOrganizerToken_ValidatesSuccessfullyWithOrganizerRole()
     {
         // Arrange: Generate RSA 2048-bit key pair
