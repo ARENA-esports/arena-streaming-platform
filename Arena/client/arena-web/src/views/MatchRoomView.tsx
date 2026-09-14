@@ -2,14 +2,15 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { StreamResponse, MatchResponse } from '../types';
 import { matchService } from '../api/matchService';
-import TwitchEmbed from '../components/player/TwitchEmbed';
-import FallbackAlert from '../components/player/FallbackAlert';
+import { StreamContainer } from '../components/player/StreamContainer';
 import Badge from '../components/common/Badge';
 import Button from '../components/common/Button';
 import { useAuth } from '../context/AuthContext';
 import EditMatchModal from '../components/match/EditMatchModal';
 import DeleteMatchModal from '../components/match/DeleteMatchModal';
-import MatchSidePanel from '../components/match/MatchSidePanel';
+import BattleBar from '../components/match/BattleBar';
+import TeamSelector from '../components/match/TeamSelector';
+import FactionChat from '../components/chat/FactionChat';
 
 export const MatchRoomView: React.FC = () => {
   const { matchId } = useParams<{ matchId: string }>();
@@ -18,7 +19,7 @@ export const MatchRoomView: React.FC = () => {
   const [match, setMatch] = useState<MatchResponse | null>(null);
   const [stream, setStream] = useState<StreamResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [is404, setIs404] = useState(false);
+  const [, setIs404] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
@@ -102,19 +103,21 @@ export const MatchRoomView: React.FC = () => {
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:h-[600px]">
-        <div className="lg:col-span-8 flex flex-col justify-center">
-          {stream ? (
-            <TwitchEmbed url={stream.twitchUrl} />
-          ) : is404 ? (
-            <FallbackAlert />
-          ) : (
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 w-full h-full py-4">
+        {/* Video Player Section (Span 3 Columns) */}
+        <div className="lg:col-span-3 flex flex-col gap-3 min-w-0">
+          <BattleBar matchId={match.matchId} />
+          {isLoading ? (
             <div className="w-full aspect-video bg-arena-surface border border-arena-border animate-pulse"></div>
+          ) : (
+            <StreamContainer apiChannelName={stream?.channelName} />
           )}
+          <TeamSelector matchId={match.matchId} />
         </div>
-        
-        <div className="lg:col-span-4 h-full">
-          <MatchSidePanel match={match} stream={stream} />
+
+        {/* Chat Sidebar (Span 1 Column) */}
+        <div className="lg:col-span-1 h-[600px] lg:h-auto min-w-0">
+          <FactionChat matchId={match.matchId} />
         </div>
       </div>
 
