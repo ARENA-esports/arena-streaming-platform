@@ -1,9 +1,10 @@
 import { FC, ReactNode, useState } from 'react';
+import { Outlet } from 'react-router-dom';
 import TopBar from './TopBar';
 import Sidebar from './Sidebar';
 
 interface DashboardLayoutProps {
-  children: ReactNode;
+  children?: ReactNode;
 }
 
 export const DashboardLayout: FC<DashboardLayoutProps> = ({ children }) => {
@@ -19,7 +20,7 @@ export const DashboardLayout: FC<DashboardLayoutProps> = ({ children }) => {
       <div className="flex-1 flex flex-col min-w-0 h-screen overflow-y-auto">
         <TopBar />
         <main className="stream-main">
-          {children}
+          {children || <Outlet />}
         </main>
       </div>
     </div>

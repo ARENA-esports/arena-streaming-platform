@@ -13,7 +13,7 @@ services:
       - mysql-user-data:/var/lib/mysql
       - ./services/user/src/migrations:/docker-entrypoint-initdb.d
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-prootpassword"]
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-prootpassword" ]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -24,12 +24,16 @@ services:
       dockerfile: services/user/Dockerfile
     container_name: arena-user
     ports:
-      - "8080:8080"
+      - "5168:8080"
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__UserDb=Server=mysql-user;Port=3306;Database=arena_user_db;Uid=arena;Pwd=arena_password;
       - JwtSettings__Secret=${JWT_SECRET}
       - JwtSettings__Issuer=Arena.UserService
       - JwtSettings__Audience=Arena.Platform
+    depends_on:
+      mysql-user:
+        condition: service_healthy
 
   stream:
     build:
@@ -37,7 +41,7 @@ services:
       dockerfile: services/stream/Dockerfile
     container_name: arena-stream
     ports:
-      - "8081:8080"
+      - "5167:8080"
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ConnectionStrings__DefaultConnection=Server=mysql;Port=3306;Database=arena_stream_db;Uid=root;Pwd=rootpassword;AllowUserVariables=True;
@@ -45,7 +49,8 @@ services:
       - JwtSettings__Issuer=Arena.UserService
       - JwtSettings__Audience=Arena.Platform
     depends_on:
-      - mysql
+      mysql:
+        condition: service_healthy
 
   tournament:
     build:
@@ -61,7 +66,8 @@ services:
       - JwtSettings__Issuer=Arena.UserService
       - JwtSettings__Audience=Arena.Platform
     depends_on:
-      - mysql
+      mysql:
+        condition: service_healthy
 
   mysql:
     image: mysql:8.0
@@ -70,6 +76,16 @@ services:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: arena_stream_db
     ports:
-      - "3306:3306"
+      - "3308:3306"
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD}" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
     volumes:
       - ./infra/mysql/01_create_stream_db.sql:/docker-entrypoint-initdb.d/01_create_stream_db.sql
+      - mysql-stream-data:/var/lib/mysql
+
+volumes:
+  mysql-user-data:
+  mysql-stream-data:
