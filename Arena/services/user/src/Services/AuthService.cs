@@ -2,10 +2,6 @@ using System;
 using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
 using System.Security.Cryptography;
-using System.Threading.Tasks;
-using BCrypt.Net;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Hosting;
 using UserService.Entities;
 using UserService.Models;
 using UserService.Repositories;
@@ -18,6 +14,7 @@ public class AuthService : IAuthService
     private readonly IJwtTokenGenerator _jwtTokenGenerator;
     private readonly ITokenBlacklistService _tokenBlacklistService;
     private readonly IPasswordResetRepository _passwordResetRepository;
+    private readonly IEmailVerificationRepository _emailVerificationRepository;
     private readonly IConfiguration _configuration;
     private readonly IHostEnvironment _environment;
 
@@ -26,6 +23,7 @@ public class AuthService : IAuthService
         IJwtTokenGenerator jwtTokenGenerator,
         ITokenBlacklistService tokenBlacklistService,
         IPasswordResetRepository passwordResetRepository,
+        IEmailVerificationRepository emailVerificationRepository,
         IConfiguration configuration,
         IHostEnvironment environment)
     {
@@ -33,6 +31,7 @@ public class AuthService : IAuthService
         _jwtTokenGenerator = jwtTokenGenerator;
         _tokenBlacklistService = tokenBlacklistService;
         _passwordResetRepository = passwordResetRepository;
+        _emailVerificationRepository = emailVerificationRepository;
         _configuration = configuration;
         _environment = environment;
     }
@@ -51,7 +50,7 @@ public class AuthService : IAuthService
             throw new InvalidOperationException("Username is already taken.");
         }
 
-        string passwordHash = BCrypt.Net.BCrypt.HashPassword(request.Password);
+        var passwordHash = BCrypt.Net.BCrypt.HashPassword(request.Password);
 
         var user = new User
         {
@@ -61,15 +60,43 @@ public class AuthService : IAuthService
             Role = "Viewer" // Default role
         };
 
-        int userId = await _userRepository.CreateUserAsync(user);
+        var userId = await _userRepository.CreateUserAsync(user);
 
-        return new SignupResponse
+        // Generate email verification token upon signup
+        var expiryMinutes = _configuration.GetValue<int>("EmailVerificationSettings:ExpiryMinutes", 1440);
+        if (expiryMinutes <= 0)
+        {
+            expiryMinutes = 1440;
+        }
+
+        var tokenBytes = RandomNumberGenerator.GetBytes(32);
+        var token = Convert.ToHexString(tokenBytes).ToLowerInvariant();
+        var expiresAt = DateTime.UtcNow.AddMinutes(expiryMinutes);
+
+        var verificationToken = new EmailVerificationToken
+        {
+            UserId = userId,
+            Token = token,
+            ExpiresAt = expiresAt,
+            IsUsed = false
+        };
+
+        await _emailVerificationRepository.CreateTokenAsync(verificationToken);
+
+        var response = new SignupResponse
         {
             UserId = userId,
             Username = user.Username,
             Email = user.Email,
             Message = "Signup successful. Please verify your email."
         };
+
+        if (_environment.IsDevelopment())
+        {
+            response.VerificationToken = token;
+        }
+
+        return response;
     }
 
     public async Task<LoginResponse> LoginAsync(LoginRequest request)
@@ -107,7 +134,7 @@ public class AuthService : IAuthService
 
         if (tokenString.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
         {
-            tokenString = tokenString.Substring("Bearer ".Length).Trim();
+            tokenString = tokenString[7..].Trim();
         }
 
         var handler = new JwtSecurityTokenHandler();
@@ -142,14 +169,14 @@ public class AuthService : IAuthService
             };
         }
 
-        int expiryMinutes = _configuration.GetValue<int>("PasswordResetSettings:ExpiryMinutes", 15);
+        var expiryMinutes = _configuration.GetValue<int>("PasswordResetSettings:ExpiryMinutes", 15);
         if (expiryMinutes <= 0)
         {
             expiryMinutes = 15;
         }
 
         var tokenBytes = RandomNumberGenerator.GetBytes(32);
-        string token = Convert.ToHexString(tokenBytes).ToLowerInvariant();
+        var token = Convert.ToHexString(tokenBytes).ToLowerInvariant();
         var expiresAt = DateTime.UtcNow.AddMinutes(expiryMinutes);
 
         await _passwordResetRepository.InvalidateUserTokensAsync(user.UserId);
@@ -192,7 +219,7 @@ public class AuthService : IAuthService
             throw new InvalidOperationException("Invalid or expired reset token.");
         }
 
-        string passwordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
+        var passwordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
         await _userRepository.UpdatePasswordAsync(resetToken.UserId, passwordHash);
         await _passwordResetRepository.MarkAsUsedAsync(resetToken.Token);
 
@@ -203,6 +230,96 @@ public class AuthService : IAuthService
         {
             Message = "Password has been successfully reset."
         };
+    }
+
+    public async Task<UserProfileResponse?> GetProfileAsync(int userId)
+    {
+        var user = await _userRepository.GetByIdAsync(userId);
+        if (user == null)
+        {
+            return null;
+        }
+
+        return new UserProfileResponse
+        {
+            UserId = user.UserId,
+            Username = user.Username,
+            Email = user.Email,
+            Role = user.Role,
+            EmailVerified = user.EmailVerified,
+            AvatarUrl = user.AvatarUrl,
+            CreatedAt = user.CreatedAt,
+            UpdatedAt = user.UpdatedAt
+        };
+    }
+
+    public async Task<VerifyEmailResponse> VerifyEmailAsync(VerifyEmailRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Token))
+        {
+            throw new ArgumentException("Verification token is required.");
+        }
+
+        var verificationToken = await _emailVerificationRepository.GetByTokenAsync(request.Token);
+        if (verificationToken == null || verificationToken.IsUsed || verificationToken.ExpiresAt <= DateTime.UtcNow)
+        {
+            throw new InvalidOperationException("Invalid or expired verification token.");
+        }
+
+        await _userRepository.VerifyEmailAsync(verificationToken.UserId);
+        await _emailVerificationRepository.MarkAsUsedAsync(verificationToken.Token);
+
+        return new VerifyEmailResponse
+        {
+            Message = "Email has been successfully verified."
+        };
+    }
+
+    public async Task<ResendVerificationEmailResponse> ResendVerificationEmailAsync(ResendVerificationEmailRequest request)
+    {
+        var user = await _userRepository.GetByEmailAsync(request.Email);
+        if (user == null || user.EmailVerified)
+        {
+            // Generic response prevents account enumeration
+            return new ResendVerificationEmailResponse
+            {
+                Message = "If the email is registered and unverified, a verification email has been sent."
+            };
+        }
+
+        var expiryMinutes = _configuration.GetValue<int>("EmailVerificationSettings:ExpiryMinutes", 1440);
+        if (expiryMinutes <= 0)
+        {
+            expiryMinutes = 1440;
+        }
+
+        var tokenBytes = RandomNumberGenerator.GetBytes(32);
+        var token = Convert.ToHexString(tokenBytes).ToLowerInvariant();
+        var expiresAt = DateTime.UtcNow.AddMinutes(expiryMinutes);
+
+        await _emailVerificationRepository.InvalidateUserTokensAsync(user.UserId);
+
+        var verificationToken = new EmailVerificationToken
+        {
+            UserId = user.UserId,
+            Token = token,
+            ExpiresAt = expiresAt,
+            IsUsed = false
+        };
+
+        await _emailVerificationRepository.CreateTokenAsync(verificationToken);
+
+        var response = new ResendVerificationEmailResponse
+        {
+            Message = "If the email is registered and unverified, a verification email has been sent."
+        };
+
+        if (_environment.IsDevelopment())
+        {
+            response.VerificationToken = token;
+        }
+
+        return response;
     }
 
     public async Task<LoginResponse> RefreshTokenAsync(int userId)
