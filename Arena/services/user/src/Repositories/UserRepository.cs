@@ -87,6 +87,7 @@ public class UserRepository : IUserRepository
 
         return rowsAffected > 0;
     }
+
     public async Task<bool> UpdateProfileAsync(int userId, string username, string email, string? avatarUrl, string? displayName, string? bio, string? bannerUrl, bool emailVerified)
     {
         using var connection = CreateConnection();
@@ -116,6 +117,7 @@ public class UserRepository : IUserRepository
 
         return rowsAffected > 0;
     }
+
     public async Task<bool> VerifyEmailAsync(int userId)
     {
         using var connection = CreateConnection();
