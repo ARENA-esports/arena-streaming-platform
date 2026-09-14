@@ -226,27 +226,153 @@ public class TournamentsControllerTests
         Assert.Equal(StatusCodes.Status404NotFound, notFoundResult.StatusCode);
     }
 
+    #endregion
+
+    #region View All Tournaments Tests
+
     [Fact]
-    public async Task GetAllTournaments_Returns200WithList()
+    public async Task GetAllTournaments_NoFilter_Returns200WithAllTournamentsOrderedByStartDate()
     {
         // Arrange
-        var tournaments = new List<TournamentResponse>
-        {
-            new(1, "Winter Open", "WINTER-2026", DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddDays(10), TournamentStatus.Completed),
-            new(2, "Spring Open", "SPRING-2026", DateTimeOffset.UtcNow.AddDays(15), DateTimeOffset.UtcNow.AddDays(25), TournamentStatus.Scheduled)
-        };
+        var t1 = new TournamentResponse(1, "Winter Open", "WINTER-2026", DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddDays(10), TournamentStatus.Completed);
+        var t2 = new TournamentResponse(2, "Spring Open", "SPRING-2026", DateTimeOffset.UtcNow.AddDays(15), DateTimeOffset.UtcNow.AddDays(25), TournamentStatus.Scheduled);
+        var tournaments = new List<TournamentResponse> { t1, t2 };
 
-        _mockRepository.Setup(r => r.GetAllTournamentsAsync())
+        _mockRepository.Setup(r => r.GetAllTournamentsAsync(null))
             .ReturnsAsync(tournaments);
 
         // Act
-        var result = await _controller.GetAllTournaments();
+        var result = await _controller.GetAllTournaments(null);
 
         // Assert
         var okResult = Assert.IsType<OkObjectResult>(result);
         Assert.Equal(StatusCodes.Status200OK, okResult.StatusCode);
         var response = Assert.IsAssignableFrom<IEnumerable<TournamentResponse>>(okResult.Value);
         Assert.Equal(2, response.Count());
+        Assert.Equal(t1.StartDate, response.First().StartDate);
+        _mockRepository.Verify(r => r.GetAllTournamentsAsync(null), Times.Once);
+    }
+
+    [Theory]
+    [InlineData(TournamentStatus.Scheduled)]
+    [InlineData(TournamentStatus.Active)]
+    [InlineData(TournamentStatus.Completed)]
+    [InlineData(TournamentStatus.Cancelled)]
+    public async Task GetAllTournaments_WithValidStatusFilter_ReturnsFilteredTournaments(string status)
+    {
+        // Arrange
+        var filteredList = new List<TournamentResponse>
+        {
+            new(10, $"Test {status} Tournament", "TEST-SEASON", DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddDays(7), status)
+        };
+
+        _mockRepository.Setup(r => r.GetAllTournamentsAsync(status))
+            .ReturnsAsync(filteredList);
+
+        // Act
+        var result = await _controller.GetAllTournaments(status);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(StatusCodes.Status200OK, okResult.StatusCode);
+        var response = Assert.IsAssignableFrom<IEnumerable<TournamentResponse>>(okResult.Value);
+        Assert.Single(response);
+        Assert.Equal(status, response.First().Status);
+        _mockRepository.Verify(r => r.GetAllTournamentsAsync(status), Times.Once);
+    }
+
+    [Fact]
+    public async Task GetAllTournaments_WithStatusCaseInsensitive_PassesCanonicalStatusToRepository()
+    {
+        // Arrange
+        var activeTournaments = new List<TournamentResponse>
+        {
+            new(3, "Active Major", "MAJOR-2026", DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddDays(5), TournamentStatus.Active)
+        };
+
+        _mockRepository.Setup(r => r.GetAllTournamentsAsync(TournamentStatus.Active))
+            .ReturnsAsync(activeTournaments);
+
+        // Act: send lowercase "active"
+        var result = await _controller.GetAllTournaments("active");
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(StatusCodes.Status200OK, okResult.StatusCode);
+        var response = Assert.IsAssignableFrom<IEnumerable<TournamentResponse>>(okResult.Value);
+        Assert.Single(response);
+        _mockRepository.Verify(r => r.GetAllTournamentsAsync(TournamentStatus.Active), Times.Once);
+    }
+
+    [Fact]
+    public async Task GetAllTournaments_EmptyDatabase_Returns200WithEmptyCollection()
+    {
+        // Arrange
+        _mockRepository.Setup(r => r.GetAllTournamentsAsync(null))
+            .ReturnsAsync(new List<TournamentResponse>());
+
+        // Act
+        var result = await _controller.GetAllTournaments(null);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(StatusCodes.Status200OK, okResult.StatusCode);
+        var response = Assert.IsAssignableFrom<IEnumerable<TournamentResponse>>(okResult.Value);
+        Assert.Empty(response);
+        _mockRepository.Verify(r => r.GetAllTournamentsAsync(null), Times.Once);
+    }
+
+    [Fact]
+    public async Task GetAllTournaments_FilteredStatusWithNoMatches_Returns200WithEmptyCollection()
+    {
+        // Arrange
+        _mockRepository.Setup(r => r.GetAllTournamentsAsync(TournamentStatus.Cancelled))
+            .ReturnsAsync(new List<TournamentResponse>());
+
+        // Act
+        var result = await _controller.GetAllTournaments("Cancelled");
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(StatusCodes.Status200OK, okResult.StatusCode);
+        var response = Assert.IsAssignableFrom<IEnumerable<TournamentResponse>>(okResult.Value);
+        Assert.Empty(response);
+        _mockRepository.Verify(r => r.GetAllTournamentsAsync(TournamentStatus.Cancelled), Times.Once);
+    }
+
+    [Theory]
+    [InlineData("InvalidStatus")]
+    [InlineData("Archived")]
+    [InlineData("Unknown")]
+    [InlineData("12345")]
+    public async Task GetAllTournaments_InvalidStatusFilter_Returns400BadRequest(string invalidStatus)
+    {
+        // Act
+        var result = await _controller.GetAllTournaments(invalidStatus);
+
+        // Assert
+        var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
+        Assert.Equal(StatusCodes.Status400BadRequest, badRequestResult.StatusCode);
+        _mockRepository.Verify(r => r.GetAllTournamentsAsync(It.IsAny<string?>()), Times.Never);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("\t")]
+    public async Task GetAllTournaments_WhitespaceOrEmptyStatus_CallsRepositoryWithoutFilter(string emptyStatus)
+    {
+        // Arrange
+        _mockRepository.Setup(r => r.GetAllTournamentsAsync(null))
+            .ReturnsAsync(new List<TournamentResponse>());
+
+        // Act
+        var result = await _controller.GetAllTournaments(emptyStatus);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(StatusCodes.Status200OK, okResult.StatusCode);
+        _mockRepository.Verify(r => r.GetAllTournamentsAsync(null), Times.Once);
     }
 
     #endregion
