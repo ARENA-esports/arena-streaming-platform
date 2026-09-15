@@ -30,6 +30,20 @@ public class TeamsController : ControllerBase
     }
 
     /// <summary>
+    /// Retrieves a list of all registered teams with branding colors and logos.
+    /// Publicly accessible to any viewer.
+    /// </summary>
+    /// <returns>List of registered teams with 200 OK.</returns>
+    [HttpGet]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(IReadOnlyList<TeamResponse>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetAllTeams()
+    {
+        var teams = await _teamRepository.GetAllTeamsAsync();
+        return Ok(teams);
+    }
+
+    /// <summary>
     /// Registers a new team and assigns its faction color code.
     /// Restricted to users with the Organizer role.
     /// </summary>
@@ -86,18 +100,18 @@ public class TeamsController : ControllerBase
     }
 
     /// <summary>
-    /// Retrieves a team by its unique identifier.
-    /// Publicly accessible to authenticated and unauthenticated users.
+    /// Retrieves a team by its unique identifier along with its active roster of players.
+    /// Publicly accessible to authenticated and unauthenticated viewers.
     /// </summary>
     /// <param name="id">Team identifier.</param>
-    /// <returns>Team details if found, or 404 Not Found.</returns>
+    /// <returns>Team details with active roster if found, or 404 Not Found.</returns>
     [HttpGet("{id:int}")]
     [AllowAnonymous]
-    [ProducesResponseType(typeof(TeamResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(TeamDetailsResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetTeamById(int id)
     {
-        var team = await _teamRepository.GetTeamByIdAsync(id);
+        var team = await _teamRepository.GetTeamWithRosterAsync(id);
         if (team == null)
         {
             return NotFound(new { message = $"Team with ID {id} not found." });

@@ -197,9 +197,20 @@ public class TeamsControllerTests
     {
         // Arrange
         const int teamId = 1;
-        var existingTeam = new TeamResponse(teamId, "Team Crimson", "#FF0055", LogoUrl: null, CreatedAt: DateTime.UtcNow, UpdatedAt: null);
+        var existingTeam = new TeamDetailsResponse(
+            teamId,
+            "Team Crimson",
+            "#FF0055",
+            LogoUrl: null,
+            Roster: new List<PlayerResponse>
+            {
+                new(1, teamId, "ViperX", "Captain", true)
+            },
+            CreatedAt: DateTime.UtcNow,
+            UpdatedAt: null
+        );
 
-        _mockRepository.Setup(r => r.GetTeamByIdAsync(teamId))
+        _mockRepository.Setup(r => r.GetTeamWithRosterAsync(teamId))
             .ReturnsAsync(existingTeam);
 
         // Act
@@ -208,10 +219,12 @@ public class TeamsControllerTests
         // Assert
         var okResult = Assert.IsType<OkObjectResult>(result);
         Assert.Equal(StatusCodes.Status200OK, okResult.StatusCode);
-        var response = Assert.IsType<TeamResponse>(okResult.Value);
+        var response = Assert.IsType<TeamDetailsResponse>(okResult.Value);
         Assert.Equal(teamId, response.TeamId);
         Assert.Equal("Team Crimson", response.TeamName);
         Assert.Equal("#FF0055", response.ColorHex);
+        Assert.Single(response.Roster);
+        Assert.Equal("ViperX", response.Roster[0].Username);
     }
 
     [Fact]
@@ -219,8 +232,8 @@ public class TeamsControllerTests
     {
         // Arrange
         const int nonExistentId = 999;
-        _mockRepository.Setup(r => r.GetTeamByIdAsync(nonExistentId))
-            .ReturnsAsync((TeamResponse?)null);
+        _mockRepository.Setup(r => r.GetTeamWithRosterAsync(nonExistentId))
+            .ReturnsAsync((TeamDetailsResponse?)null);
 
         // Act
         var result = await _controller.GetTeamById(nonExistentId);
