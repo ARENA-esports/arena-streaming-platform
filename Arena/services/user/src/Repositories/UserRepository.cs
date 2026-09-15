@@ -134,12 +134,4 @@ public class UserRepository : IUserRepository
         var rowsAffected = await connection.ExecuteAsync(sql, new { UserId = userId });
         return rowsAffected > 0;
     }
-
-    public async Task<bool> DeleteUserAsync(int userId)
-    {
-        using var connection = CreateConnection();
-        const string sql = "DELETE FROM users WHERE user_id = @UserId";
-        var rowsAffected = await connection.ExecuteAsync(sql, new { UserId = userId });
-        return rowsAffected > 0;
-    }
 }
