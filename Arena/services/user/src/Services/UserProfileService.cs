@@ -32,6 +32,9 @@ public class UserProfileService : IUserService
             Role = user.Role,
             EmailVerified = user.EmailVerified,
             AvatarUrl = user.AvatarUrl,
+            DisplayName = user.DisplayName,
+            Bio = user.Bio,
+            BannerUrl = user.BannerUrl,
             CreatedAt = user.CreatedAt,
             UpdatedAt = user.UpdatedAt
         };
@@ -83,7 +86,25 @@ public class UserProfileService : IUserService
             updatedAvatarUrl = string.IsNullOrWhiteSpace(request.AvatarUrl) ? null : request.AvatarUrl.Trim();
         }
 
-        await _userRepository.UpdateProfileAsync(userId, updatedUsername, updatedEmail, updatedAvatarUrl, emailVerified);
+        var updatedDisplayName = user.DisplayName;
+        if (request.DisplayName != null)
+        {
+            updatedDisplayName = string.IsNullOrWhiteSpace(request.DisplayName) ? null : request.DisplayName.Trim();
+        }
+
+        var updatedBio = user.Bio;
+        if (request.Bio != null)
+        {
+            updatedBio = string.IsNullOrWhiteSpace(request.Bio) ? null : request.Bio.Trim();
+        }
+
+        var updatedBannerUrl = user.BannerUrl;
+        if (request.BannerUrl != null)
+        {
+            updatedBannerUrl = string.IsNullOrWhiteSpace(request.BannerUrl) ? null : request.BannerUrl.Trim();
+        }
+
+        await _userRepository.UpdateProfileAsync(userId, updatedUsername, updatedEmail, updatedAvatarUrl, updatedDisplayName, updatedBio, updatedBannerUrl, emailVerified);
 
         var refreshedUser = await _userRepository.GetByIdAsync(userId);
         return new UserProfileResponse
@@ -94,6 +115,9 @@ public class UserProfileService : IUserService
             Role = refreshedUser.Role,
             EmailVerified = refreshedUser.EmailVerified,
             AvatarUrl = refreshedUser.AvatarUrl,
+            DisplayName = refreshedUser.DisplayName,
+            Bio = refreshedUser.Bio,
+            BannerUrl = refreshedUser.BannerUrl,
             CreatedAt = refreshedUser.CreatedAt,
             UpdatedAt = refreshedUser.UpdatedAt
         };
@@ -137,5 +161,20 @@ public class UserProfileService : IUserService
         {
             Message = "Password has been successfully changed."
         };
+    }
+
+    public async Task DeleteAccountAsync(int userId)
+    {
+        var user = await _userRepository.GetByIdAsync(userId);
+        if (user == null)
+        {
+            throw new KeyNotFoundException("User not found.");
+        }
+
+        // Revoke active sessions
+        await _tokenBlacklistService.RevokeUserTokensAsync(userId, DateTime.UtcNow.AddMinutes(120));
+
+        // Hard delete user from database
+        await _userRepository.DeleteUserAsync(userId);
     }
 }

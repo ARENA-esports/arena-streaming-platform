@@ -12,6 +12,7 @@ public interface IUserRepository
     Task<User?> GetByUsernameExcludingUserAsync(string username, int userId);
     Task<int> CreateUserAsync(User user);
     Task<bool> UpdatePasswordAsync(int userId, string passwordHash);
-    Task<bool> UpdateProfileAsync(int userId, string username, string email, string? avatarUrl, bool emailVerified);
+    Task<bool> UpdateProfileAsync(int userId, string username, string email, string? avatarUrl, string? displayName, string? bio, string? bannerUrl, bool emailVerified);
+    Task<bool> DeleteUserAsync(int userId);
     Task<bool> VerifyEmailAsync(int userId);
 }

@@ -3,10 +3,13 @@ using Microsoft.AspNetCore.Authorization;   //import [Authorize] and role-based 
 using StreamService.DTOs;
 using StreamService.Repositories;
 
+using Microsoft.AspNetCore.RateLimiting;
+
 namespace StreamService.Controllers;
 
 [ApiController]     // enable auto model validation base on DTO data annotations
 [Route("api/[controller]")]     // map route dynamically base on controller name prefix
+[EnableRateLimiting("StreamIpLimiter")]
 public class MatchesController : ControllerBase
 {
     private readonly IMatchRepository _matchRepository;     // hold repository reference securely, prevent modification

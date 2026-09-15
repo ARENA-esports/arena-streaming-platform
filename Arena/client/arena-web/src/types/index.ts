@@ -50,6 +50,13 @@ export interface UserProfile {
   username: string;
   email: string;
   role: 'Viewer' | 'Streamer' | 'Organizer';
+  emailVerified?: boolean;
+  avatarUrl?: string;
+  displayName?: string;
+  bio?: string;
+  bannerUrl?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface CreateMatchRequest {

@@ -2,14 +2,15 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { StreamResponse, MatchResponse } from '../types';
 import { matchService } from '../api/matchService';
-import TwitchEmbed from '../components/player/TwitchEmbed';
-import FallbackAlert from '../components/player/FallbackAlert';
+import { StreamContainer } from '../components/player/StreamContainer';
 import Badge from '../components/common/Badge';
 import Button from '../components/common/Button';
 import { useAuth } from '../context/AuthContext';
 import EditMatchModal from '../components/match/EditMatchModal';
 import DeleteMatchModal from '../components/match/DeleteMatchModal';
-import MatchSidePanel from '../components/match/MatchSidePanel';
+import BattleBar from '../components/match/BattleBar';
+import TeamSelector from '../components/match/TeamSelector';
+import FactionChat from '../components/chat/FactionChat';
 
 export const MatchRoomView: React.FC = () => {
   const { matchId } = useParams<{ matchId: string }>();
@@ -18,9 +19,10 @@ export const MatchRoomView: React.FC = () => {
   const [match, setMatch] = useState<MatchResponse | null>(null);
   const [stream, setStream] = useState<StreamResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [is404, setIs404] = useState(false);
+  const [, setIs404] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState('team');
 
   useEffect(() => {
     if (!matchId) return;
@@ -102,19 +104,44 @@ export const MatchRoomView: React.FC = () => {
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:h-[600px]">
-        <div className="lg:col-span-8 flex flex-col justify-center">
-          {stream ? (
-            <TwitchEmbed url={stream.twitchUrl} />
-          ) : is404 ? (
-            <FallbackAlert />
+      <div className="grid grid-cols-1 lg:grid-cols-[3fr_1fr] gap-4 w-full h-full py-4">
+        {/* Video Player Section - Always mounted in left column */}
+        <div className="lg:col-start-1 flex flex-col gap-3 min-w-0">
+          {isLoading ? (
+            <div className="w-full aspect-video bg-arena-surface border border-arena-border animate-pulse rounded-sm"></div>
           ) : (
-            <div className="w-full aspect-video bg-arena-surface border border-arena-border animate-pulse"></div>
+            <StreamContainer apiChannelName={stream?.channelName} />
           )}
         </div>
-        
-        <div className="lg:col-span-4 h-full">
-          <MatchSidePanel match={match} stream={stream} />
+
+        {/* Panel Group - Always mounted in right column, visibility toggled on mobile */}
+        <div className="lg:col-start-2 flex flex-col gap-4 min-w-0">
+          {/* Tab switcher - mobile only */}
+          <div className="flex lg:hidden border-b border-arena-border mb-2">
+            {['team', 'chat', 'battle'].map(tab => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`px-4 py-3 flex-1 text-sm font-bold uppercase tracking-wider transition-colors duration-200 ${
+                  activeTab === tab 
+                    ? 'border-b-2 border-arena-cyan text-arena-text' 
+                    : 'text-arena-textMuted hover:text-arena-text'
+                }`}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
+
+          <div className={activeTab === 'team' ? 'block' : 'hidden lg:block'}>
+            <TeamSelector matchId={match.matchId} />
+          </div>
+          <div className={`h-[600px] lg:h-auto min-w-0 ${activeTab === 'chat' ? 'block' : 'hidden lg:block'}`}>
+            <FactionChat matchId={match.matchId} />
+          </div>
+          <div className={activeTab === 'battle' ? 'block' : 'hidden lg:block'}>
+            <BattleBar matchId={match.matchId} />
+          </div>
         </div>
       </div>
 

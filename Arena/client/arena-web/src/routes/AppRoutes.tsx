@@ -16,22 +16,19 @@ import ResetPasswordView from '../views/ResetPasswordView';
 import ScheduleMatchView from '../views/ScheduleMatchView';
 import LinkStreamView from '../views/LinkStreamView';
 import ForbiddenView from '../views/ForbiddenView';
+import ProfileSettingsView from '../views/ProfileSettingsView';
 
 export const AppRoutes: FC = () => {
   return (
-    <DashboardLayout>
-      <Routes>
-        {/* Public Routes */}
+    <Routes>
+      {/* Public Routes with Dashboard Layout */}
+      <Route element={<DashboardLayout />}>
         <Route path="/" element={<HomeView />} />
         <Route path="/matches" element={<MatchesView />} />
         <Route path="/matches/:matchId" element={<MatchRoomView />} />
-        <Route path="/login" element={<LoginView />} />
-        <Route path="/signup" element={<SignupView />} />
-        <Route path="/forgot-password" element={<ForgotPasswordView />} />
-        <Route path="/reset-password" element={<ResetPasswordView />} />
         <Route path="/403" element={<ForbiddenView />} />
-
-        {/* Protected Routes */}
+        
+        {/* Protected Routes with Dashboard Layout */}
         <Route
           path="/organizer/matches/new"
           element={
@@ -48,7 +45,21 @@ export const AppRoutes: FC = () => {
             </ProtectedRoute>
           }
         />
-      </Routes>
-    </DashboardLayout>
+        <Route
+          path="/settings/profile"
+          element={
+            <ProtectedRoute allowedRoles={['Viewer', 'Streamer', 'Organizer']}>
+              <ProfileSettingsView />
+            </ProtectedRoute>
+          }
+        />
+      </Route>
+
+      {/* Auth Routes without Dashboard Layout */}
+      <Route path="/login" element={<LoginView />} />
+      <Route path="/signup" element={<SignupView />} />
+      <Route path="/forgot-password" element={<ForgotPasswordView />} />
+      <Route path="/reset-password" element={<ResetPasswordView />} />
+    </Routes>
   );
 };

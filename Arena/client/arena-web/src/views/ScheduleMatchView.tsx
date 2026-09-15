@@ -3,11 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { useFormik } from 'formik';
 import * as Yup from 'yup';
 import { matchService } from '../api/matchService';
-import Input from '../components/common/Input';
+import { useTheme } from '../context/ThemeContext';
 import Button from '../components/common/Button';
 
 export const ScheduleMatchView: FC = () => {
   const navigate = useNavigate();
+  const { actualTheme } = useTheme();
   const [serverError, setServerError] = useState<string | null>(null);
 
   const formik = useFormik({
@@ -48,9 +49,9 @@ export const ScheduleMatchView: FC = () => {
   });
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-12">
-      <div className="bg-arena-surface border border-arena-border rounded-sm p-8 shadow-[0_0_50px_rgba(0,184,252,0.05)]">
-        <h1 className="text-3xl font-bold text-white mb-8">
+    <div className="max-w-xl mx-auto px-4 py-12">
+      <div className="bg-[var(--panel)] border border-[var(--line)] rounded-lg p-8 shadow-xl">
+        <h1 className="text-3xl font-bold text-[var(--text)] mb-8">
           Schedule Match
         </h1>
 
@@ -62,29 +63,45 @@ export const ScheduleMatchView: FC = () => {
           )}
 
           <div className="grid grid-cols-2 gap-6">
-            <Input
-              label="Team A ID"
-              id="teamAId"
-              type="number"
-              {...formik.getFieldProps('teamAId')}
-              error={formik.touched.teamAId ? formik.errors.teamAId : undefined}
-            />
-            <Input
-              label="Team B ID"
-              id="teamBId"
-              type="number"
-              {...formik.getFieldProps('teamBId')}
-              error={formik.touched.teamBId ? formik.errors.teamBId : undefined}
-            />
+            <div>
+              <label htmlFor="teamAId" className="text-xs font-mono text-[var(--muted)] mb-1 block uppercase">Team A ID</label>
+              <input
+                id="teamAId"
+                type="number"
+                className="bg-[var(--panel-2)] border border-[var(--line)] focus:border-[var(--prime)] text-[var(--text)] rounded px-3 py-2 text-sm w-full outline-none transition-colors"
+                {...formik.getFieldProps('teamAId')}
+              />
+              {formik.touched.teamAId && formik.errors.teamAId && (
+                <div className="text-arena-crimson text-xs mt-1">{formik.errors.teamAId}</div>
+              )}
+            </div>
+            <div>
+              <label htmlFor="teamBId" className="text-xs font-mono text-[var(--muted)] mb-1 block uppercase">Team B ID</label>
+              <input
+                id="teamBId"
+                type="number"
+                className="bg-[var(--panel-2)] border border-[var(--line)] focus:border-[var(--prime)] text-[var(--text)] rounded px-3 py-2 text-sm w-full outline-none transition-colors"
+                {...formik.getFieldProps('teamBId')}
+              />
+              {formik.touched.teamBId && formik.errors.teamBId && (
+                <div className="text-arena-crimson text-xs mt-1">{formik.errors.teamBId}</div>
+              )}
+            </div>
           </div>
 
-          <Input
-            label="Scheduled Start Time (Local)"
-            id="scheduledStartTime"
-            type="datetime-local"
-            {...formik.getFieldProps('scheduledStartTime')}
-            error={formik.touched.scheduledStartTime ? (formik.errors.scheduledStartTime as string) : undefined}
-          />
+          <div>
+            <label htmlFor="scheduledStartTime" className="text-xs font-mono text-[var(--muted)] mb-1 block uppercase">Scheduled Start Time (Local)</label>
+            <input
+              id="scheduledStartTime"
+              type="datetime-local"
+              style={{ colorScheme: actualTheme }}
+              className="bg-[var(--panel-2)] border border-[var(--line)] focus:border-[var(--prime)] text-[var(--text)] rounded px-3 py-2 text-sm w-full outline-none transition-colors"
+              {...formik.getFieldProps('scheduledStartTime')}
+            />
+            {formik.touched.scheduledStartTime && formik.errors.scheduledStartTime && (
+              <div className="text-arena-crimson text-xs mt-1">{formik.errors.scheduledStartTime as string}</div>
+            )}
+          </div>
 
           <div className="pt-4">
             <Button type="submit" className="w-full" isLoading={formik.isSubmitting}>

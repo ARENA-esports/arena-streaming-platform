@@ -11,6 +11,9 @@ public class User
     public string Role { get; set; } = "Viewer";
     public bool EmailVerified { get; set; }
     public string? AvatarUrl { get; set; }
+    public string? DisplayName { get; set; }
+    public string? Bio { get; set; }
+    public string? BannerUrl { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 }
