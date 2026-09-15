@@ -209,6 +209,44 @@ public class TeamRepository : ITeamRepository
         return new TeamDetailsResponse(id, name, color, logoUrl, roster, createdAt, updatedAt);
     }
 
+    /// <inheritdoc />
+    public async Task<int> AddPlayerToTeamAsync(int teamId, string username, string? role)
+    {
+        using var connection = new MySqlConnection(_connectionString);
+        await connection.OpenAsync();
+
+        const string sql = @"
+            INSERT INTO team_players (team_id, username, role, is_active)
+            VALUES (@TeamId, @Username, @Role, TRUE);
+            SELECT LAST_INSERT_ID();";
+
+        using var command = new MySqlCommand(sql, connection);
+        command.Parameters.AddWithValue("@TeamId", teamId);
+        command.Parameters.AddWithValue("@Username", username);
+        command.Parameters.AddWithValue("@Role", (object?)role ?? DBNull.Value);
+
+        var result = await command.ExecuteScalarAsync();
+        return Convert.ToInt32(result);
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> RemovePlayerFromTeamAsync(int teamId, int playerId)
+    {
+        using var connection = new MySqlConnection(_connectionString);
+        await connection.OpenAsync();
+
+        const string sql = @"
+            DELETE FROM team_players
+            WHERE player_id = @PlayerId AND team_id = @TeamId;";
+
+        using var command = new MySqlCommand(sql, connection);
+        command.Parameters.AddWithValue("@PlayerId", playerId);
+        command.Parameters.AddWithValue("@TeamId", teamId);
+
+        var rowsAffected = await command.ExecuteNonQueryAsync();
+        return rowsAffected > 0;
+    }
+
     private static TeamResponse MapTeamResponse(MySqlDataReader reader)
     {
         var logoUrlOrdinal = reader.GetOrdinal("logo_url");

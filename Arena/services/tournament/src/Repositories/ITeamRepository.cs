@@ -54,4 +54,21 @@ public interface ITeamRepository
     /// <param name="teamId">Unique team identifier.</param>
     /// <returns>Team details with active roster, or null if the team does not exist.</returns>
     Task<TeamDetailsResponse?> GetTeamWithRosterAsync(int teamId);
+
+    /// <summary>
+    /// Adds a player to a team's roster using a parameterized ADO.NET query.
+    /// </summary>
+    /// <param name="teamId">Team identifier.</param>
+    /// <param name="username">Player username.</param>
+    /// <param name="role">Optional player role or position.</param>
+    /// <returns>Assigned player_id.</returns>
+    Task<int> AddPlayerToTeamAsync(int teamId, string username, string? role);
+
+    /// <summary>
+    /// Removes a player from a team's roster using a parameterized ADO.NET query.
+    /// </summary>
+    /// <param name="teamId">Team identifier.</param>
+    /// <param name="playerId">Player identifier.</param>
+    /// <returns>True if a player was removed, false otherwise.</returns>
+    Task<bool> RemovePlayerFromTeamAsync(int teamId, int playerId);
 }
