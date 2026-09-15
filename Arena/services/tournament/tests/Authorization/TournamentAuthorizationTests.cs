@@ -89,6 +89,47 @@ public class TournamentAuthorizationTests
     }
 
     [Fact]
+    public void TeamsController_AddPlayer_RequiresOrganizerRoleAndJson()
+    {
+        // Arrange
+        var method = typeof(TeamsController).GetMethod("AddPlayer");
+        Assert.NotNull(method);
+
+        // Assert HTTP Method attribute is HttpPost with template
+        var httpAttr = method.GetCustomAttribute<HttpPostAttribute>();
+        Assert.NotNull(httpAttr);
+        Assert.Equal("{id:int}/players", httpAttr.Template);
+
+        // Assert Consumes application/json
+        var consumesAttr = method.GetCustomAttribute<ConsumesAttribute>();
+        Assert.NotNull(consumesAttr);
+        Assert.Contains("application/json", consumesAttr.ContentTypes);
+
+        // Assert Authorize attribute is present with Roles = "Organizer"
+        var authAttr = method.GetCustomAttribute<AuthorizeAttribute>();
+        Assert.NotNull(authAttr);
+        Assert.Equal("Organizer", authAttr.Roles);
+    }
+
+    [Fact]
+    public void TeamsController_RemovePlayer_RequiresOrganizerRole()
+    {
+        // Arrange
+        var method = typeof(TeamsController).GetMethod("RemovePlayer");
+        Assert.NotNull(method);
+
+        // Assert HTTP Method attribute is HttpDelete with template
+        var httpAttr = method.GetCustomAttribute<HttpDeleteAttribute>();
+        Assert.NotNull(httpAttr);
+        Assert.Equal("{id:int}/players/{playerId:int}", httpAttr.Template);
+
+        // Assert Authorize attribute is present with Roles = "Organizer"
+        var authAttr = method.GetCustomAttribute<AuthorizeAttribute>();
+        Assert.NotNull(authAttr);
+        Assert.Equal("Organizer", authAttr.Roles);
+    }
+
+    [Fact]
     public void TeamsController_UploadTeamLogo_RequiresOrganizerRoleAndMultipartFormData()
     {
         // Arrange

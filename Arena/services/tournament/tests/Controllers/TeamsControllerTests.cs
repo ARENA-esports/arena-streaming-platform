@@ -676,4 +676,209 @@ public class TeamsControllerTests
     }
 
     #endregion
+
+    #region Add and Remove Player Tests
+
+    [Fact]
+    public async Task AddPlayer_ValidPayload_Returns201CreatedWithAssignedPlayerId()
+    {
+        // Arrange
+        const int teamId = 1;
+        const int assignedPlayerId = 10;
+        var existingTeam = new TeamResponse(teamId, "Team Crimson", "#FF0055", null, DateTime.UtcNow, null);
+
+        _mockRepository.Setup(r => r.GetTeamByIdAsync(teamId))
+            .ReturnsAsync(existingTeam);
+
+        _mockRepository.Setup(r => r.AddPlayerToTeamAsync(teamId, "Striker", "Duelist"))
+            .ReturnsAsync(assignedPlayerId);
+
+        var request = new AddPlayerRequest
+        {
+            Username = "Striker",
+            Role = "Duelist"
+        };
+
+        // Act
+        var result = await _controller.AddPlayer(teamId, request);
+
+        // Assert
+        var createdAtActionResult = Assert.IsType<CreatedAtActionResult>(result);
+        Assert.Equal(StatusCodes.Status201Created, createdAtActionResult.StatusCode);
+        Assert.Equal(teamId, createdAtActionResult.RouteValues?["id"]);
+
+        var response = Assert.IsType<PlayerResponse>(createdAtActionResult.Value);
+        Assert.Equal(assignedPlayerId, response.PlayerId);
+        Assert.Equal(teamId, response.TeamId);
+        Assert.Equal("Striker", response.Username);
+        Assert.Equal("Duelist", response.Role);
+        Assert.True(response.IsActive);
+
+        _mockRepository.Verify(r => r.AddPlayerToTeamAsync(teamId, "Striker", "Duelist"), Times.Once);
+    }
+
+    [Fact]
+    public async Task AddPlayer_AlternativeAliases_Returns201Created()
+    {
+        // Arrange
+        const int teamId = 2;
+        const int assignedPlayerId = 11;
+        var existingTeam = new TeamResponse(teamId, "Team Cobalt", "#0077FF", null, DateTime.UtcNow, null);
+
+        _mockRepository.Setup(r => r.GetTeamByIdAsync(teamId))
+            .ReturnsAsync(existingTeam);
+
+        _mockRepository.Setup(r => r.AddPlayerToTeamAsync(teamId, "SentinelOne", "Support"))
+            .ReturnsAsync(assignedPlayerId);
+
+        var request = new AddPlayerRequest
+        {
+            PlayerName = "SentinelOne",
+            Position = "Support"
+        };
+
+        // Act
+        var result = await _controller.AddPlayer(teamId, request);
+
+        // Assert
+        var createdAtActionResult = Assert.IsType<CreatedAtActionResult>(result);
+        Assert.Equal(StatusCodes.Status201Created, createdAtActionResult.StatusCode);
+
+        var response = Assert.IsType<PlayerResponse>(createdAtActionResult.Value);
+        Assert.Equal(assignedPlayerId, response.PlayerId);
+        Assert.Equal("SentinelOne", response.Username);
+        Assert.Equal("Support", response.Role);
+
+        _mockRepository.Verify(r => r.AddPlayerToTeamAsync(teamId, "SentinelOne", "Support"), Times.Once);
+    }
+
+    [Fact]
+    public async Task AddPlayer_NonExistentTeam_Returns404NotFound()
+    {
+        // Arrange
+        const int nonExistentTeamId = 999;
+        _mockRepository.Setup(r => r.GetTeamByIdAsync(nonExistentTeamId))
+            .ReturnsAsync((TeamResponse?)null);
+
+        var request = new AddPlayerRequest
+        {
+            Username = "Striker",
+            Role = "Duelist"
+        };
+
+        // Act
+        var result = await _controller.AddPlayer(nonExistentTeamId, request);
+
+        // Assert
+        var notFoundResult = Assert.IsType<NotFoundObjectResult>(result);
+        Assert.Equal(StatusCodes.Status404NotFound, notFoundResult.StatusCode);
+        _mockRepository.Verify(r => r.AddPlayerToTeamAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string?>()), Times.Never);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData(null)]
+    public async Task AddPlayer_MissingOrWhitespaceUsername_Returns400BadRequest(string? invalidUsername)
+    {
+        // Arrange
+        const int teamId = 1;
+        var request = new AddPlayerRequest
+        {
+            Username = invalidUsername,
+            Role = "Duelist"
+        };
+
+        // Act
+        var result = await _controller.AddPlayer(teamId, request);
+
+        // Assert
+        var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
+        Assert.Equal(StatusCodes.Status400BadRequest, badRequestResult.StatusCode);
+        _mockRepository.Verify(r => r.AddPlayerToTeamAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string?>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task AddPlayer_InvalidModelState_Returns400BadRequest()
+    {
+        // Arrange
+        const int teamId = 1;
+        _controller.ModelState.AddModelError("Username", "Too long");
+        var request = new AddPlayerRequest();
+
+        // Act
+        var result = await _controller.AddPlayer(teamId, request);
+
+        // Assert
+        var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
+        Assert.Equal(StatusCodes.Status400BadRequest, badRequestResult.StatusCode);
+        _mockRepository.Verify(r => r.AddPlayerToTeamAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string?>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task RemovePlayer_ValidPlayerAndTeam_Returns204NoContent()
+    {
+        // Arrange
+        const int teamId = 1;
+        const int playerId = 5;
+        var existingTeam = new TeamResponse(teamId, "Team Crimson", "#FF0055", null, DateTime.UtcNow, null);
+
+        _mockRepository.Setup(r => r.GetTeamByIdAsync(teamId))
+            .ReturnsAsync(existingTeam);
+
+        _mockRepository.Setup(r => r.RemovePlayerFromTeamAsync(teamId, playerId))
+            .ReturnsAsync(true);
+
+        // Act
+        var result = await _controller.RemovePlayer(teamId, playerId);
+
+        // Assert
+        var noContentResult = Assert.IsType<NoContentResult>(result);
+        Assert.Equal(StatusCodes.Status204NoContent, noContentResult.StatusCode);
+        _mockRepository.Verify(r => r.RemovePlayerFromTeamAsync(teamId, playerId), Times.Once);
+    }
+
+    [Fact]
+    public async Task RemovePlayer_NonExistentTeam_Returns404NotFound()
+    {
+        // Arrange
+        const int nonExistentTeamId = 999;
+        const int playerId = 5;
+
+        _mockRepository.Setup(r => r.GetTeamByIdAsync(nonExistentTeamId))
+            .ReturnsAsync((TeamResponse?)null);
+
+        // Act
+        var result = await _controller.RemovePlayer(nonExistentTeamId, playerId);
+
+        // Assert
+        var notFoundResult = Assert.IsType<NotFoundObjectResult>(result);
+        Assert.Equal(StatusCodes.Status404NotFound, notFoundResult.StatusCode);
+        _mockRepository.Verify(r => r.RemovePlayerFromTeamAsync(It.IsAny<int>(), It.IsAny<int>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task RemovePlayer_PlayerNotOnTeam_Returns404NotFound()
+    {
+        // Arrange
+        const int teamId = 1;
+        const int nonExistentPlayerId = 999;
+        var existingTeam = new TeamResponse(teamId, "Team Crimson", "#FF0055", null, DateTime.UtcNow, null);
+
+        _mockRepository.Setup(r => r.GetTeamByIdAsync(teamId))
+            .ReturnsAsync(existingTeam);
+
+        _mockRepository.Setup(r => r.RemovePlayerFromTeamAsync(teamId, nonExistentPlayerId))
+            .ReturnsAsync(false);
+
+        // Act
+        var result = await _controller.RemovePlayer(teamId, nonExistentPlayerId);
+
+        // Assert
+        var notFoundResult = Assert.IsType<NotFoundObjectResult>(result);
+        Assert.Equal(StatusCodes.Status404NotFound, notFoundResult.StatusCode);
+        _mockRepository.Verify(r => r.RemovePlayerFromTeamAsync(teamId, nonExistentPlayerId), Times.Once);
+    }
+
+    #endregion
 }
