@@ -195,6 +195,77 @@ public class TeamsController : ControllerBase
     }
 
     /// <summary>
+    /// Adds a player to a team's roster with an assigned role or position.
+    /// Restricted to users with the Organizer role.
+    /// </summary>
+    /// <param name="id">Team identifier.</param>
+    /// <param name="request">Payload containing player name/username and optional role/position.</param>
+    /// <returns>Assigned player record with 201 Created containing player_id.</returns>
+    [HttpPost("{id:int}/players")]
+    [Authorize(Roles = "Organizer")]
+    [Consumes("application/json")]
+    [ProducesResponseType(typeof(PlayerResponse), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> AddPlayer(int id, [FromBody] AddPlayerRequest request)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        if (request == null || string.IsNullOrWhiteSpace(request.EffectiveUsername))
+        {
+            return BadRequest(new { message = "Player username or name is required." });
+        }
+
+        var team = await _teamRepository.GetTeamByIdAsync(id);
+        if (team == null)
+        {
+            return NotFound(new { message = $"Team with ID {id} not found." });
+        }
+
+        var playerId = await _teamRepository.AddPlayerToTeamAsync(id, request.EffectiveUsername, request.EffectiveRole);
+        _logger.LogInformation("Player {PlayerId} '{Username}' added to team {TeamId}", playerId, request.EffectiveUsername, id);
+
+        var playerResponse = new PlayerResponse(playerId, id, request.EffectiveUsername, request.EffectiveRole, true);
+        return CreatedAtAction(nameof(GetTeamById), new { id }, playerResponse);
+    }
+
+    /// <summary>
+    /// Removes a player from a team's roster.
+    /// Restricted to users with the Organizer role.
+    /// </summary>
+    /// <param name="id">Team identifier.</param>
+    /// <param name="playerId">Player identifier.</param>
+    /// <returns>204 No Content on successful removal.</returns>
+    [HttpDelete("{id:int}/players/{playerId:int}")]
+    [Authorize(Roles = "Organizer")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> RemovePlayer(int id, int playerId)
+    {
+        var team = await _teamRepository.GetTeamByIdAsync(id);
+        if (team == null)
+        {
+            return NotFound(new { message = $"Team with ID {id} not found." });
+        }
+
+        var removed = await _teamRepository.RemovePlayerFromTeamAsync(id, playerId);
+        if (!removed)
+        {
+            return NotFound(new { message = $"Player with ID {playerId} not found on team {id}." });
+        }
+
+        _logger.LogInformation("Player {PlayerId} removed from team {TeamId}", playerId, id);
+        return NoContent();
+    }
+
+    /// <summary>
     /// Uploads and assigns a visual logo for a specified team.
     /// Restricted to users with the Organizer role.
     /// </summary>
