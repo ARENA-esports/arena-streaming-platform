@@ -100,6 +100,80 @@ public class TeamsController : ControllerBase
     }
 
     /// <summary>
+    /// Updates an existing team's name and/or color hex code.
+    /// Restricted to users with the Organizer role.
+    /// </summary>
+    /// <param name="id">Team identifier.</param>
+    /// <param name="request">Team update payload containing team_name and/or color_hex.</param>
+    /// <returns>Updated team details with 200 OK.</returns>
+    [HttpPut("{id:int}")]
+    [Authorize(Roles = "Organizer")]
+    [Consumes("application/json")]
+    [ProducesResponseType(typeof(TeamResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> UpdateTeam(int id, [FromBody] UpdateTeamRequest request)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        if (request == null || (request.TeamName == null && request.ColorHex == null))
+        {
+            return BadRequest(new { message = "At least one field ('team_name' or 'color_hex') must be provided for update." });
+        }
+
+        if (request.TeamName != null && string.IsNullOrWhiteSpace(request.TeamName))
+        {
+            return BadRequest(new { message = "Team name cannot be empty or whitespace." });
+        }
+
+        string? trimmedColor = null;
+        if (request.ColorHex != null)
+        {
+            trimmedColor = request.ColorHex.Trim();
+            if (!HexColorPattern.IsMatch(trimmedColor))
+            {
+                return BadRequest(new
+                {
+                    message = "Color hex code must be a valid 7-character hexadecimal format starting with '#' (e.g., #FF0055)."
+                });
+            }
+        }
+
+        var existingTeam = await _teamRepository.GetTeamByIdAsync(id);
+        if (existingTeam == null)
+        {
+            return NotFound(new { message = $"Team with ID {id} not found." });
+        }
+
+        string? trimmedName = request.TeamName?.Trim();
+
+        try
+        {
+            var updated = await _teamRepository.UpdateTeamAsync(id, trimmedName, trimmedColor);
+            if (!updated)
+            {
+                return NotFound(new { message = $"Team with ID {id} not found." });
+            }
+
+            _logger.LogInformation("Team {TeamId} details updated", id);
+
+            var result = await _teamRepository.GetTeamByIdAsync(id);
+            return Ok(result);
+        }
+        catch (TeamConflictException ex)
+        {
+            _logger.LogWarning("Duplicate team name collision for team {TeamId}: {Message}", id, ex.Message);
+            return Conflict(new { message = ex.Message });
+        }
+    }
+
+    /// <summary>
     /// Retrieves a team by its unique identifier along with its active roster of players.
     /// Publicly accessible to authenticated and unauthenticated viewers.
     /// </summary>
