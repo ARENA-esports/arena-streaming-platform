@@ -20,7 +20,8 @@ public class WebhookLogRepository : IWebhookLogRepository   // declare concrete 
         await connection.OpenAsync();       // open async network connection
         const string sql = "SELECT COUNT(1) FROM webhook_message_logs WHERE message_id = @MessageId;";
         using var command = new MySqlCommand(sql, connection);  // create ADO.NET command object and connect it to sql connection
-        command.Parameters.AddWithValue("@MessageId",messageId);// parameterize query
+        //hard: Strongly typed parameter mapping prevents SQL injection on untrusted external headers
+        command.Parameters.Add("@MessageId",MySqlDbType.VarChar,128).Value = messageId;// parameterize query
         var count = Convert.ToInt32(await command.ExecuteScalarAsync());
         return count > 0;
     }
@@ -38,11 +39,12 @@ public class WebhookLogRepository : IWebhookLogRepository   // declare concrete 
                 @MessageId, @StreamId, @MessageType, @SubscriptionType, @PayloadHash
             );";
         using var command = new MySqlCommand(sql,connection);
-        command.Parameters.AddWithValue("@MessageId",messageId);
-        command.Parameters.AddWithValue("@StreamId",(object?)streamId ?? DBNull.Value); // handle nullable fields,prevent runtime null exception crashes
-        command.Parameters.AddWithValue("@MessageType",messageType);
-        command.Parameters.AddWithValue("@SubscriptionType",(object?)subscriptionType ?? DBNull.Value);// handle nullable fields,prevent runtime null exception crashes
-        command.Parameters.AddWithValue("@PayloadHash",(object?)payloadHash ?? DBNull.Value);
+        //hard: Explicit column typing bounds memory consumption and prevents database buffer overflows
+        command.Parameters.Add("@MessageId", MySqlDbType.VarChar, 128).Value = messageId;
+        command.Parameters.Add("@StreamId", MySqlDbType.Int32).Value = (object?)streamId ?? DBNull.Value; // handle nullable fields,prevent runtime null exception crashes
+        command.Parameters.Add("@MessageType", MySqlDbType.VarChar, 64).Value = messageType;
+        command.Parameters.Add("@SubscriptionType", MySqlDbType.VarChar, 64).Value = (object?)subscriptionType ?? DBNull.Value;// handle nullable fields,prevent runtime null exception crashes
+        command.Parameters.Add("@PayloadHash", MySqlDbType.VarChar, 64).Value = (object?)payloadHash ?? DBNull.Value;
         await command.ExecuteNonQueryAsync();
     }
 
@@ -60,11 +62,12 @@ public class WebhookLogRepository : IWebhookLogRepository   // declare concrete 
             );";
 
         using var command = new MySqlCommand(sql, connection);
-        command.Parameters.AddWithValue("@MessageId", messageId);                                            // primary key constraint guarantees atomic uniqueness
-        command.Parameters.AddWithValue("@StreamId", (object?)streamId ?? DBNull.Value);                    // handle nullable fields, prevent runtime null exception crashes
-        command.Parameters.AddWithValue("@MessageType", messageType);
-        command.Parameters.AddWithValue("@SubscriptionType", (object?)subscriptionType ?? DBNull.Value);    // handle nullable fields
-        command.Parameters.AddWithValue("@PayloadHash", (object?)payloadHash ?? DBNull.Value);
+       //hard comment: Primary key constraint on message_id provides atomic deduplication without distributed lock contention
+        command.Parameters.Add("@MessageId", MySqlDbType.VarChar, 128).Value = messageId;                   // primary key constraint guarantees atomic uniqueness
+        command.Parameters.Add("@StreamId", MySqlDbType.Int32).Value = (object?)streamId ?? DBNull.Value;   // handle nullable fields, prevent runtime null exception crashes
+        command.Parameters.Add("@MessageType", MySqlDbType.VarChar, 64).Value = messageType;
+        command.Parameters.Add("@SubscriptionType", MySqlDbType.VarChar, 64).Value = (object?)subscriptionType ?? DBNull.Value;    // handle nullable fields
+        command.Parameters.Add("@PayloadHash", MySqlDbType.VarChar, 64).Value = (object?)payloadHash ?? DBNull.Value;
 
         try
         {
@@ -75,6 +78,22 @@ public class WebhookLogRepository : IWebhookLogRepository   // declare concrete 
         {
             return false; // duplicate delivery -> another request already claimed this message ID
         }
+    }
+    //hard: Mitigated CWE-400 Unbounded Storage Growth by pruning expired deduplication records older than retention threshold
+    public async Task<int> PurgeExpiredLogsAsync(int retentionDays = 7)
+    {
+        using var connection = new MySqlConnection(_connectionString);
+        await connection.OpenAsync();
+
+        const string sql = @"
+            DELETE FROM webhook_message_logs 
+            WHERE received_at < DATE_SUB(UTC_TIMESTAMP(), INTERVAL @RetentionDays DAY)
+            LIMIT 5000;";
+
+        using var command = new MySqlCommand(sql, connection);
+        command.Parameters.Add("@RetentionDays", MySqlDbType.Int32).Value = retentionDays;
+
+        return await command.ExecuteNonQueryAsync();
     }
 
 }

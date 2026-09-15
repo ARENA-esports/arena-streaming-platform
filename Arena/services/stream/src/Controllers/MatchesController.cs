@@ -3,10 +3,13 @@ using Microsoft.AspNetCore.Authorization;   //import [Authorize] and role-based 
 using StreamService.DTOs;
 using StreamService.Repositories;
 
+using Microsoft.AspNetCore.RateLimiting;
+
 namespace StreamService.Controllers;
 
 [ApiController]     // enable auto model validation base on DTO data annotations
 [Route("api/[controller]")]     // map route dynamically base on controller name prefix
+[EnableRateLimiting("StreamIpLimiter")]
 public class MatchesController : ControllerBase
 {
     private readonly IMatchRepository _matchRepository;     // hold repository reference securely, prevent modification
@@ -63,9 +66,9 @@ public class MatchesController : ControllerBase
     [HttpGet]
     [AllowAnonymous]
     [ProducesResponseType(typeof(IEnumerable<MatchResponse>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetMatches()
+    public async Task<IActionResult> GetMatches([FromQuery] int? teamId)
     {
-        var matches = await _matchRepository.GetAllMatchesAsync();
+        var matches = await _matchRepository.GetAllMatchesAsync(teamId);
         return Ok(matches);
     }
 

@@ -13,7 +13,7 @@ services:
       - mysql-user-data:/var/lib/mysql
       - ./services/user/src/migrations:/docker-entrypoint-initdb.d
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-prootpassword"]
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-prootpassword" ]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -24,10 +24,11 @@ services:
       dockerfile: services/user/Dockerfile
     container_name: arena-user
     ports:
-      - "8080:8080"
+      - "5168:8080"
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
-      - JwtSettings__Secret=${JWT_SECRET:-Arena_Secret_Key_For_Jwt_Token_Signing_2026_SE3022_Production_Grade!}
+      - ConnectionStrings__UserDb=Server=mysql-user;Port=3306;Database=arena_user_db;Uid=arena;Pwd=arena_password;
+      - JwtSettings__Secret=${JWT_SECRET}
       - JwtSettings__Issuer=Arena.UserService
       - JwtSettings__Audience=Arena.Platform
     depends_on:
@@ -40,7 +41,7 @@ services:
       dockerfile: services/stream/Dockerfile
     container_name: arena-stream
     ports:
-      - "8081:8080"
+      - "5167:8080"
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ConnectionStrings__DefaultConnection=Server=mysql;Port=3306;Database=arena_stream_db;Uid=root;Pwd=rootpassword;AllowUserVariables=True;

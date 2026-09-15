@@ -50,6 +50,13 @@ export interface UserProfile {
   username: string;
   email: string;
   role: 'Viewer' | 'Streamer' | 'Organizer';
+  emailVerified?: boolean;
+  avatarUrl?: string;
+  displayName?: string;
+  bio?: string;
+  bannerUrl?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface CreateMatchRequest {
@@ -63,7 +70,7 @@ export interface MatchResponse {
   teamAId: number;
   teamBId: number;
   scheduledTime: string;
-  status: 'Scheduled' | 'Live' | 'Ended';
+  status: 'Scheduled' | 'Live' | 'Ended' | 'Cancelled';
 }
 
 export interface LinkStreamRequest {

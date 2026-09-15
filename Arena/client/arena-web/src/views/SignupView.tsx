@@ -3,7 +3,6 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useFormik } from 'formik';
 import * as Yup from 'yup';
 import AuthLayout from '../components/layout/AuthLayout';
-import Input from '../components/common/Input';
 import Button from '../components/common/Button';
 import { authService } from '../api/authService';
 
@@ -26,7 +25,7 @@ export const SignupView: React.FC = () => {
         .oneOf([Yup.ref('password')], 'Passwords must match')
         .required('Confirm Password is required'),
     }),
-    onSubmit: async (values, { setSubmitting }) => {
+    onSubmit: async (values: any, { setSubmitting }: any) => {
       setServerError(null);
       try {
         await authService.signup({
@@ -52,36 +51,65 @@ export const SignupView: React.FC = () => {
           </div>
         )}
 
-        <Input
-          label="Username"
-          id="username"
-          {...formik.getFieldProps('username')}
-          error={formik.touched.username ? formik.errors.username : undefined}
-        />
+        <div className="space-y-1">
+          <label className="block text-[11px] font-mono font-bold uppercase tracking-wider text-[var(--muted)]">
+            Username
+          </label>
+          <input
+            id="username"
+            type="text"
+            className="w-full bg-transparent border-b border-[var(--line)] focus:border-[var(--prime)] text-[var(--text)] py-2.5 outline-none transition-colors placeholder:text-[var(--muted)]"
+            {...formik.getFieldProps('username')}
+          />
+          {formik.touched.username && formik.errors.username && (
+            <div className="text-arena-crimson text-xs mt-1">{formik.errors.username as string}</div>
+          )}
+        </div>
         
-        <Input
-          label="Email Address"
-          id="email"
-          type="email"
-          {...formik.getFieldProps('email')}
-          error={formik.touched.email ? formik.errors.email : undefined}
-        />
+        <div className="space-y-1">
+          <label className="block text-[11px] font-mono font-bold uppercase tracking-wider text-[var(--muted)]">
+            Email Address
+          </label>
+          <input
+            id="email"
+            type="email"
+            className="w-full bg-transparent border-b border-[var(--line)] focus:border-[var(--prime)] text-[var(--text)] py-2.5 outline-none transition-colors placeholder:text-[var(--muted)]"
+            {...formik.getFieldProps('email')}
+          />
+          {formik.touched.email && formik.errors.email && (
+            <div className="text-arena-crimson text-xs mt-1">{formik.errors.email as string}</div>
+          )}
+        </div>
         
-        <Input
-          label="Password"
-          id="password"
-          type="password"
-          {...formik.getFieldProps('password')}
-          error={formik.touched.password ? formik.errors.password : undefined}
-        />
+        <div className="space-y-1">
+          <label className="block text-[11px] font-mono font-bold uppercase tracking-wider text-[var(--muted)]">
+            Password
+          </label>
+          <input
+            id="password"
+            type="password"
+            className="w-full bg-transparent border-b border-[var(--line)] focus:border-[var(--prime)] text-[var(--text)] py-2.5 outline-none transition-colors placeholder:text-[var(--muted)]"
+            {...formik.getFieldProps('password')}
+          />
+          {formik.touched.password && formik.errors.password && (
+            <div className="text-arena-crimson text-xs mt-1">{formik.errors.password as string}</div>
+          )}
+        </div>
 
-        <Input
-          label="Confirm Password"
-          id="confirmPassword"
-          type="password"
-          {...formik.getFieldProps('confirmPassword')}
-          error={formik.touched.confirmPassword ? formik.errors.confirmPassword : undefined}
-        />
+        <div className="space-y-1">
+          <label className="block text-[11px] font-mono font-bold uppercase tracking-wider text-[var(--muted)]">
+            Confirm Password
+          </label>
+          <input
+            id="confirmPassword"
+            type="password"
+            className="w-full bg-transparent border-b border-[var(--line)] focus:border-[var(--prime)] text-[var(--text)] py-2.5 outline-none transition-colors placeholder:text-[var(--muted)]"
+            {...formik.getFieldProps('confirmPassword')}
+          />
+          {formik.touched.confirmPassword && formik.errors.confirmPassword && (
+            <div className="text-arena-crimson text-xs mt-1">{formik.errors.confirmPassword as string}</div>
+          )}
+        </div>
 
         <Button
           type="submit"

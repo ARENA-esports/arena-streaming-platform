@@ -11,4 +11,5 @@ public interface IWebhookLogRepository
         returns false if MySQL error 1062 occurs (duplicate delivery detected).
     */
     Task<bool> TryLogMessageAsync(string messageId, int? streamId, string messageType, string? subscriptionType, string? payloadHash);
+    Task<int> PurgeExpiredLogsAsync(int retentionDays = 7);
 }

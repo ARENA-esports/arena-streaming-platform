@@ -1,16 +1,21 @@
 import { FC, useEffect, useState } from 'react';
 import { MatchResponse } from '../types';
 import { apiClient } from '../api/client';
+import { useSearchParams } from 'react-router-dom';
 import MatchList from '../components/match/MatchList';
 
 export const MatchesView: FC = () => {
   const [matches, setMatches] = useState<MatchResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [searchParams] = useSearchParams();
+  const teamIdParam = searchParams.get('teamId');
 
   useEffect(() => {
     const fetchMatches = async () => {
       try {
-        const res = await apiClient.get<MatchResponse[]>('/matches');
+        const targetTeamId = teamIdParam ? parseInt(teamIdParam, 10) : undefined;
+        const config = (targetTeamId && !isNaN(targetTeamId)) ? { params: { teamId: targetTeamId } } : {};
+        const res = await apiClient.get<MatchResponse[]>('/matches', config);
         setMatches(res.data);
       } catch (err) {
         console.error('Failed to fetch matches', err);
@@ -19,7 +24,7 @@ export const MatchesView: FC = () => {
       }
     };
     fetchMatches();
-  }, []);
+  }, [teamIdParam]);
 
   const liveMatches = matches.filter((m) => m.status === 'Live');
   const upcomingMatches = matches.filter((m) => m.status === 'Scheduled');

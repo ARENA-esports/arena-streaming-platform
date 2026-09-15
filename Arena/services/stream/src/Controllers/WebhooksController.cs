@@ -7,10 +7,13 @@ using StreamService.Services;
 using System.Text;
 using System.Text.Json;
 
+using Microsoft.AspNetCore.RateLimiting;
+
 namespace StreamService.Controllers;
 
 [ApiController]             // web api controller
 [Route("api/[controller]")] // map endpoints url to api/webhooks
+[EnableRateLimiting("StreamIpLimiter")]
 public class WebhooksController : ControllerBase
 {
     // private fields to dependency injection

@@ -1,9 +1,12 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Threading.RateLimiting;
 using System.Text;
 using Dapper;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.AspNetCore.RateLimiting;
 using UserService.Repositories;
 using UserService.Services;
 using DbUp;
@@ -18,21 +21,53 @@ builder.Services.AddOpenApi();
 // Problem Details for RFC 7807 standardized error responses
 builder.Services.AddProblemDetails();
 
+// hard: add memoryCache to prevent DOS during per request token blacklist checks
+builder.Services.AddMemoryCache();
 // Configure restrictive CORS policy for client authentication
+//hard: Allow Vite port (5173) and React port (3000) by default to prevent CORS preflight blocks during dev
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
-    ?? new[] { "http://localhost:3000" };
+    ?? new[] { "http://localhost:3000", "http://localhost:5173", "http://127.0.0.1:5173" };
 
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("ArenaClientCors", policy =>
     {
+        // hard: mitigated origin spoofing. replace critical wildcardSetIsOriginAllowed(origin => true) with explicit origin whitelist
         policy.WithOrigins(allowedOrigins)
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials();
     });
 });
+// hard: register ip based rate limiting to prevent brute force credential attacks, account spamming and DOS
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    // strinct fixed window policy for authentication endpoints(login,signup,password reset)
+    options.AddPolicy("AuthIpLimiter",httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "anonymous",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                //hard: 100 permits in Development for test runs; 5 in Production
+                PermitLimit = builder.Environment.IsDevelopment() ? 100 : 5,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
 
+    // Standard policy for general authenticated profile mutations
+    options.AddPolicy("GeneralApiLimiter", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                          ?? httpContext.Connection.RemoteIpAddress?.ToString()
+                          ?? "anonymous",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 60,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 2
+            }));
+});
 // Dapper configuration
 DefaultTypeMap.MatchNamesWithUnderscores = true;
 
@@ -41,9 +76,13 @@ builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<ITokenBlacklistRepository, TokenBlacklistRepository>();
 builder.Services.AddScoped<ITokenBlacklistService, TokenBlacklistService>();
 builder.Services.AddScoped<IPasswordResetRepository, PasswordResetRepository>();
+builder.Services.AddScoped<IEmailVerificationRepository, EmailVerificationRepository>();
 builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IUserService, UserProfileService>();
 
+// // hard: migrated from symmetric hmac to rs256 asymmetric cryptography to prevent microservice key confusion attacks
+// var pub
 // JWT Authentication
 var jwtSecret = builder.Configuration["JwtSettings:Secret"]
     ?? throw new InvalidOperationException("JwtSettings:Secret is not configured.");
@@ -70,6 +109,15 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
         options.Events = new JwtBearerEvents
         {
+            //hard: let ASP.NET read token from secure cookie instead of Authorization: Bearer header
+            OnMessageReceived = context =>
+            {
+                if (context.Request.Cookies.TryGetValue("arena_access_token", out var token))
+                {
+                    context.Token = token;
+                }
+                return Task.CompletedTask;
+            },
             OnTokenValidated = async context =>
             {
                 var blacklistService = context.HttpContext.RequestServices.GetRequiredService<ITokenBlacklistService>();
@@ -108,12 +156,13 @@ if (!result.Successful)
 // Exception Handling at the very top of the HTTP pipeline
 app.UseExceptionHandler();
 
-// Global Security Headers middleware
+//hard: Injected defensive security headers and Content-Security-Policy to block clickjacking and cross-site framing
 app.Use(async (context, next) =>
 {
     context.Response.Headers.Append("X-Content-Type-Options", "nosniff");
     context.Response.Headers.Append("X-Frame-Options", "DENY");
     context.Response.Headers.Append("Referrer-Policy", "strict-origin-when-cross-origin");
+    context.Response.Headers.Append("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none';");
     await next();
 });
 
@@ -125,7 +174,8 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-
+//hard: Rate limiter pipeline placed prior to routing to drop abusive floods at the ingress boundary
+app.UseRateLimiter();
 // CORS must run before Authentication and Authorization
 app.UseCors("ArenaClientCors");
 

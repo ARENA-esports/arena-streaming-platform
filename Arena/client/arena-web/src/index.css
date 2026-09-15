@@ -5,12 +5,12 @@
 @layer base {
   html {
     background-color: theme('colors.arena.bg');
-    color: white;
+    color: theme('colors.arena.text');
   }
 
   body {
     background-color: theme('colors.arena.bg');
-    color: white;
+    color: theme('colors.arena.text');
     @apply font-sans;
   }
 }
@@ -51,29 +51,34 @@ select:-webkit-autofill:focus {
 :root {
   /* mirrors the `arena` Tailwind theme extension */
   --bg: #000000;
-  /* arena-base */
   --panel: #0D1117;
-  /* arena-surface */
   --panel-2: #161B22;
-  /* arena-elevated */
+  --topbar-bg: #000000;
   --line: #2A2F38;
-  /* arena-border-default */
   --line-active: #00B8FC;
-  /* arena-border-active */
-  --text: #eaeeec;
+  --text: #FFFFFF;
   --subtext: #A1A1AA;
-  /* arena-subtext — secondary copy */
   --muted: #71717A;
-  /* arena-muted — tertiary/label copy */
   --prime: #00B8FC;
-  /* arena-primary */
   --prime-dim: #009ADB;
-  /* arena-primary-hover */
   --live: #FF2B56;
   --error: #FF3B30;
-  --shadow-cyan: 0 0 20px -5px rgba(0, 184, 252, 0.4);
   --shadow-live: 0 0 16px -3px rgba(255, 43, 86, 0.5);
   --stream-thumb: url("/league-of-legends.jpg");
+}
+
+:root.light {
+  --bg: #F8FAFC;
+  --panel: #FFFFFF;
+  --panel-2: #F1F5F9;
+  --topbar-bg: #FFFFFF;
+  --line: #E2E8F0;
+  --line-active: #0096D6;
+  --text: #0F172A;
+  --subtext: #475569;
+  --muted: #94A3B8;
+  --shadow-cyan: 0 0 20px -5px rgba(0, 184, 252, 0.4);
+  --shadow-live: 0 0 16px -3px rgba(255, 43, 86, 0.5);
 }
 
 .focus-ring {
@@ -106,19 +111,22 @@ button {
   font-family: inherit;
 }
 
-/* ===== Top bar ===== */
+/* ===== Topbar Shell ===== */
 .topbar {
   display: flex;
   align-items: center;
-  gap: 0;
-  height: 72px;
-  flex-shrink: 0;
-  padding: 0 20px 0 0;
+  height: 56px;
+  min-height: 56px;
+  max-height: 56px;
+  flex-shrink: 0; /* CRITICAL: Prevents carousel from crushing the header */
+  padding: 0 20px;
   border-bottom: 1px solid var(--line);
-  background: #18181B;
+  background: var(--topbar-bg);
   position: sticky;
   top: 0;
   z-index: 100;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .menu-btn {
@@ -130,22 +138,26 @@ button {
 }
 
 .brand {
-  font-family: "Roobert", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
-  font-weight: 700;
-  font-size: 1.2rem;
-  letter-spacing: -0.01em;
-  white-space: nowrap;
+  font-weight: 800;
+  font-size: 1.35rem;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  text-decoration: none;
 }
 
 .brand span {
   color: var(--prime);
 }
 
+/* ===== Search Wrapper & Input ===== */
 .search-wrap {
   flex: 1;
-  max-width: 640px;
+  max-width: 440px;
   margin: 0 auto;
   position: relative;
+  display: flex;
+  align-items: center;
+  height: 34px; /* Matches input height */
 }
 
 .search-wrap svg {
@@ -153,21 +165,30 @@ button {
   left: 12px;
   top: 50%;
   transform: translateY(-50%);
+  width: 14px;
+  height: 14px;
   color: var(--muted);
+  pointer-events: none;
+  display: block;
 }
 
 .search-wrap input {
   width: 100%;
+  height: 34px;
+  line-height: 34px;
   background: var(--panel-2);
   border: 1px solid var(--line);
   border-radius: 14px;
-  padding: 10px 14px 10px 38px;
+  padding: 0 12px 0 34px; /* 34px left padding gives clean space for 14px icon */
   color: var(--text);
-  font-size: 0.88rem;
+  font-size: 0.8rem;
+  box-sizing: border-box;
+  transition: border-color 0.15s ease;
 }
 
 .search-wrap input::placeholder {
   color: var(--muted);
+  font-size: 0.78rem;
 }
 
 .search-wrap input:focus {
@@ -194,33 +215,48 @@ button {
   color: var(--text);
 }
 
+/* ===== Action Buttons ===== */
 .btn-ghost {
-  background: rgba(255, 255, 255, 0.15);
-  border: 1px solid transparent;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
   color: var(--text);
-  padding: 8px 16px;
+  padding: 0 14px;
   border-radius: 14px;
-  font-size: 0.85rem;
+  font-size: 0.78rem;
+  font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
-  transition: background 0.15s ease;
+  box-sizing: border-box;
+  transition: all 0.15s ease;
 }
 
 .btn-ghost:hover {
-  background: rgba(255, 255, 255, 0.2);
+  border-color: var(--prime);
+  color: var(--prime);
 }
 
 .btn-solid {
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: var(--prime);
-  color: #000;
-  font-weight: 600;
-  padding: 8px 18px;
+  color: #000000;
+  padding: 0 16px;
   border-radius: 14px;
-  font-size: 0.85rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   border: none;
   cursor: pointer;
   white-space: nowrap;
-  transition: background 0.15s ease;
+  box-shadow: 0 0 12px -2px rgba(0, 184, 252, 0.35);
+  transition: all 0.15s ease;
 }
 
 .btn-solid:hover {
@@ -348,7 +384,7 @@ button {
   align-items: center;
   gap: 7px;
   padding: 4px 9px;
-  background: rgba(0, 0, 0, 0.75);
+  background: rgba(0, 0, 0, 0.85);
   border: 1px solid rgba(255, 43, 86, 0.5);
   border-radius: 3px;
   font-family: ui-monospace, monospace;
@@ -364,7 +400,7 @@ button {
   align-items: center;
   gap: 5px;
   padding: 4px 9px;
-  background: rgba(0, 0, 0, 0.75);
+  background: rgba(0, 0, 0, 0.85);
   border: 1px solid var(--line);
   border-radius: 3px;
   font-family: ui-monospace, monospace;
@@ -677,8 +713,9 @@ button {
   display: flex;
   align-items: flex-end;
   padding: 26px;
-  background: linear-gradient(135deg, #12161d 0%, #0a0c10 60%);
+  background: linear-gradient(135deg, #0F141C 0%, #080A0E 100%);
   border: 1px solid var(--line);
+  color: #FFFFFF !important;
 }
 
 .live-event-banner::before {
@@ -731,10 +768,11 @@ button {
 .event-content h3 {
   font-size: 1.35rem;
   font-weight: 700;
+  color: #FFFFFF !important;
 }
 
 .event-content p {
-  color: var(--subtext);
+  color: #A1A1AA !important;
   font-size: 0.9rem;
   margin-top: 8px;
 }
@@ -748,7 +786,8 @@ button {
 
 @media (max-width: 900px) {
   .search-wrap {
-    display: none;
+    margin: 0 16px;
+    min-width: 120px;
   }
 
   .icon-rail {

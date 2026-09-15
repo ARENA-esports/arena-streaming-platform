@@ -13,11 +13,11 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api/Auth': {
-        target: 'http://localhost:5168', // User Service (local .NET CLI port)
+        target: 'http://127.0.0.1:5168', // User Service (local .NET CLI port)
         changeOrigin: true,
       },
       '/api': {
-        target: 'http://localhost:5167', // Stream Service (local .NET CLI port)
+        target: 'http://127.0.0.1:5167', // Stream Service (local .NET CLI port)
         changeOrigin: true,
       },
     },

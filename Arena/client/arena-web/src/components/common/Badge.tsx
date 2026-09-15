@@ -7,7 +7,7 @@ function cn(...inputs: ClassValue[]) {
 }
 
 interface BadgeProps {
-  status: 'Scheduled' | 'Live' | 'Ended';
+  status: 'Scheduled' | 'Live' | 'Ended' | 'Cancelled';
   className?: string;
 }
 
@@ -25,6 +25,14 @@ export const Badge: FC<BadgeProps> = ({ status, className }) => {
     return (
       <div className={cn("inline-flex items-center px-2.5 py-0.5 rounded-full bg-arena-surface border border-arena-border text-arena-textMuted font-bold text-xs uppercase tracking-widest", className)}>
         ENDED
+      </div>
+    );
+  }
+
+  if (status === 'Cancelled') {
+    return (
+      <div className={cn("inline-flex items-center px-2.5 py-0.5 rounded-full bg-arena-surface border border-arena-crimson/50 text-arena-crimson font-bold text-xs uppercase tracking-widest", className)}>
+        CANCELLED
       </div>
     );
   }

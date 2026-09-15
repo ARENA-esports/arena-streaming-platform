@@ -3,7 +3,6 @@ import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useFormik } from 'formik';
 import * as Yup from 'yup';
 import AuthLayout from '../components/layout/AuthLayout';
-import Input from '../components/common/Input';
 import Button from '../components/common/Button';
 import { useAuth } from '../context/AuthContext';
 
@@ -24,7 +23,7 @@ export const LoginView: React.FC = () => {
       identifier: Yup.string().required('Username or Email is required'),
       password: Yup.string().required('Password is required'),
     }),
-    onSubmit: async (values, { setSubmitting }) => {
+    onSubmit: async (values: any, { setSubmitting }: any) => {
       setServerError(null);
       try {
         await login(values);
@@ -46,22 +45,37 @@ export const LoginView: React.FC = () => {
           </div>
         )}
         
-        <Input
-          label="Username or Email"
-          id="identifier"
-          {...formik.getFieldProps('identifier')}
-          error={formik.touched.identifier ? formik.errors.identifier : undefined}
-          autoComplete="username"
-        />
+        <div className="space-y-1">
+          <label className="block text-[11px] font-mono font-bold uppercase tracking-wider text-[var(--muted)]">
+            Username or Email
+          </label>
+          <input
+            id="identifier"
+            type="text"
+            className="w-full bg-transparent border-b border-[var(--line)] focus:border-[var(--prime)] text-[var(--text)] py-2.5 outline-none transition-colors placeholder:text-[var(--muted)]"
+            {...formik.getFieldProps('identifier')}
+            autoComplete="username"
+          />
+          {formik.touched.identifier && formik.errors.identifier && (
+            <div className="text-arena-crimson text-xs mt-1">{formik.errors.identifier as string}</div>
+          )}
+        </div>
         
-        <Input
-          label="Password"
-          id="password"
-          type="password"
-          {...formik.getFieldProps('password')}
-          error={formik.touched.password ? formik.errors.password : undefined}
-          autoComplete="current-password"
-        />
+        <div className="space-y-1">
+          <label className="block text-[11px] font-mono font-bold uppercase tracking-wider text-[var(--muted)]">
+            Password
+          </label>
+          <input
+            id="password"
+            type="password"
+            className="w-full bg-transparent border-b border-[var(--line)] focus:border-[var(--prime)] text-[var(--text)] py-2.5 outline-none transition-colors placeholder:text-[var(--muted)]"
+            {...formik.getFieldProps('password')}
+            autoComplete="current-password"
+          />
+          {formik.touched.password && formik.errors.password && (
+            <div className="text-arena-crimson text-xs mt-1">{formik.errors.password as string}</div>
+          )}
+        </div>
 
         <div className="flex items-center justify-end">
           <div className="text-sm">
