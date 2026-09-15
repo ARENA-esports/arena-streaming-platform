@@ -27,27 +27,41 @@ export const TopBar: FC = () => {
     logout();
   };
 
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const handleSearch = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && searchQuery.trim()) {
+      navigate(`/matches?teamId=${encodeURIComponent(searchQuery.trim())}`);
+    }
+  };
+
   return (
     <header className="topbar">
       <Link to="/" className="brand" style={{ marginLeft: '24px' }}>aren<span>a</span></Link>
-      <div className="search-wrap">
+      <div className="search-wrap hidden sm:block">
         <Search size={16} />
-        <input type="text" placeholder="Search matches, teams, streamers" />
+        <input 
+          type="text" 
+          placeholder="Search by Team ID..." 
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          onKeyDown={handleSearch}
+        />
       </div>
       <div className="topbar-right relative">
         {user ? (
           <div className="flex items-center gap-4 relative" ref={dropdownRef}>
             {user.role === 'Organizer' && (
               <Link to="/organizer/matches/new" className="btn-ghost" style={{ textDecoration: 'none' }}>
-                Schedule Match
+                Schedule
               </Link>
             )}
             
             <button 
-              className="w-8 h-8 rounded-full bg-[var(--panel)] border border-[var(--line)] text-[var(--text)] flex items-center justify-center hover:border-[var(--prime)] transition-colors outline-none focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--prime)]"
+              className="w-[34px] h-[34px] rounded-full bg-[var(--panel)] border border-[var(--line)] text-[var(--text)] flex items-center justify-center hover:border-[var(--prime)] transition-colors outline-none focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--prime)]"
               onClick={() => setDropdownOpen(!dropdownOpen)}
             >
-              {user.avatarUrl ? (
+              {(user.avatarUrl && (user.avatarUrl.startsWith('http://') || user.avatarUrl.startsWith('https://'))) ? (
                 <img src={user.avatarUrl} alt={user.username} className="w-full h-full rounded-full object-cover" />
               ) : (
                 <User size={18} />
@@ -73,7 +87,7 @@ export const TopBar: FC = () => {
                   }}
                 >
                   <div className="w-10 h-10 rounded-full bg-arena-cyan text-black flex items-center justify-center flex-shrink-0">
-                    {user.avatarUrl ? (
+                    {(user.avatarUrl && (user.avatarUrl.startsWith('http://') || user.avatarUrl.startsWith('https://'))) ? (
                       <img src={user.avatarUrl} alt={user.username} className="w-full h-full rounded-full object-cover" />
                     ) : (
                       <User size={24} />
@@ -141,7 +155,7 @@ export const TopBar: FC = () => {
             )}
             
             <button 
-              className="w-8 h-8 rounded-full bg-[var(--panel)] border border-[var(--line)] text-[var(--text)] flex items-center justify-center hover:border-[var(--prime)] transition-colors outline-none focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--prime)]"
+              className="w-[34px] h-[34px] rounded-full bg-[var(--panel)] border border-[var(--line)] text-[var(--text)] flex items-center justify-center hover:border-[var(--prime)] transition-colors outline-none focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--prime)]"
               onClick={() => setDropdownOpen(!dropdownOpen)}
             >
               <User size={18} />

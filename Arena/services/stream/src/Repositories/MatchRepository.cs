@@ -112,18 +112,29 @@ public class MatchRepository : IMatchRepository
         return null;    // return null if record not found
     }
 
-    public async Task<IEnumerable<MatchResponse>> GetAllMatchesAsync()
+    public async Task<IEnumerable<MatchResponse>> GetAllMatchesAsync(int? teamId = null)
     {
         var matches = new List<MatchResponse>();
         using var connection = new MySqlConnection(_connectionString);
         await connection.OpenAsync();
 
-        const string sql = @"
+        string sql = @"
         SELECT match_id, tournament_id, team_a_id, team_b_id, scheduled_time, status, winner_team_id, created_at
-        FROM matches
-        ORDER BY scheduled_time ASC;
-        ";
+        FROM matches";
+
+        if (teamId.HasValue)
+        {
+            sql += " WHERE team_a_id = @TeamId OR team_b_id = @TeamId";
+        }
+        
+        sql += " ORDER BY scheduled_time ASC;";
+
         using var command = new MySqlCommand(sql, connection);
+        if (teamId.HasValue)
+        {
+            command.Parameters.AddWithValue("@TeamId", teamId.Value);
+        }
+
         using var reader = await command.ExecuteReaderAsync();
 
         while (await reader.ReadAsync())

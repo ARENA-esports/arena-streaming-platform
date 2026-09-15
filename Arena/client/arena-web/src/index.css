@@ -111,18 +111,22 @@ button {
   font-family: inherit;
 }
 
-/* ===== Top bar ===== */
+/* ===== Topbar Shell ===== */
 .topbar {
   display: flex;
   align-items: center;
-  height: 64px;
-  padding: 0 24px;
+  height: 56px;
+  min-height: 56px;
+  max-height: 56px;
+  flex-shrink: 0; /* CRITICAL: Prevents carousel from crushing the header */
+  padding: 0 20px;
   border-bottom: 1px solid var(--line);
   background: var(--topbar-bg);
   position: sticky;
   top: 0;
   z-index: 100;
-  transition: background-color 0.2s ease, border-color 0.2s ease;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .menu-btn {
@@ -145,11 +149,15 @@ button {
   color: var(--prime);
 }
 
+/* ===== Search Wrapper & Input ===== */
 .search-wrap {
   flex: 1;
-  max-width: 640px;
+  max-width: 440px;
   margin: 0 auto;
   position: relative;
+  display: flex;
+  align-items: center;
+  height: 34px; /* Matches input height */
 }
 
 .search-wrap svg {
@@ -157,21 +165,30 @@ button {
   left: 12px;
   top: 50%;
   transform: translateY(-50%);
+  width: 14px;
+  height: 14px;
   color: var(--muted);
+  pointer-events: none;
+  display: block;
 }
 
 .search-wrap input {
   width: 100%;
+  height: 34px;
+  line-height: 34px;
   background: var(--panel-2);
   border: 1px solid var(--line);
   border-radius: 14px;
-  padding: 10px 14px 10px 38px;
+  padding: 0 12px 0 34px; /* 34px left padding gives clean space for 14px icon */
   color: var(--text);
-  font-size: 0.88rem;
+  font-size: 0.8rem;
+  box-sizing: border-box;
+  transition: border-color 0.15s ease;
 }
 
 .search-wrap input::placeholder {
   color: var(--muted);
+  font-size: 0.78rem;
 }
 
 .search-wrap input:focus {
@@ -198,33 +215,48 @@ button {
   color: var(--text);
 }
 
+/* ===== Action Buttons ===== */
 .btn-ghost {
-  background: rgba(255, 255, 255, 0.15);
-  border: 1px solid transparent;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
   color: var(--text);
-  padding: 8px 16px;
+  padding: 0 14px;
   border-radius: 14px;
-  font-size: 0.85rem;
+  font-size: 0.78rem;
+  font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
-  transition: background 0.15s ease;
+  box-sizing: border-box;
+  transition: all 0.15s ease;
 }
 
 .btn-ghost:hover {
-  background: rgba(255, 255, 255, 0.2);
+  border-color: var(--prime);
+  color: var(--prime);
 }
 
 .btn-solid {
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: var(--prime);
-  color: #000;
-  font-weight: 600;
-  padding: 8px 18px;
+  color: #000000;
+  padding: 0 16px;
   border-radius: 14px;
-  font-size: 0.85rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   border: none;
   cursor: pointer;
   white-space: nowrap;
-  transition: background 0.15s ease;
+  box-shadow: 0 0 12px -2px rgba(0, 184, 252, 0.35);
+  transition: all 0.15s ease;
 }
 
 .btn-solid:hover {
@@ -754,7 +786,8 @@ button {
 
 @media (max-width: 900px) {
   .search-wrap {
-    display: none;
+    margin: 0 16px;
+    min-width: 120px;
   }
 
   .icon-rail {
