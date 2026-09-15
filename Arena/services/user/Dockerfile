@@ -5,12 +5,14 @@ WORKDIR /repo
 COPY services/user/src/UserService.csproj services/user/src/
 COPY shared/EventContracts/src/EventContracts.csproj shared/EventContracts/src/
 
-RUN dotnet restore services/user/src/UserService.csproj
+RUN --mount=type=cache,id=nuget,target=/root/.nuget/packages \
+    dotnet restore services/user/src/UserService.csproj
 
 COPY services/user/src/ services/user/src/
 COPY shared/EventContracts/src/ shared/EventContracts/src/
 
-RUN dotnet publish services/user/src/UserService.csproj -c Release -o /app/publish
+RUN --mount=type=cache,id=nuget,target=/root/.nuget/packages \
+    dotnet publish services/user/src/UserService.csproj -c Release -o /app/publish --no-restore
 
 # Stage 2: Runtime
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final

@@ -3,15 +3,18 @@ using System.Security.Cryptography;
 using System.Text;
 using DbUp;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using TournamentService.Repositories;
+using TournamentService.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddHttpContextAccessor();
 
 // Register Problem Details for RFC 7807 standardized error responses
 builder.Services.AddProblemDetails();
@@ -96,7 +99,6 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateIssuer = true,
             ValidIssuer = jwtIssuer,
             ValidateAudience = true,
-            ValidAudience = jwtAudience,
             ValidateLifetime = true,
             RoleClaimType = ClaimTypes.Role,
             ClockSkew = TimeSpan.Zero
@@ -105,8 +107,12 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 builder.Services.AddAuthorization();
 
-// Register ADO.NET repository
+// Register ADO.NET repositories
 builder.Services.AddScoped<ITournamentRepository, TournamentRepository>();
+builder.Services.AddScoped<ITeamRepository, TeamRepository>();
+
+// Register file storage services
+builder.Services.AddScoped<IFileStorageService, LocalFileStorageService>();
 
 var app = builder.Build();
 
@@ -116,6 +122,8 @@ if (!string.IsNullOrEmpty(connectionString))
 {
     try
     {
+        EnsureDatabase.For.MySqlDatabase(connectionString);
+
         var upgrader = DeployChanges.To
             .MySqlDatabase(connectionString)
             .WithScriptsEmbeddedInAssembly(System.Reflection.Assembly.GetExecutingAssembly())
@@ -153,6 +161,20 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+// Serve static files from uploads folder
+var uploadsPath = Path.Combine(app.Environment.ContentRootPath, "uploads");
+if (!Directory.Exists(uploadsPath))
+{
+    Directory.CreateDirectory(uploadsPath);
+}
+
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(uploadsPath),
+    RequestPath = "/uploads"
+});
+
 app.UseCors("ArenaClientCors");
 
 app.UseAuthentication();

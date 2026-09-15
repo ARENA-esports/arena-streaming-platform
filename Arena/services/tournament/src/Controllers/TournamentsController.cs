@@ -98,16 +98,36 @@ public class TournamentsController : ControllerBase
     }
 
     /// <summary>
-    /// Retrieves all tournaments ordered by start date.
+    /// Retrieves all tournaments ordered by start date, optionally filtered by status.
     /// Publicly accessible to authenticated and unauthenticated users.
     /// </summary>
-    /// <returns>List of tournament seasons.</returns>
+    /// <param name="status">Optional status filter parameter (e.g. Scheduled, Active, Completed, Cancelled).</param>
+    /// <returns>List of tournament seasons ordered by start date.</returns>
     [HttpGet]
     [AllowAnonymous]
     [ProducesResponseType(typeof(IEnumerable<TournamentResponse>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetAllTournaments()
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> GetAllTournaments([FromQuery] string? status = null)
     {
-        var tournaments = await _tournamentRepository.GetAllTournamentsAsync();
+        string? filterStatus = null;
+
+        if (!string.IsNullOrWhiteSpace(status))
+        {
+            var canonicalStatus = TournamentStatus.AllowedStatuses
+                .FirstOrDefault(s => string.Equals(s, status.Trim(), StringComparison.OrdinalIgnoreCase));
+
+            if (canonicalStatus == null)
+            {
+                return BadRequest(new
+                {
+                    message = $"Invalid tournament status '{status}'. Allowed values are: {string.Join(", ", TournamentStatus.AllowedStatuses)}."
+                });
+            }
+
+            filterStatus = canonicalStatus;
+        }
+
+        var tournaments = await _tournamentRepository.GetAllTournamentsAsync(filterStatus);
         return Ok(tournaments);
     }
 
