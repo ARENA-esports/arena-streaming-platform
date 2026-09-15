@@ -51,7 +51,7 @@ public class TeamRepository : ITeamRepository
         await connection.OpenAsync();
 
         const string sql = @"
-            SELECT team_id, team_name, color_hex, created_at, updated_at
+            SELECT team_id, team_name, color_hex, logo_url, created_at, updated_at
             FROM teams
             WHERE team_id = @TeamId
             LIMIT 1;";
@@ -68,14 +68,38 @@ public class TeamRepository : ITeamRepository
         return null;
     }
 
+    /// <inheritdoc />
+    public async Task<bool> UpdateTeamLogoAsync(int teamId, string logoUrl)
+    {
+        using var connection = new MySqlConnection(_connectionString);
+        await connection.OpenAsync();
+
+        const string sql = @"
+            UPDATE teams
+            SET logo_url = @LogoUrl
+            WHERE team_id = @TeamId;";
+
+        using var command = new MySqlCommand(sql, connection);
+        command.Parameters.AddWithValue("@LogoUrl", logoUrl);
+        command.Parameters.AddWithValue("@TeamId", teamId);
+
+        var rowsAffected = await command.ExecuteNonQueryAsync();
+        return rowsAffected > 0;
+    }
+
     private static TeamResponse MapTeamResponse(MySqlDataReader reader)
     {
+        var logoUrlOrdinal = reader.GetOrdinal("logo_url");
+        var createdAtOrdinal = reader.GetOrdinal("created_at");
+        var updatedAtOrdinal = reader.GetOrdinal("updated_at");
+
         return new TeamResponse(
             reader.GetInt32("team_id"),
             reader.GetString("team_name"),
             reader.GetString("color_hex"),
-            reader.IsDBNull(reader.GetOrdinal("created_at")) ? null : reader.GetDateTime("created_at"),
-            reader.IsDBNull(reader.GetOrdinal("updated_at")) ? null : reader.GetDateTime("updated_at")
+            reader.IsDBNull(logoUrlOrdinal) ? null : reader.GetString(logoUrlOrdinal),
+            reader.IsDBNull(createdAtOrdinal) ? null : reader.GetDateTime(createdAtOrdinal),
+            reader.IsDBNull(updatedAtOrdinal) ? null : reader.GetDateTime(updatedAtOrdinal)
         );
     }
 }

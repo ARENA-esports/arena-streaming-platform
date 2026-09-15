@@ -59,8 +59,9 @@ public class TeamsControllerTests
             assignedId,
             request.TeamName,
             request.ColorHex,
-            DateTime.UtcNow,
-            null
+            LogoUrl: null,
+            CreatedAt: DateTime.UtcNow,
+            UpdatedAt: null
         );
 
         _mockRepository.Setup(r => r.CreateTeamAsync("Team Crimson", "#FF0055"))
@@ -178,7 +179,7 @@ public class TeamsControllerTests
     {
         // Arrange
         const int teamId = 1;
-        var existingTeam = new TeamResponse(teamId, "Team Crimson", "#FF0055", DateTime.UtcNow, null);
+        var existingTeam = new TeamResponse(teamId, "Team Crimson", "#FF0055", LogoUrl: null, CreatedAt: DateTime.UtcNow, UpdatedAt: null);
 
         _mockRepository.Setup(r => r.GetTeamByIdAsync(teamId))
             .ReturnsAsync(existingTeam);

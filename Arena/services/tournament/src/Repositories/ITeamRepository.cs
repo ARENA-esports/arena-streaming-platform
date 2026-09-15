@@ -22,4 +22,12 @@ public interface ITeamRepository
     /// <param name="teamId">Team identifier.</param>
     /// <returns>Team record or null if not found.</returns>
     Task<TeamResponse?> GetTeamByIdAsync(int teamId);
+
+    /// <summary>
+    /// Updates the logo URL for a specified team via ADO.NET.
+    /// </summary>
+    /// <param name="teamId">Team identifier.</param>
+    /// <param name="logoUrl">Public storage URI of the uploaded team logo.</param>
+    /// <returns>True if a team record was updated, false otherwise.</returns>
+    Task<bool> UpdateTeamLogoAsync(int teamId, string logoUrl);
 }
