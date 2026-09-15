@@ -89,6 +89,36 @@ public class TeamRepository : ITeamRepository
     }
 
     /// <inheritdoc />
+    public async Task<bool> UpdateTeamAsync(int teamId, string? teamName, string? colorHex)
+    {
+        using var connection = new MySqlConnection(_connectionString);
+        await connection.OpenAsync();
+
+        // Atomic update applying COALESCE to update either or both fields while preserving others.
+        const string sql = @"
+            UPDATE teams
+            SET 
+                team_name = COALESCE(@TeamName, team_name),
+                color_hex = COALESCE(@ColorHex, color_hex)
+            WHERE team_id = @TeamId;";
+
+        using var command = new MySqlCommand(sql, connection);
+        command.Parameters.AddWithValue("@TeamId", teamId);
+        command.Parameters.AddWithValue("@TeamName", (object?)teamName ?? DBNull.Value);
+        command.Parameters.AddWithValue("@ColorHex", (object?)colorHex ?? DBNull.Value);
+
+        try
+        {
+            var rowsAffected = await command.ExecuteNonQueryAsync();
+            return rowsAffected > 0;
+        }
+        catch (MySqlException ex) when (ex.Number == 1062) // MySQL duplicate key error code
+        {
+            throw new TeamConflictException(teamName ?? string.Empty, ex);
+        }
+    }
+
+    /// <inheritdoc />
     public async Task<IReadOnlyList<TeamResponse>> GetAllTeamsAsync()
     {
         using var connection = new MySqlConnection(_connectionString);
