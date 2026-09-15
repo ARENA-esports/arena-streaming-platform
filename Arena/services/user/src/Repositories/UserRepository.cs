@@ -130,7 +130,7 @@ public class UserRepository : IUserRepository
     public async Task<bool> VerifyEmailAsync(int userId)
     {
         using var connection = CreateConnection();
-        const string sql = "UPDATE users SET email_verified = TRUE WHERE user_id = @UserId";
+        const string sql = "UPDATE users SET email_verified = true WHERE user_id = @UserId";
         var rowsAffected = await connection.ExecuteAsync(sql, new { UserId = userId });
         return rowsAffected > 0;
     }
