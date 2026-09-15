@@ -33,12 +33,14 @@ public class TournamentAuthorizationTests
     }
 
     [Theory]
-    [InlineData("GetTournamentById")]
-    [InlineData("GetAllTournaments")]
-    public void PublicEndpoints_AllowAnonymousAccess(string methodName)
+    [InlineData(typeof(TournamentsController), "GetTournamentById")]
+    [InlineData(typeof(TournamentsController), "GetAllTournaments")]
+    [InlineData(typeof(TeamsController), "GetAllTeams")]
+    [InlineData(typeof(TeamsController), "GetTeamById")]
+    public void PublicEndpoints_AllowAnonymousAccess(Type controllerType, string methodName)
     {
         // Arrange
-        var method = typeof(TournamentsController).GetMethod(methodName);
+        var method = controllerType.GetMethod(methodName);
         Assert.NotNull(method);
 
         // Assert AllowAnonymous attribute is present
@@ -61,18 +63,6 @@ public class TournamentAuthorizationTests
         var authAttr = method.GetCustomAttribute<AuthorizeAttribute>();
         Assert.NotNull(authAttr);
         Assert.Equal("Organizer", authAttr.Roles);
-    }
-
-    [Fact]
-    public void TeamsController_GetTeamById_AllowsAnonymousAccess()
-    {
-        // Arrange
-        var method = typeof(TeamsController).GetMethod("GetTeamById");
-        Assert.NotNull(method);
-
-        // Assert AllowAnonymous attribute is present
-        var allowAnonymousAttr = method.GetCustomAttribute<AllowAnonymousAttribute>();
-        Assert.NotNull(allowAnonymousAttr);
     }
 
     [Fact]

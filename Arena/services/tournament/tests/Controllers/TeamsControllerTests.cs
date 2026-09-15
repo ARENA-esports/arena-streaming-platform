@@ -60,6 +60,53 @@ public class TeamsControllerTests
         };
     }
 
+    #region Get All Teams Tests
+
+    [Fact]
+    public async Task GetAllTeams_ExistingTeams_Returns200OKWithTeamsList()
+    {
+        // Arrange
+        var mockTeams = new List<TeamResponse>
+        {
+            new(1, "Team Crimson", "#FF0055", "https://assets.arena.gg/teams/crimson.png", DateTime.UtcNow, null),
+            new(2, "Team Cobalt", "#0077FF", "https://assets.arena.gg/teams/cobalt.png", DateTime.UtcNow, null)
+        };
+
+        _mockRepository.Setup(r => r.GetAllTeamsAsync())
+            .ReturnsAsync(mockTeams);
+
+        // Act
+        var result = await _controller.GetAllTeams();
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(StatusCodes.Status200OK, okResult.StatusCode);
+        var response = Assert.IsAssignableFrom<IReadOnlyList<TeamResponse>>(okResult.Value);
+        Assert.Equal(2, response.Count);
+        Assert.Equal("Team Crimson", response[0].TeamName);
+        Assert.Equal("Team Cobalt", response[1].TeamName);
+        _mockRepository.Verify(r => r.GetAllTeamsAsync(), Times.Once);
+    }
+
+    [Fact]
+    public async Task GetAllTeams_NoTeams_Returns200OKWithEmptyList()
+    {
+        // Arrange
+        _mockRepository.Setup(r => r.GetAllTeamsAsync())
+            .ReturnsAsync(new List<TeamResponse>());
+
+        // Act
+        var result = await _controller.GetAllTeams();
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(StatusCodes.Status200OK, okResult.StatusCode);
+        var response = Assert.IsAssignableFrom<IReadOnlyList<TeamResponse>>(okResult.Value);
+        Assert.Empty(response);
+    }
+
+    #endregion
+
     #region Create Team Tests
 
     [Fact]
@@ -193,7 +240,7 @@ public class TeamsControllerTests
     #region Get Team By Id Tests
 
     [Fact]
-    public async Task GetTeamById_ExistingTeam_Returns200OK()
+    public async Task GetTeamById_WithActiveRosterPlayers_Returns200OKWithPopulatedRoster()
     {
         // Arrange
         const int teamId = 1;
@@ -201,10 +248,12 @@ public class TeamsControllerTests
             teamId,
             "Team Crimson",
             "#FF0055",
-            LogoUrl: null,
+            LogoUrl: "https://assets.arena.gg/teams/crimson.png",
             Roster: new List<PlayerResponse>
             {
-                new(1, teamId, "ViperX", "Captain", true)
+                new(1, teamId, "ViperX", "Captain", true),
+                new(2, teamId, "Blaze", "Duelist", true),
+                new(3, teamId, "Phantom", "Support", true)
             },
             CreatedAt: DateTime.UtcNow,
             UpdatedAt: null
@@ -223,8 +272,42 @@ public class TeamsControllerTests
         Assert.Equal(teamId, response.TeamId);
         Assert.Equal("Team Crimson", response.TeamName);
         Assert.Equal("#FF0055", response.ColorHex);
-        Assert.Single(response.Roster);
+        Assert.Equal("https://assets.arena.gg/teams/crimson.png", response.LogoUrl);
+        Assert.Equal(3, response.Roster.Count);
         Assert.Equal("ViperX", response.Roster[0].Username);
+        Assert.Equal("Captain", response.Roster[0].Role);
+        Assert.Equal("Blaze", response.Roster[1].Username);
+    }
+
+    [Fact]
+    public async Task GetTeamById_WithEmptyRoster_Returns200OKWithEmptyRosterArray()
+    {
+        // Arrange
+        const int teamId = 4;
+        var existingTeam = new TeamDetailsResponse(
+            teamId,
+            "Team Shadow",
+            "#8A2BE2",
+            LogoUrl: null,
+            Roster: new List<PlayerResponse>(),
+            CreatedAt: DateTime.UtcNow,
+            UpdatedAt: null
+        );
+
+        _mockRepository.Setup(r => r.GetTeamWithRosterAsync(teamId))
+            .ReturnsAsync(existingTeam);
+
+        // Act
+        var result = await _controller.GetTeamById(teamId);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(StatusCodes.Status200OK, okResult.StatusCode);
+        var response = Assert.IsType<TeamDetailsResponse>(okResult.Value);
+        Assert.Equal(teamId, response.TeamId);
+        Assert.Equal("Team Shadow", response.TeamName);
+        Assert.NotNull(response.Roster);
+        Assert.Empty(response.Roster);
     }
 
     [Fact]
