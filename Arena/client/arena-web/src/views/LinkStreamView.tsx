@@ -19,7 +19,7 @@ export const LinkStreamView: React.FC = () => {
     validationSchema: Yup.object({
       channelName: Yup.string().required('Twitch channel name is required'),
     }),
-    onSubmit: async (values, { setSubmitting }) => {
+    onSubmit: async (values: { channelName: string }, { setSubmitting }: { setSubmitting: (isSubmitting: boolean) => void }) => {
       setServerError(null);
       try {
         if (!matchId) throw new Error('Match ID is missing');

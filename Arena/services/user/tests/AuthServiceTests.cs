@@ -674,6 +674,8 @@ public class AuthServiceTests
 
         _mockEmailVerificationRepo.Verify(r => r.CreateTokenAsync(It.IsAny<EmailVerificationToken>()), Times.Never);
         _mockEmailVerificationRepo.Verify(r => r.InvalidateUserTokensAsync(It.IsAny<int>()), Times.Never);
+    }
+
     [Fact]
     public async Task RefreshTokenAsync_WithValidUser_ReturnsNewLoginResponseWithJwt()
     {

@@ -16,7 +16,7 @@ export const ForgotPasswordView: React.FC = () => {
     validationSchema: Yup.object({
       email: Yup.string().email('Invalid email address').required('Email is required'),
     }),
-    onSubmit: async (values, { setSubmitting }) => {
+    onSubmit: async (values: { email: string }, { setSubmitting }: { setSubmitting: (isSubmitting: boolean) => void }) => {
       setStatusMessage(null);
       try {
         const response = await authService.forgotPassword(values);
