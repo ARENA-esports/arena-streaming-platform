@@ -39,8 +39,8 @@ export const StreamContainer: React.FC<StreamContainerProps> = ({ apiChannelName
 
             {/* Embedded Player Tile */}
             <TwitchPlayer channel={activeChannel} />
-            <p className="text-[10px] text-gray-500 text-center mt-1">
-                Seeing Error #2000? Please disable your ad-blocker or tracking prevention for this site.
+            <p className="text-[10px] text-white text-center mt-1">
+                Seeing Error? Please disable your ad-blocker or tracking prevention for this site.
             </p>
         </div>
     );

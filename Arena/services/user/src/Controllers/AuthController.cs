@@ -86,7 +86,7 @@ public class AuthController : ControllerBase
             Response.Cookies.Append("arena_access_token",response.Token,new CookieOptions
             {
                 HttpOnly = true,
-                Secure = true,
+                Secure = !_env.IsDevelopment(), // Secure in production, allows HTTP for local dev
                 SameSite = SameSiteMode.Strict,
                 Expires = DateTimeOffset.UtcNow.AddMinutes(30)
             });
@@ -121,7 +121,7 @@ public class AuthController : ControllerBase
             Response.Cookies.Delete("arena_access_token", new CookieOptions
             {
                 HttpOnly = true,
-                Secure = true,
+                Secure = !_env.IsDevelopment(),
                 SameSite = SameSiteMode.Strict
             });
             var authHeader = Request.Headers.Authorization.ToString();
@@ -325,7 +325,7 @@ public class AuthController : ControllerBase
             Response.Cookies.Append("arena_access_token", response.Token, new CookieOptions
             {
                 HttpOnly = true,
-                Secure = true,
+                Secure = !_env.IsDevelopment(),
                 SameSite = SameSiteMode.Strict,
                 Expires = DateTimeOffset.UtcNow.AddMinutes(30)
             });

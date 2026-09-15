@@ -88,6 +88,7 @@ public class UserRepository : IUserRepository
         return rowsAffected > 0;
     }
 
+    // Added missing parameters: displayName, bio, bannerUrl
     public async Task<bool> UpdateProfileAsync(int userId, string username, string email, string? avatarUrl, string? displayName, string? bio, string? bannerUrl, bool emailVerified)
     {
         using var connection = CreateConnection();
@@ -102,7 +103,7 @@ public class UserRepository : IUserRepository
                 email_verified = @EmailVerified,
                 updated_at = UTC_TIMESTAMP()
             WHERE user_id = @UserId";
-            
+
         var rowsAffected = await connection.ExecuteAsync(sql, new
         {
             UserId = userId,
@@ -115,6 +116,14 @@ public class UserRepository : IUserRepository
             EmailVerified = emailVerified
         });
 
+        return rowsAffected > 0;
+    }
+
+    public async Task<bool> DeleteUserAsync(int userId)
+    {
+        using var connection = CreateConnection();
+        const string sql = "DELETE FROM users WHERE user_id = @UserId";
+        var rowsAffected = await connection.ExecuteAsync(sql, new { UserId = userId });
         return rowsAffected > 0;
     }
 

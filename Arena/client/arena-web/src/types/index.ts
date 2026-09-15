@@ -70,7 +70,7 @@ export interface MatchResponse {
   teamAId: number;
   teamBId: number;
   scheduledTime: string;
-  status: 'Scheduled' | 'Live' | 'Ended';
+  status: 'Scheduled' | 'Live' | 'Ended' | 'Cancelled';
 }
 
 export interface LinkStreamRequest {

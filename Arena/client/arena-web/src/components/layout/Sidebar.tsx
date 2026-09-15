@@ -56,18 +56,26 @@ export const Sidebar: FC<SidebarProps> = ({ isExpanded = false, toggleSidebar })
         
         <div className={`rail-divider ${isExpanded ? 'w-full' : ''}`}></div>
         
-        <div className={`rail-avatars ${isExpanded ? 'w-full px-2' : ''}`}>
-          {['HV', 'AR', 'CV', 'FX', 'WC', 'SI', 'EA'].map((initials, idx) => (
-            <div 
-              key={idx} 
-              className={`rail-avatar ${['HV', 'AR', 'FX'].includes(initials) ? 'live' : ''} ${isExpanded ? 'w-full justify-start px-3 gap-3 rounded-md' : ''}`}
-              style={isExpanded ? { width: '100%', borderRadius: '8px' } : undefined}
-            >
-              <span className={isExpanded ? '' : 'hidden'}>{['HV', 'AR', 'FX'].includes(initials) ? '🔴' : ''}</span>
-              {initials}
-              {isExpanded && <span className="font-sans text-xs capitalize text-arena-subtext ml-2">Channel</span>}
-            </div>
-          ))}
+        <div className={`rail-avatars ${isExpanded ? 'w-full px-2' : 'flex flex-col gap-3'}`}>
+          {['HV', 'AR', 'CV', 'FX', 'WC', 'SI', 'EA'].map((initials, idx) => {
+            const isLive = ['HV', 'AR', 'FX'].includes(initials);
+            return (
+              <div 
+                key={idx} 
+                className={`flex items-center font-mono text-xs font-bold transition-all bg-[var(--panel-2)] cursor-pointer ${
+                  isExpanded 
+                    ? 'w-full justify-start px-3 py-2 gap-3 rounded-md hover:bg-[var(--line)] ' + (isLive ? 'text-[var(--live)]' : 'text-[var(--subtext)]')
+                    : 'w-9 h-9 rounded-full justify-center shrink-0 ' + (isLive
+                      ? 'border-2 border-[var(--live)] shadow-[0_0_8px_rgba(255,43,86,0.6)] animate-pulse text-[var(--live)]'
+                      : 'border border-[var(--line)] text-[var(--subtext)] hover:border-[var(--prime)] hover:text-[var(--prime)]')
+                }`}
+              >
+                {isExpanded && isLive && <span className="w-2 h-2 rounded-full bg-[var(--live)] shadow-[0_0_8px_rgba(255,43,86,0.6)] animate-pulse shrink-0"></span>}
+                {initials}
+                {isExpanded && <span className="font-sans text-xs capitalize text-[var(--subtext)] ml-2">Channel</span>}
+              </div>
+            );
+          })}
         </div>
       </aside>
 

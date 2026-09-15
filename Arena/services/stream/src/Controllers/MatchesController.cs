@@ -66,9 +66,9 @@ public class MatchesController : ControllerBase
     [HttpGet]
     [AllowAnonymous]
     [ProducesResponseType(typeof(IEnumerable<MatchResponse>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetMatches()
+    public async Task<IActionResult> GetMatches([FromQuery] int? teamId)
     {
-        var matches = await _matchRepository.GetAllMatchesAsync();
+        var matches = await _matchRepository.GetAllMatchesAsync(teamId);
         return Ok(matches);
     }
 

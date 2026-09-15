@@ -101,6 +101,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateIssuer = true,
             ValidIssuer = jwtIssuer,
             ValidateAudience = true,
+            ValidAudience = jwtAudience,
             ValidateLifetime = true,
             RoleClaimType = ClaimTypes.Role,
             ClockSkew = TimeSpan.Zero
