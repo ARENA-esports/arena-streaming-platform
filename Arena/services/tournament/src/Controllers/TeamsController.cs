@@ -1,9 +1,11 @@
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using TournamentService.DTOs;
 using TournamentService.Exceptions;
 using TournamentService.Repositories;
+using TournamentService.Services;
 
 namespace TournamentService.Controllers;
 
@@ -14,11 +16,16 @@ public class TeamsController : ControllerBase
 {
     private static readonly Regex HexColorPattern = new(CreateTeamRequest.HexColorRegex, RegexOptions.Compiled);
     private readonly ITeamRepository _teamRepository;
+    private readonly IFileStorageService _fileStorageService;
     private readonly ILogger<TeamsController> _logger;
 
-    public TeamsController(ITeamRepository teamRepository, ILogger<TeamsController> logger)
+    public TeamsController(
+        ITeamRepository teamRepository,
+        IFileStorageService fileStorageService,
+        ILogger<TeamsController> logger)
     {
         _teamRepository = teamRepository;
+        _fileStorageService = fileStorageService;
         _logger = logger;
     }
 
@@ -97,5 +104,46 @@ public class TeamsController : ControllerBase
         }
 
         return Ok(team);
+    }
+
+    /// <summary>
+    /// Uploads and assigns a visual logo for a specified team.
+    /// Restricted to users with the Organizer role.
+    /// </summary>
+    /// <param name="id">Team identifier.</param>
+    /// <param name="file">Multipart image file (PNG, JPEG, or SVG up to 2 MB).</param>
+    /// <returns>Publicly accessible logo URL with 200 OK.</returns>
+    [HttpPost("{id:int}/logo")]
+    [Authorize(Roles = "Organizer")]
+    [Consumes("multipart/form-data")]
+    [ProducesResponseType(typeof(UploadTeamLogoResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UploadTeamLogo(int id, IFormFile? file)
+    {
+        var existingTeam = await _teamRepository.GetTeamByIdAsync(id);
+        if (existingTeam == null)
+        {
+            return NotFound(new { message = $"Team with ID {id} not found." });
+        }
+
+        if (!_fileStorageService.ValidateTeamLogo(file, out var validationError))
+        {
+            return BadRequest(new { message = validationError });
+        }
+
+        var publicUrl = await _fileStorageService.SaveFileAsync(file!, "logos", HttpContext.RequestAborted);
+
+        var updated = await _teamRepository.UpdateTeamLogoAsync(id, publicUrl);
+        if (!updated)
+        {
+            return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Failed to update team logo in database." });
+        }
+
+        _logger.LogInformation("Team {TeamId} logo uploaded successfully: {LogoUrl}", id, publicUrl);
+
+        return Ok(new UploadTeamLogoResponse(publicUrl, id));
     }
 }

@@ -7,6 +7,7 @@ using TournamentService.Controllers;
 using TournamentService.DTOs;
 using TournamentService.Exceptions;
 using TournamentService.Repositories;
+using TournamentService.Services;
 using Xunit;
 
 namespace TournamentService.Tests.Controllers;
@@ -14,14 +15,20 @@ namespace TournamentService.Tests.Controllers;
 public class TeamsControllerTests
 {
     private readonly Mock<ITeamRepository> _mockRepository;
+    private readonly Mock<IFileStorageService> _mockFileStorageService;
     private readonly Mock<ILogger<TeamsController>> _mockLogger;
     private readonly TeamsController _controller;
 
     public TeamsControllerTests()
     {
         _mockRepository = new Mock<ITeamRepository>();
+        _mockFileStorageService = new Mock<IFileStorageService>();
         _mockLogger = new Mock<ILogger<TeamsController>>();
-        _controller = new TeamsController(_mockRepository.Object, _mockLogger.Object);
+        _controller = new TeamsController(
+            _mockRepository.Object,
+            _mockFileStorageService.Object,
+            _mockLogger.Object
+        );
         SetUserContext("Organizer");
     }
 
