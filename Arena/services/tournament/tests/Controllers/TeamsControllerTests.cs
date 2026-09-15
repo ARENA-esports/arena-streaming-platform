@@ -237,6 +237,237 @@ public class TeamsControllerTests
 
     #endregion
 
+    #region Update Team Tests
+
+    [Fact]
+    public async Task UpdateTeam_ValidNameAndColor_Returns200OKWithUpdatedDetails()
+    {
+        // Arrange
+        const int teamId = 1;
+        var existingTeam = new TeamResponse(teamId, "Old Name", "#111111", null, DateTime.UtcNow, null);
+        var updatedTeam = new TeamResponse(teamId, "New Name", "#222222", null, existingTeam.CreatedAt, DateTime.UtcNow);
+
+        _mockRepository.SetupSequence(r => r.GetTeamByIdAsync(teamId))
+            .ReturnsAsync(existingTeam)
+            .ReturnsAsync(updatedTeam);
+
+        _mockRepository.Setup(r => r.UpdateTeamAsync(teamId, "New Name", "#222222"))
+            .ReturnsAsync(true);
+
+        var request = new UpdateTeamRequest
+        {
+            TeamName = "New Name",
+            ColorHex = "#222222"
+        };
+
+        // Act
+        var result = await _controller.UpdateTeam(teamId, request);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(StatusCodes.Status200OK, okResult.StatusCode);
+        var response = Assert.IsType<TeamResponse>(okResult.Value);
+        Assert.Equal(teamId, response.TeamId);
+        Assert.Equal("New Name", response.TeamName);
+        Assert.Equal("#222222", response.ColorHex);
+        _mockRepository.Verify(r => r.UpdateTeamAsync(teamId, "New Name", "#222222"), Times.Once);
+    }
+
+    [Fact]
+    public async Task UpdateTeam_OnlyName_Returns200OKWithUpdatedName()
+    {
+        // Arrange
+        const int teamId = 1;
+        var existingTeam = new TeamResponse(teamId, "Old Name", "#111111", null, DateTime.UtcNow, null);
+        var updatedTeam = new TeamResponse(teamId, "Renamed Team", "#111111", null, existingTeam.CreatedAt, DateTime.UtcNow);
+
+        _mockRepository.SetupSequence(r => r.GetTeamByIdAsync(teamId))
+            .ReturnsAsync(existingTeam)
+            .ReturnsAsync(updatedTeam);
+
+        _mockRepository.Setup(r => r.UpdateTeamAsync(teamId, "Renamed Team", null))
+            .ReturnsAsync(true);
+
+        var request = new UpdateTeamRequest
+        {
+            TeamName = "Renamed Team"
+        };
+
+        // Act
+        var result = await _controller.UpdateTeam(teamId, request);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(StatusCodes.Status200OK, okResult.StatusCode);
+        var response = Assert.IsType<TeamResponse>(okResult.Value);
+        Assert.Equal("Renamed Team", response.TeamName);
+        _mockRepository.Verify(r => r.UpdateTeamAsync(teamId, "Renamed Team", null), Times.Once);
+    }
+
+    [Fact]
+    public async Task UpdateTeam_OnlyColor_Returns200OKWithUpdatedColor()
+    {
+        // Arrange
+        const int teamId = 1;
+        var existingTeam = new TeamResponse(teamId, "Team Crimson", "#FF0000", null, DateTime.UtcNow, null);
+        var updatedTeam = new TeamResponse(teamId, "Team Crimson", "#00FF00", null, existingTeam.CreatedAt, DateTime.UtcNow);
+
+        _mockRepository.SetupSequence(r => r.GetTeamByIdAsync(teamId))
+            .ReturnsAsync(existingTeam)
+            .ReturnsAsync(updatedTeam);
+
+        _mockRepository.Setup(r => r.UpdateTeamAsync(teamId, null, "#00FF00"))
+            .ReturnsAsync(true);
+
+        var request = new UpdateTeamRequest
+        {
+            ColorHex = "#00FF00"
+        };
+
+        // Act
+        var result = await _controller.UpdateTeam(teamId, request);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(StatusCodes.Status200OK, okResult.StatusCode);
+        var response = Assert.IsType<TeamResponse>(okResult.Value);
+        Assert.Equal("#00FF00", response.ColorHex);
+        _mockRepository.Verify(r => r.UpdateTeamAsync(teamId, null, "#00FF00"), Times.Once);
+    }
+
+    [Fact]
+    public async Task UpdateTeam_DuplicateTeamName_Returns409Conflict()
+    {
+        // Arrange
+        const int teamId = 1;
+        var existingTeam = new TeamResponse(teamId, "Team Crimson", "#FF0000", null, DateTime.UtcNow, null);
+
+        _mockRepository.Setup(r => r.GetTeamByIdAsync(teamId))
+            .ReturnsAsync(existingTeam);
+
+        _mockRepository.Setup(r => r.UpdateTeamAsync(teamId, "ExistingOtherTeam", null))
+            .ThrowsAsync(new TeamConflictException("ExistingOtherTeam"));
+
+        var request = new UpdateTeamRequest
+        {
+            TeamName = "ExistingOtherTeam"
+        };
+
+        // Act
+        var result = await _controller.UpdateTeam(teamId, request);
+
+        // Assert
+        var conflictResult = Assert.IsType<ConflictObjectResult>(result);
+        Assert.Equal(StatusCodes.Status409Conflict, conflictResult.StatusCode);
+        _mockRepository.Verify(r => r.UpdateTeamAsync(teamId, "ExistingOtherTeam", null), Times.Once);
+    }
+
+    [Fact]
+    public async Task UpdateTeam_NonExistentTeam_Returns404NotFound()
+    {
+        // Arrange
+        const int nonExistentId = 999;
+        _mockRepository.Setup(r => r.GetTeamByIdAsync(nonExistentId))
+            .ReturnsAsync((TeamResponse?)null);
+
+        var request = new UpdateTeamRequest
+        {
+            TeamName = "Any Name"
+        };
+
+        // Act
+        var result = await _controller.UpdateTeam(nonExistentId, request);
+
+        // Assert
+        var notFoundResult = Assert.IsType<NotFoundObjectResult>(result);
+        Assert.Equal(StatusCodes.Status404NotFound, notFoundResult.StatusCode);
+        _mockRepository.Verify(r => r.UpdateTeamAsync(It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task UpdateTeam_NeitherFieldProvided_Returns400BadRequest()
+    {
+        // Arrange
+        const int teamId = 1;
+        var request = new UpdateTeamRequest
+        {
+            TeamName = null,
+            ColorHex = null
+        };
+
+        // Act
+        var result = await _controller.UpdateTeam(teamId, request);
+
+        // Assert
+        var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
+        Assert.Equal(StatusCodes.Status400BadRequest, badRequestResult.StatusCode);
+        _mockRepository.Verify(r => r.UpdateTeamAsync(It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>()), Times.Never);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task UpdateTeam_EmptyOrWhitespaceTeamName_Returns400BadRequest(string invalidName)
+    {
+        // Arrange
+        const int teamId = 1;
+        var request = new UpdateTeamRequest
+        {
+            TeamName = invalidName
+        };
+
+        // Act
+        var result = await _controller.UpdateTeam(teamId, request);
+
+        // Assert
+        var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
+        Assert.Equal(StatusCodes.Status400BadRequest, badRequestResult.StatusCode);
+        _mockRepository.Verify(r => r.UpdateTeamAsync(It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>()), Times.Never);
+    }
+
+    [Theory]
+    [InlineData("FF0055")]    // Missing #
+    [InlineData("#FFF")]       // Too short
+    [InlineData("#GG0055")]    // Non-hex characters
+    [InlineData("#12345678")]  // Too long
+    [InlineData("not-a-color")]
+    public async Task UpdateTeam_InvalidColorHex_Returns400BadRequest(string invalidHex)
+    {
+        // Arrange
+        const int teamId = 1;
+        var request = new UpdateTeamRequest
+        {
+            ColorHex = invalidHex
+        };
+
+        // Act
+        var result = await _controller.UpdateTeam(teamId, request);
+
+        // Assert
+        var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
+        Assert.Equal(StatusCodes.Status400BadRequest, badRequestResult.StatusCode);
+        _mockRepository.Verify(r => r.UpdateTeamAsync(It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task UpdateTeam_InvalidModelState_Returns400BadRequest()
+    {
+        // Arrange
+        const int teamId = 1;
+        _controller.ModelState.AddModelError("TeamName", "Too long");
+        var request = new UpdateTeamRequest();
+
+        // Act
+        var result = await _controller.UpdateTeam(teamId, request);
+
+        // Assert
+        var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
+        Assert.Equal(StatusCodes.Status400BadRequest, badRequestResult.StatusCode);
+        _mockRepository.Verify(r => r.UpdateTeamAsync(It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>()), Times.Never);
+    }
+
+    #endregion
+
     #region Get Team By Id Tests
 
     [Fact]

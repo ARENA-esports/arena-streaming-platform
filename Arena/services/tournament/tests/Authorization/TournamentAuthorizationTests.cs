@@ -66,6 +66,29 @@ public class TournamentAuthorizationTests
     }
 
     [Fact]
+    public void TeamsController_UpdateTeam_RequiresOrganizerRoleAndJson()
+    {
+        // Arrange
+        var method = typeof(TeamsController).GetMethod("UpdateTeam");
+        Assert.NotNull(method);
+
+        // Assert HTTP Method attribute is HttpPut with template
+        var httpAttr = method.GetCustomAttribute<HttpPutAttribute>();
+        Assert.NotNull(httpAttr);
+        Assert.Equal("{id:int}", httpAttr.Template);
+
+        // Assert Consumes application/json
+        var consumesAttr = method.GetCustomAttribute<ConsumesAttribute>();
+        Assert.NotNull(consumesAttr);
+        Assert.Contains("application/json", consumesAttr.ContentTypes);
+
+        // Assert Authorize attribute is present with Roles = "Organizer"
+        var authAttr = method.GetCustomAttribute<AuthorizeAttribute>();
+        Assert.NotNull(authAttr);
+        Assert.Equal("Organizer", authAttr.Roles);
+    }
+
+    [Fact]
     public void TeamsController_UploadTeamLogo_RequiresOrganizerRoleAndMultipartFormData()
     {
         // Arrange
