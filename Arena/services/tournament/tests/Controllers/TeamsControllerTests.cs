@@ -49,6 +49,17 @@ public class TeamsControllerTests
         };
     }
 
+    private static IFormFile CreateTestFormFile(string fileName, string contentType, long sizeBytes = 1024)
+    {
+        var content = new byte[sizeBytes];
+        var stream = new MemoryStream(content);
+        return new FormFile(stream, 0, sizeBytes, "file", fileName)
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = contentType
+        };
+    }
+
     #region Create Team Tests
 
     [Fact]
@@ -217,6 +228,124 @@ public class TeamsControllerTests
         // Assert
         var notFoundResult = Assert.IsType<NotFoundObjectResult>(result);
         Assert.Equal(StatusCodes.Status404NotFound, notFoundResult.StatusCode);
+    }
+
+    #endregion
+
+    #region Upload Team Logo Tests
+
+    [Fact]
+    public async Task UploadTeamLogo_ValidImageFile_Returns200OKWithPublicUrlAndPersistsToDb()
+    {
+        // Arrange
+        const int teamId = 1;
+        const string publicUrl = "https://assets.arena.gg/uploads/logos/logo_123.png";
+        var existingTeam = new TeamResponse(teamId, "Team Crimson", "#FF0055", LogoUrl: null, CreatedAt: DateTime.UtcNow, UpdatedAt: null);
+        var file = CreateTestFormFile("logo.png", "image/png", 500 * 1024);
+
+        _mockRepository.Setup(r => r.GetTeamByIdAsync(teamId))
+            .ReturnsAsync(existingTeam);
+
+        string? outError = null;
+        _mockFileStorageService.Setup(s => s.ValidateTeamLogo(file, out outError))
+            .Returns(true);
+
+        _mockFileStorageService.Setup(s => s.SaveFileAsync(file, "logos", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(publicUrl);
+
+        _mockRepository.Setup(r => r.UpdateTeamLogoAsync(teamId, publicUrl))
+            .ReturnsAsync(true);
+
+        // Act
+        var result = await _controller.UploadTeamLogo(teamId, file);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(StatusCodes.Status200OK, okResult.StatusCode);
+
+        var response = Assert.IsType<UploadTeamLogoResponse>(okResult.Value);
+        Assert.Equal(teamId, response.TeamId);
+        Assert.Equal(publicUrl, response.LogoUrl);
+
+        _mockFileStorageService.Verify(s => s.SaveFileAsync(file, "logos", It.IsAny<CancellationToken>()), Times.Once);
+        _mockRepository.Verify(r => r.UpdateTeamLogoAsync(teamId, publicUrl), Times.Once);
+    }
+
+    [Fact]
+    public async Task UploadTeamLogo_NonExistentTeam_Returns404NotFound()
+    {
+        // Arrange
+        const int nonExistentTeamId = 888;
+        var file = CreateTestFormFile("logo.png", "image/png");
+
+        _mockRepository.Setup(r => r.GetTeamByIdAsync(nonExistentTeamId))
+            .ReturnsAsync((TeamResponse?)null);
+
+        // Act
+        var result = await _controller.UploadTeamLogo(nonExistentTeamId, file);
+
+        // Assert
+        var notFoundResult = Assert.IsType<NotFoundObjectResult>(result);
+        Assert.Equal(StatusCodes.Status404NotFound, notFoundResult.StatusCode);
+
+        _mockFileStorageService.Verify(s => s.SaveFileAsync(It.IsAny<IFormFile>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        _mockRepository.Verify(r => r.UpdateTeamLogoAsync(It.IsAny<int>(), It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task UploadTeamLogo_InvalidFile_Returns400BadRequest()
+    {
+        // Arrange
+        const int teamId = 1;
+        var existingTeam = new TeamResponse(teamId, "Team Crimson", "#FF0055", LogoUrl: null, CreatedAt: DateTime.UtcNow, UpdatedAt: null);
+        var oversizedFile = CreateTestFormFile("large.png", "image/png", 3 * 1024 * 1024);
+
+        _mockRepository.Setup(r => r.GetTeamByIdAsync(teamId))
+            .ReturnsAsync(existingTeam);
+
+        string? expectedError = "File size exceeds the maximum allowed limit of 2 MB.";
+        _mockFileStorageService.Setup(s => s.ValidateTeamLogo(oversizedFile, out expectedError))
+            .Returns(false);
+
+        // Act
+        var result = await _controller.UploadTeamLogo(teamId, oversizedFile);
+
+        // Assert
+        var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
+        Assert.Equal(StatusCodes.Status400BadRequest, badRequestResult.StatusCode);
+
+        _mockFileStorageService.Verify(s => s.SaveFileAsync(It.IsAny<IFormFile>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        _mockRepository.Verify(r => r.UpdateTeamLogoAsync(It.IsAny<int>(), It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task UploadTeamLogo_DatabaseUpdateFails_Returns500InternalServerError()
+    {
+        // Arrange
+        const int teamId = 1;
+        const string publicUrl = "https://assets.arena.gg/uploads/logos/logo.png";
+        var existingTeam = new TeamResponse(teamId, "Team Crimson", "#FF0055", LogoUrl: null, CreatedAt: DateTime.UtcNow, UpdatedAt: null);
+        var file = CreateTestFormFile("logo.png", "image/png");
+
+        _mockRepository.Setup(r => r.GetTeamByIdAsync(teamId))
+            .ReturnsAsync(existingTeam);
+
+        string? outError = null;
+        _mockFileStorageService.Setup(s => s.ValidateTeamLogo(file, out outError))
+            .Returns(true);
+
+        _mockFileStorageService.Setup(s => s.SaveFileAsync(file, "logos", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(publicUrl);
+
+        _mockRepository.Setup(r => r.UpdateTeamLogoAsync(teamId, publicUrl))
+            .ReturnsAsync(false);
+
+        // Act
+        var result = await _controller.UploadTeamLogo(teamId, file);
+
+        // Assert
+        var statusResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(StatusCodes.Status500InternalServerError, statusResult.StatusCode);
     }
 
     #endregion

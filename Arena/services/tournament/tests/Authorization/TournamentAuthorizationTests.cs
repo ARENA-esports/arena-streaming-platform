@@ -76,6 +76,29 @@ public class TournamentAuthorizationTests
     }
 
     [Fact]
+    public void TeamsController_UploadTeamLogo_RequiresOrganizerRoleAndMultipartFormData()
+    {
+        // Arrange
+        var method = typeof(TeamsController).GetMethod("UploadTeamLogo");
+        Assert.NotNull(method);
+
+        // Assert HTTP Method attribute is HttpPost with template
+        var httpAttr = method.GetCustomAttribute<HttpPostAttribute>();
+        Assert.NotNull(httpAttr);
+        Assert.Equal("{id:int}/logo", httpAttr.Template);
+
+        // Assert Consumes multipart/form-data
+        var consumesAttr = method.GetCustomAttribute<ConsumesAttribute>();
+        Assert.NotNull(consumesAttr);
+        Assert.Contains("multipart/form-data", consumesAttr.ContentTypes);
+
+        // Assert Authorize attribute is present with Roles = "Organizer"
+        var authAttr = method.GetCustomAttribute<AuthorizeAttribute>();
+        Assert.NotNull(authAttr);
+        Assert.Equal("Organizer", authAttr.Roles);
+    }
+
+    [Fact]
     public void Rs256JwtValidation_ValidOrganizerToken_ValidatesSuccessfullyWithOrganizerRole()
     {
         // Arrange: Generate RSA 2048-bit key pair
