@@ -65,10 +65,10 @@ public class MatchesController : ControllerBase
     /* get endpoint for fetching all matches */
     [HttpGet]
     [AllowAnonymous]
-    [ProducesResponseType(typeof(IEnumerable<MatchResponse>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetMatches([FromQuery] int? teamId)
+    [ProducesResponseType(typeof(List<MatchScheduleResponse>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetMatches([FromQuery(Name = "teamId")] string? teamQuery, [FromQuery] string? status)
     {
-        var matches = await _matchRepository.GetAllMatchesAsync(teamId);
+        var matches = await _matchRepository.GetAllMatchesAsync(teamQuery, status);
         return Ok(matches);
     }
 

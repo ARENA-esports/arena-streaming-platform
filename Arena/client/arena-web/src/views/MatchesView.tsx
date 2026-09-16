@@ -1,11 +1,11 @@
 import { FC, useEffect, useState } from 'react';
-import { MatchResponse } from '../types';
+import { MatchScheduleResponse } from '../types';
 import { apiClient } from '../api/client';
 import { useSearchParams } from 'react-router-dom';
 import MatchList from '../components/match/MatchList';
 
 export const MatchesView: FC = () => {
-  const [matches, setMatches] = useState<MatchResponse[]>([]);
+  const [matches, setMatches] = useState<MatchScheduleResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchParams] = useSearchParams();
   const teamIdParam = searchParams.get('teamId');
@@ -13,10 +13,15 @@ export const MatchesView: FC = () => {
   useEffect(() => {
     const fetchMatches = async () => {
       try {
-        const targetTeamId = teamIdParam ? parseInt(teamIdParam, 10) : undefined;
-        const config = (targetTeamId && !isNaN(targetTeamId)) ? { params: { teamId: targetTeamId } } : {};
-        const res = await apiClient.get<MatchResponse[]>('/matches', config);
-        setMatches(res.data);
+        const baseParams = teamIdParam ? { teamId: teamIdParam } : {};
+        
+        const [liveRes, scheduledRes, pastRes] = await Promise.all([
+          apiClient.get<MatchScheduleResponse[]>('/matches', { params: { ...baseParams, status: 'Live' } }),
+          apiClient.get<MatchScheduleResponse[]>('/matches', { params: { ...baseParams, status: 'Scheduled' } }),
+          apiClient.get<MatchScheduleResponse[]>('/matches', { params: { ...baseParams, status: 'Ended' } })
+        ]);
+        
+        setMatches([...liveRes.data, ...scheduledRes.data, ...pastRes.data]);
       } catch (err) {
         console.error('Failed to fetch matches', err);
       } finally {

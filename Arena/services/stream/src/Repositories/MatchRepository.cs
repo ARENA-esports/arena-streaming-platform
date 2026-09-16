@@ -112,46 +112,73 @@ public class MatchRepository : IMatchRepository
         return null;    // return null if record not found
     }
 
-    public async Task<IEnumerable<MatchResponse>> GetAllMatchesAsync(int? teamId = null)
+    public async Task<List<MatchScheduleResponse>> GetAllMatchesAsync(string? teamQuery, string? statusFilter)
     {
-        var matches = new List<MatchResponse>();
+        var status = statusFilter ?? StreamStatus.Scheduled;
+
+        var sql = @"
+            SELECT m.match_id, m.tournament_id, m.scheduled_time, m.status,
+                   ta.team_id AS team_a_id, ta.team_name AS team_a_name, ta.color_hex AS team_a_color, ta.logo_url AS team_a_logo,
+                   tb.team_id AS team_b_id, tb.team_name AS team_b_name, tb.color_hex AS team_b_color, tb.logo_url AS team_b_logo
+            FROM matches m
+            JOIN teams ta ON m.team_a_id = ta.team_id
+            JOIN teams tb ON m.team_b_id = tb.team_id
+            WHERE m.status = @Status";
+
+        bool isNumericQuery = int.TryParse(teamQuery, out int teamId);
+
+        if (!string.IsNullOrWhiteSpace(teamQuery))
+        {
+            if (isNumericQuery)
+            {
+                sql += " AND (m.team_a_id = @TeamId OR m.team_b_id = @TeamId)";
+            }
+            else
+            {
+                sql += " AND (ta.team_name LIKE @TeamName OR tb.team_name LIKE @TeamName)";
+            }
+        }
+        sql += " ORDER BY m.scheduled_time ASC;";
+
         using var connection = new MySqlConnection(_connectionString);
         await connection.OpenAsync();
-
-        string sql = @"
-        SELECT match_id, tournament_id, team_a_id, team_b_id, scheduled_time, status, winner_team_id, created_at
-        FROM matches";
-
-        if (teamId.HasValue)
-        {
-            sql += " WHERE team_a_id = @TeamId OR team_b_id = @TeamId";
-        }
-        
-        sql += " ORDER BY scheduled_time ASC;";
-
         using var command = new MySqlCommand(sql, connection);
-        if (teamId.HasValue)
+        command.Parameters.AddWithValue("@Status", status);
+        
+        if (!string.IsNullOrWhiteSpace(teamQuery))
         {
-            command.Parameters.AddWithValue("@TeamId", teamId.Value);
+            if (isNumericQuery)
+            {
+                command.Parameters.AddWithValue("@TeamId", teamId);
+            }
+            else
+            {
+                command.Parameters.AddWithValue("@TeamName", $"%{teamQuery}%");
+            }
         }
 
+        var results = new List<MatchScheduleResponse>();
         using var reader = await command.ExecuteReaderAsync();
-
         while (await reader.ReadAsync())
         {
-            matches.Add(new MatchResponse(
+            results.Add(new MatchScheduleResponse(
                 reader.GetInt32("match_id"),
                 reader.GetInt32("tournament_id"),
-                reader.GetInt32("team_a_id"),
-                reader.GetInt32("team_b_id"),
                 new DateTimeOffset(reader.GetDateTime("scheduled_time"), TimeSpan.Zero),
                 reader.GetString("status"),
-                reader.IsDBNull(reader.GetOrdinal("winner_team_id")) ? null : reader.GetInt32("winner_team_id"),
-                reader.GetDateTime("created_at")
+                new TeamSummary(
+                    reader.GetInt32("team_a_id"),
+                    reader.GetString("team_a_name"),
+                    reader.GetString("team_a_color"),
+                    reader.IsDBNull(reader.GetOrdinal("team_a_logo")) ? null : reader.GetString("team_a_logo")),
+                new TeamSummary(
+                    reader.GetInt32("team_b_id"),
+                    reader.GetString("team_b_name"),
+                    reader.GetString("team_b_color"),
+                    reader.IsDBNull(reader.GetOrdinal("team_b_logo")) ? null : reader.GetString("team_b_logo"))
             ));
         }
-
-        return matches;
+        return results;
     }
 
     public async Task<bool> UpdateMatchStatusAsync(int matchId, string newStatus, string expectedCurrentStatus)
@@ -233,4 +260,6 @@ public class MatchRepository : IMatchRepository
         var rowsAffected = await command.ExecuteNonQueryAsync();
         return rowsAffected > 0;
     }
+
+
 }

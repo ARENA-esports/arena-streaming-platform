@@ -145,6 +145,74 @@ public class MatchesControllerTests
         Assert.Equal(expectedMatch, createdResult.Value);
     }
 
+    /* ---------------- GetMatches Tests (Story 98) ---------------- */
+
+    [Fact]
+    public async Task GetMatches_WithNoParameters_PassesDefaultStatusAndNoTeamId()
+    {
+        // Arrange
+        var mockResults = new List<MatchScheduleResponse>
+        {
+            new MatchScheduleResponse(1, 1, DateTimeOffset.UtcNow, "Scheduled", 
+                new TeamSummary(1, "A", "#FFF", null), new TeamSummary(2, "B", "#000", null))
+        };
+        _matchRepoMock.Setup(m => m.GetAllMatchesAsync(null, null)).ReturnsAsync(mockResults);
+
+        // Act
+        var result = await _controller.GetMatches(null, null);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(StatusCodes.Status200OK, okResult.StatusCode);
+        Assert.Equal(mockResults, okResult.Value);
+        _matchRepoMock.Verify(m => m.GetAllMatchesAsync(null, null), Times.Once);
+    }
+
+    [Fact]
+    public async Task GetMatches_WithTeamIdAndStatus_PassesFiltersCorrectly()
+    {
+        // Arrange
+        var mockResults = new List<MatchScheduleResponse>(); // Empty result scenario
+        _matchRepoMock.Setup(m => m.GetAllMatchesAsync("5", "Live")).ReturnsAsync(mockResults);
+
+        // Act
+        var result = await _controller.GetMatches("5", "Live");
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(StatusCodes.Status200OK, okResult.StatusCode);
+        Assert.Equal(mockResults, okResult.Value);
+        _matchRepoMock.Verify(m => m.GetAllMatchesAsync("5", "Live"), Times.Once);
+    }
+
+    [Fact]
+    public async Task GetMatches_TeamDataCompleteness_ReturnsNestedTeamSummaries()
+    {
+        // Arrange
+        var mockResults = new List<MatchScheduleResponse>
+        {
+            new MatchScheduleResponse(10, 2, DateTimeOffset.UtcNow, "Ended", 
+                new TeamSummary(10, "Team A Name", "#111111", "https://logo.a"), 
+                new TeamSummary(20, "Team B Name", "#222222", null))
+        };
+        _matchRepoMock.Setup(m => m.GetAllMatchesAsync(null, "Ended")).ReturnsAsync(mockResults);
+
+        // Act
+        var result = await _controller.GetMatches(null, "Ended");
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var returnedMatches = Assert.IsAssignableFrom<List<MatchScheduleResponse>>(okResult.Value);
+        Assert.Single(returnedMatches);
+        var match = returnedMatches[0];
+        
+        // Assert completeness of nested data
+        Assert.Equal(10, match.TeamA.TeamId);
+        Assert.Equal("Team A Name", match.TeamA.name);
+        Assert.Equal("https://logo.a", match.TeamA.LogoUrl);
+        Assert.Null(match.TeamB.LogoUrl);
+    }
+
     /* ---------------- GetMatchById Tests ---------------- */
 
     [Fact]

@@ -73,6 +73,22 @@ export interface MatchResponse {
   status: 'Scheduled' | 'Live' | 'Ended' | 'Cancelled';
 }
 
+export interface TeamSummary {
+  teamId: number;
+  name: string;
+  colorHex: string;
+  logoUrl: string | null;
+}
+
+export interface MatchScheduleResponse {
+  matchId: number;
+  tournamentId: number;
+  scheduledTime: string;
+  status: 'Scheduled' | 'Live' | 'Ended' | 'Cancelled';
+  teamA: TeamSummary;
+  teamB: TeamSummary;
+}
+
 export interface LinkStreamRequest {
   channelName: string;
   embedParentDomain: string;

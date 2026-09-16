@@ -10,7 +10,6 @@ public interface IMatchRepository
     Task<bool> BothTeamsExistAsync(int teamAId, int teamBId);
     Task<int> CreateMatchAsync(int tournamentId, int teamAId, int teamBId, DateTimeOffset scheduledTime);
     Task<MatchResponse?> GetMatchByIdAsync(int matchId);
-    Task<IEnumerable<MatchResponse>> GetAllMatchesAsync(int? teamId = null);
     // Cascades status transitions (Scheduled -> Live, Live -> Ended) to the linked match
     Task<bool> UpdateMatchStatusAsync(int matchId, string newStatus, string expectedCurrentStatus);
     
@@ -22,4 +21,5 @@ public interface IMatchRepository
 
     // Completely deletes a match from the system
     Task<bool> DeleteMatchAsync(int matchId);
+    Task<List<MatchScheduleResponse>> GetAllMatchesAsync(string? teamQuery, string? statusFilter);
 }

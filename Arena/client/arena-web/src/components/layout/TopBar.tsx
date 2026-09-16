@@ -29,8 +29,14 @@ export const TopBar: FC = () => {
 
   const [searchQuery, setSearchQuery] = useState('');
 
-  const handleSearch = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleSearchKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && searchQuery.trim()) {
+      executeSearch();
+    }
+  };
+
+  const executeSearch = () => {
+    if (searchQuery.trim()) {
       navigate(`/matches?teamId=${encodeURIComponent(searchQuery.trim())}`);
     }
   };
@@ -38,14 +44,19 @@ export const TopBar: FC = () => {
   return (
     <header className="topbar">
       <Link to="/" className="brand" style={{ marginLeft: '24px' }}>aren<span>a</span></Link>
-      <div className="search-wrap hidden sm:block">
-        <Search size={16} />
+      <div className="search-wrap hidden sm:block relative">
+        <Search 
+          size={16} 
+          className="absolute left-3 top-1/2 -translate-y-1/2 text-arena-textMuted cursor-pointer hover:text-arena-cyan transition-colors" 
+          onClick={executeSearch}
+        />
         <input 
           type="text" 
           placeholder="Search by Team ID..." 
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          onKeyDown={handleSearch}
+          onKeyDown={handleSearchKeyPress}
+          className="w-full h-full bg-transparent border-none outline-none text-arena-text placeholder:text-arena-textMuted"
         />
       </div>
       <div className="topbar-right relative">

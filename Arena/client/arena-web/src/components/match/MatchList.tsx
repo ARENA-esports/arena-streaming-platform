@@ -1,9 +1,9 @@
 import React from 'react';
-import { MatchResponse } from '../../types';
+import { MatchScheduleResponse } from '../../types';
 import MatchCard from './MatchCard';
 
 interface MatchListProps {
-  matches: MatchResponse[];
+  matches: MatchScheduleResponse[];
   title: string;
 }
 
