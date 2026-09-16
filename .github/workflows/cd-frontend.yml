@@ -1,0 +1,48 @@
+name: CD Frontend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Arena/client/arena-web/**'
+
+jobs:
+  deploy-frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Arena/client/arena-web
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: Arena/client/arena-web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+        env:
+          # API URLs — set these as GitHub Actions Variables (vars.*) in the repository settings
+          VITE_USER_API_URL: ${{ vars.VITE_USER_API_URL }}
+          VITE_STREAM_API_URL: ${{ vars.VITE_STREAM_API_URL }}
+          VITE_TOURNAMENT_API_URL: ${{ vars.VITE_TOURNAMENT_API_URL }}
+          # Twitch embed parent domain (e.g. your Azure Static Web App domain)
+          VITE_APP_DOMAIN: ${{ vars.VITE_APP_DOMAIN }}
+          # Optional: override channel for testing in CI
+          VITE_TWITCH_TEST_CHANNEL: ${{ vars.VITE_TWITCH_TEST_CHANNEL }}
+
+      - name: Deploy to Azure Static Web Apps
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: "upload"
+          app_location: "Arena/client/arena-web"
+          output_location: "dist"
+          skip_app_build: true

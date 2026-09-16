@@ -11,6 +11,14 @@ using TournamentService.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Application Insights — enabled when APPLICATIONINSIGHTS_CONNECTION_STRING is set in the environment
+var appInsightsConnString = builder.Configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"]
+    ?? builder.Configuration["ApplicationInsights:ConnectionString"];
+if (!string.IsNullOrEmpty(appInsightsConnString))
+{
+    builder.Services.AddApplicationInsightsTelemetry();
+}
+
 // Add services to the container.
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();

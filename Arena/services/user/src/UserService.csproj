@@ -20,6 +20,7 @@
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.22.0" />
     <PackageReference Include="dbup-mysql" Version="6.1.0" />
     <PackageReference Include="System.Drawing.Common" Version="8.0.0" />
+    <PackageReference Include="Microsoft.ApplicationInsights.AspNetCore" Version="3.1.2" />
   </ItemGroup>
 
   <ItemGroup>

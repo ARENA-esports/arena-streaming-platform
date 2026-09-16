@@ -35,7 +35,7 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("ArenaClientCors", policy =>
     {
-        policy.SetIsOriginAllowed(origin => true)
+        policy.WithOrigins(allowedOrigins)
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials();
