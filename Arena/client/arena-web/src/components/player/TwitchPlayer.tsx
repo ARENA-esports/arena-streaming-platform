@@ -19,7 +19,7 @@ export const TwitchPlayer: React.FC<TwitchPlayerProps> = ({
             .map((d: string) => d.trim())
             .filter(Boolean);
         const currentHost = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
-        return Array.from(new Set([...(parentDomains || []), ...envDomains, currentHost]));
+        return Array.from(new Set([...(parentDomains || []), ...envDomains, currentHost, 'localhost', 'arena-esports.azurewebsites.net']));
     }, [parentDomains]);
     // once resolvedDomains is ready we build the embed URL for the twitch iframe
     const embedUrl = useMemo(() => {
@@ -28,7 +28,7 @@ export const TwitchPlayer: React.FC<TwitchPlayerProps> = ({
 
         const parentParams = resolvedDomains
             .map((domain) => `parent=${encodeURIComponent(domain)}`)
-            .join('&')
+            .join('&');
 
         return `https://player.twitch.tv/?channel=${encodeURIComponent(trimmedChannel)}&${parentParams}&autoplay=true&muted=false`;
         // render iframe using recommended attributes
@@ -50,11 +50,11 @@ export const TwitchPlayer: React.FC<TwitchPlayerProps> = ({
             <iframe
                 src={embedUrl}
                 title={`Twitch Stream - ${channel}`}
+                allow="autoplay; fullscreen"
                 allowFullScreen
                 sandbox="allow-scripts allow-same-origin allow-presentation allow-popups allow-modals"
                 referrerPolicy="strict-origin-when-cross-origin"
                 className="absolute inset-0 w-full h-full border-0">
-
             </iframe>
         </div>
     );

@@ -16,12 +16,15 @@ export interface ChangePasswordRequest {
   newPassword: string;
 }
 
-// //hard: Stored XSS defense: validate URL schemes to block malicious 'javascript:' or data pseudo-protocols
-const isSafeHttpUrl = (urlString?: string): boolean => {
+// //hard: Stored XSS defense: validate URL schemes to block malicious 'javascript:' or data pseudo-protocols except safe data:image/
+const isSafeUrl = (urlString?: string): boolean => {
   if (!urlString || urlString.trim() === '') return true;
+  const trimmed = urlString.trim();
+  if (trimmed.startsWith('data:image/')) return true;
+  if (trimmed.startsWith('/') || trimmed.startsWith('assets/')) return true;
   try {
-    const parsed = new URL(urlString);
-    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+    const parsed = new URL(trimmed);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:' || parsed.protocol === 'data:';
   } catch {
     return false;
   }
@@ -40,8 +43,8 @@ const sanitizeProfilePayload = (data: UpdateProfileRequest): UpdateProfileReques
   if (data.avatarUrl !== undefined) {
     const trimmed = data.avatarUrl.trim();
     if (trimmed !== '') {
-      if (!isSafeHttpUrl(trimmed)) {
-        throw new Error('Avatar URL must use a valid http:// or https:// web address.');
+      if (!isSafeUrl(trimmed)) {
+        throw new Error('Avatar URL must use a valid image web address or uploaded file.');
       }
       sanitized.avatarUrl = trimmed;
     }
@@ -50,8 +53,8 @@ const sanitizeProfilePayload = (data: UpdateProfileRequest): UpdateProfileReques
   if (data.bannerUrl !== undefined) {
     const trimmed = data.bannerUrl.trim();
     if (trimmed !== '') {
-      if (!isSafeHttpUrl(trimmed)) {
-        throw new Error('Banner URL must use a valid http:// or https:// web address.');
+      if (!isSafeUrl(trimmed)) {
+        throw new Error('Banner URL must use a valid image web address or uploaded file.');
       }
       sanitized.bannerUrl = trimmed;
     }
@@ -86,13 +89,12 @@ export const userService = {
     return response.data;
   },
 
-  changePassword: async (data: ChangePasswordRequest) => {
-    // //hard: Ensure non-empty password submission to prevent unnecessary backend hashing rounds on invalid inputs
-    if (!data.currentPassword || !data.newPassword) {
-      throw new Error('Current password and new password are required.');
-    }
+  changePassword: async (data: ChangePasswordRequest): Promise<void> => {
+    await apiClient.put('/Users/me/password', data);
+  },
 
-    const response = await apiClient.put<{ message: string }>('/Users/me/password', data);
+  changeRole: async (role: string): Promise<UserProfile> => {
+    const response = await apiClient.put<UserProfile>('/Users/me/role', { role });
     return response.data;
   }
 };

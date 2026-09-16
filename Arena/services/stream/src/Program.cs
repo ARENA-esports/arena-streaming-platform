@@ -105,8 +105,19 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateAudience = true,        // check token's aud claim
             ValidAudience= jwtAudience,     // only accept tokens from valid audience ensuring incoming tokens are from arena
             ValidateLifetime = true,        // ensure current time of token between valid time. reject expired and not yet valid
-            RoleClaimType = ClaimTypes.Role,// map standard role claim jwt payload directly from ASP.NET
-            ClockSkew = TimeSpan.Zero       // disable 5 min clock drift to expire tokens in correct time
+            RoleClaimType = ClaimTypes.Role,
+            ClockSkew = TimeSpan.Zero
+        };
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                if (context.Request.Cookies.TryGetValue("arena_access_token", out var token))
+                {
+                    context.Token = token;
+                }
+                return Task.CompletedTask;
+            }
         };
     });
 

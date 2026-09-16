@@ -44,6 +44,7 @@ export const TwitchEmbed: React.FC<TwitchEmbedProps> = ({ url }) => {
     <div className="w-full aspect-video bg-arena-bg border border-arena-border relative rounded-sm overflow-hidden shadow-[0_0_30px_rgba(0,184,252,0.1)] group">
       <iframe
         src={sanitizedUrl}
+        allow="autoplay; fullscreen"
         allowFullScreen
         //hard: Principle of Least Privilege: Exclude allow-top-navigation to prevent third-party ads from hijacking the parent window
         //hard: Included allow-presentation and allow-modals so Twitch player controls, chat logins, and fullscreen work during local testing

@@ -35,5 +35,9 @@ export const authService = {
   getMe: async () => {
     const response = await apiClient.get<UserProfile>('/Auth/me');
     return response.data;
+  },
+  refresh: async () => {
+    const response = await apiClient.post<LoginResponse>('/Auth/refresh');
+    return response.data;
   }
 };

@@ -17,16 +17,34 @@ public class TeamsController : ControllerBase
     private static readonly Regex HexColorPattern = new(CreateTeamRequest.HexColorRegex, RegexOptions.Compiled);
     private readonly ITeamRepository _teamRepository;
     private readonly IFileStorageService _fileStorageService;
+    private readonly IConfiguration _configuration;
     private readonly ILogger<TeamsController> _logger;
 
     public TeamsController(
         ITeamRepository teamRepository,
         IFileStorageService fileStorageService,
+        IConfiguration configuration,
         ILogger<TeamsController> logger)
     {
         _teamRepository = teamRepository;
         _fileStorageService = fileStorageService;
+        _configuration = configuration;
         _logger = logger;
+    }
+
+    private async Task SyncTeamToStreamServiceAsync(int teamId, string teamName, string colorHex, string? logoUrl)
+    {
+        try
+        {
+            var streamServiceUrl = _configuration["Services:StreamServiceUrl"] ?? "http://stream:8080";
+            using var client = new HttpClient();
+            var payload = new { team_name = teamName, color_hex = colorHex, logo_url = logoUrl };
+            await client.PutAsJsonAsync($"{streamServiceUrl}/api/matches/teams/{teamId}/sync", payload);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to sync team {TeamId} to StreamService", teamId);
+        }
     }
 
     /// <summary>
@@ -86,6 +104,8 @@ public class TeamsController : ControllerBase
             );
 
             _logger.LogInformation("Team {TeamId} '{TeamName}' registered with color {ColorHex}", teamId, request.TeamName, trimmedColor);
+
+            await SyncTeamToStreamServiceAsync(teamId, request.TeamName.Trim(), trimmedColor, null);
 
             var createdTeam = await _teamRepository.GetTeamByIdAsync(teamId)
                 ?? new TeamResponse(teamId, request.TeamName.Trim(), trimmedColor);
@@ -164,6 +184,10 @@ public class TeamsController : ControllerBase
             _logger.LogInformation("Team {TeamId} details updated", id);
 
             var result = await _teamRepository.GetTeamByIdAsync(id);
+            if (result != null)
+            {
+                await SyncTeamToStreamServiceAsync(id, result.TeamName, result.ColorHex, result.LogoUrl);
+            }
             return Ok(result);
         }
         catch (TeamConflictException ex)
@@ -302,6 +326,11 @@ public class TeamsController : ControllerBase
         }
 
         _logger.LogInformation("Team {TeamId} logo uploaded successfully: {LogoUrl}", id, publicUrl);
+
+        if (existingTeam != null)
+        {
+            await SyncTeamToStreamServiceAsync(id, existingTeam.TeamName, existingTeam.ColorHex, publicUrl);
+        }
 
         return Ok(new UploadTeamLogoResponse(publicUrl, id));
     }

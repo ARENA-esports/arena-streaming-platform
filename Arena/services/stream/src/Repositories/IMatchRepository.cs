@@ -22,4 +22,7 @@ public interface IMatchRepository
     // Completely deletes a match from the system
     Task<bool> DeleteMatchAsync(int matchId);
     Task<List<MatchScheduleResponse>> GetAllMatchesAsync(string? teamQuery, string? statusFilter);
+
+    // Upserts team branding (name, color, logo_url) into local teams table for match schedule responses
+    Task UpsertTeamAsync(int teamId, string teamName, string colorHex, string? logoUrl);
 }

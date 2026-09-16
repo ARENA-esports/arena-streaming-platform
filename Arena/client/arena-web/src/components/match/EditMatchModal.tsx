@@ -3,6 +3,7 @@ import { MatchResponse, UpdateMatchRequest, UpdateMatchStatusRequest } from '../
 import { matchService } from '../../api/matchService';
 import Input from '../common/Input';
 import Button from '../common/Button';
+import { ArenaDatePicker } from '../common/ArenaDatePicker';
 
 interface EditMatchModalProps {
   match: MatchResponse;
@@ -10,10 +11,20 @@ interface EditMatchModalProps {
   onSave: (updatedMatch: MatchResponse) => void;
 }
 
+const toLocalIso = (utcString: string) => {
+  const d = new Date(utcString);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const h = String(d.getHours()).padStart(2, '0');
+  const min = String(d.getMinutes()).padStart(2, '0');
+  return `${y}-${m}-${day}T${h}:${min}`;
+};
+
 const EditMatchModal: React.FC<EditMatchModalProps> = ({ match, onClose, onSave }) => {
   const [teamAId, setTeamAId] = useState(match.teamAId.toString());
   const [teamBId, setTeamBId] = useState(match.teamBId.toString());
-  const [scheduledTime, setScheduledTime] = useState(match.scheduledTime.slice(0, 16));
+  const [scheduledTime, setScheduledTime] = useState(toLocalIso(match.scheduledTime));
   const [status, setStatus] = useState<MatchResponse['status']>(match.status);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -29,7 +40,7 @@ const EditMatchModal: React.FC<EditMatchModalProps> = ({ match, onClose, onSave 
       if (
         Number(teamAId) !== match.teamAId ||
         Number(teamBId) !== match.teamBId ||
-        scheduledTime !== match.scheduledTime.slice(0, 16)
+        scheduledTime !== toLocalIso(match.scheduledTime)
       ) {
         const updateData: UpdateMatchRequest = {
           teamAId: Number(teamAId),
@@ -56,8 +67,8 @@ const EditMatchModal: React.FC<EditMatchModalProps> = ({ match, onClose, onSave 
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm">
-      <div className="bg-arena-surface border border-arena-border rounded-[14px] p-8 w-full max-w-2xl shadow-[0_0_50px_rgba(0,184,252,0.05)]">
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/75 backdrop-blur-sm p-4 overflow-y-auto pt-[10vh] pb-[10vh]">
+      <div className="bg-arena-surface border border-arena-border rounded-[14px] p-8 w-full max-w-2xl shadow-[0_0_50px_rgba(0,184,252,0.05)] shrink-0 my-auto">
         <h2 className="text-2xl font-bold text-white mb-6">
           Edit Match
         </h2>
@@ -90,14 +101,20 @@ const EditMatchModal: React.FC<EditMatchModalProps> = ({ match, onClose, onSave 
             />
           </div>
 
-          <Input
-            label="Scheduled Start Time (Local)"
-            id="scheduledTime"
-            type="datetime-local"
-            value={scheduledTime}
-            onChange={(e) => setScheduledTime(e.target.value)}
-            required
-          />
+          <div className="mb-4">
+            <ArenaDatePicker
+              label="Scheduled Start Time (Local)"
+              value={new Date(scheduledTime)}
+              onChange={(date) => {
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                const hours = String(date.getHours()).padStart(2, '0');
+                const minutes = String(date.getMinutes()).padStart(2, '0');
+                setScheduledTime(`${year}-${month}-${day}T${hours}:${minutes}`);
+              }}
+            />
+          </div>
 
           <div className="flex flex-col w-full mb-4">
             <label className="text-xs uppercase tracking-widest text-arena-textMuted mb-1 font-sans">

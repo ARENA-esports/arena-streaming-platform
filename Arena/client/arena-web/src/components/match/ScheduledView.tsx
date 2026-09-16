@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { MatchResponse } from '../../types';
-import { Clock } from 'lucide-react';
 
 interface ScheduledViewProps {
   match: MatchResponse;
@@ -37,8 +36,7 @@ export const ScheduledView: React.FC<ScheduledViewProps> = ({ match }) => {
   return (
     <div className="flex flex-col items-center justify-center w-full aspect-video bg-arena-surface border border-arena-border rounded-sm">
       <div className="flex flex-col items-center space-y-4">
-        <Clock className="w-12 h-12 text-arena-cyan mb-2" />
-        <div className="text-sm font-mono text-arena-textMuted uppercase tracking-widest">
+        <div className="text-lg font-mono text-arena-textMuted uppercase tracking-widest">
           Stream starts in
         </div>
         <div className="text-5xl md:text-7xl font-mono font-bold text-arena-cyan drop-shadow-[0_0_15px_rgba(0,184,252,0.4)]">

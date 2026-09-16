@@ -1,8 +1,9 @@
 import { FC, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MatchScheduleResponse } from '../../types';
+import { MatchScheduleResponse, TeamSummary } from '../../types';
 import Badge from '../common/Badge';
 import { useAuth } from '../../context/AuthContext';
+import { formatLogoUrl } from '../../api/teamService';
 import { Video } from 'lucide-react';
 
 const ACCENT_PALETTE = [
@@ -16,6 +17,33 @@ const ACCENT_PALETTE = [
 interface MatchCardProps {
   match: MatchScheduleResponse;
 }
+
+const MatchTeamLogo: FC<{ team: TeamSummary }> = ({ team }) => {
+  const [imgError, setImgError] = useState(false);
+  const formattedUrl = formatLogoUrl(team.logoUrl);
+  const isInvalidUrl = !formattedUrl || formattedUrl.includes('assets.arena.gg');
+  const showImg = !isInvalidUrl && !imgError;
+
+  return (
+    <div 
+      className="w-16 h-16 rounded-full border-2 flex items-center justify-center shadow-inner overflow-hidden bg-[var(--panel-2)] shrink-0"
+      style={{ borderColor: team.colorHex || '#00B8FC' }}
+    >
+      {showImg ? (
+        <img 
+          src={formattedUrl} 
+          alt={team.name} 
+          className="w-full h-full object-cover" 
+          onError={() => setImgError(true)}
+        />
+      ) : (
+        <span className="text-lg font-bold text-white" style={{ color: team.colorHex || '#FFF' }}>
+          {(team.name || `T${team.teamId}`).substring(0, 2).toUpperCase()}
+        </span>
+      )}
+    </div>
+  );
+};
 
 export const MatchCard: FC<MatchCardProps> = ({ match }) => {
   const navigate = useNavigate();
@@ -41,30 +69,12 @@ export const MatchCard: FC<MatchCardProps> = ({ match }) => {
 
           <div className="flex justify-center items-center space-x-4 my-6">
             <div className="flex flex-col items-center gap-2">
-              <div 
-                className="w-16 h-16 rounded-full border-2 border-[var(--line)] flex items-center justify-center shadow-inner overflow-hidden bg-[var(--panel-2)]"
-                style={{ borderColor: match.teamA.colorHex }}
-              >
-                {match.teamA.logoUrl ? (
-                   <img src={match.teamA.logoUrl} alt={match.teamA.name} className="w-full h-full object-cover" />
-                ) : (
-                   <span className="text-xl font-bold text-white">T{match.teamA.teamId}</span>
-                )}
-              </div>
+              <MatchTeamLogo team={match.teamA} />
               <span className="text-xs font-mono font-bold text-[var(--text)]">{match.teamA.name}</span>
             </div>
             <div className="text-[var(--subtext)] font-bold text-xl italic px-2">VS</div>
             <div className="flex flex-col items-center gap-2">
-              <div 
-                className="w-16 h-16 rounded-full border-2 border-[var(--line)] flex items-center justify-center shadow-inner overflow-hidden bg-[var(--panel-2)]"
-                style={{ borderColor: match.teamB.colorHex }}
-              >
-                {match.teamB.logoUrl ? (
-                   <img src={match.teamB.logoUrl} alt={match.teamB.name} className="w-full h-full object-cover" />
-                ) : (
-                   <span className="text-xl font-bold text-white">T{match.teamB.teamId}</span>
-                )}
-              </div>
+              <MatchTeamLogo team={match.teamB} />
               <span className="text-xs font-mono font-bold text-[var(--text)]">{match.teamB.name}</span>
             </div>
           </div>

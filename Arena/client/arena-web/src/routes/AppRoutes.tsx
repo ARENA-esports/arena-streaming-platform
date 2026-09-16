@@ -17,6 +17,8 @@ import ScheduleMatchView from '../views/ScheduleMatchView';
 import LinkStreamView from '../views/LinkStreamView';
 import ForbiddenView from '../views/ForbiddenView';
 import ProfileSettingsView from '../views/ProfileSettingsView';
+import TournamentsView from '../views/TournamentsView';
+import TeamsView from '../views/TeamsView';
 
 export const AppRoutes: FC = () => {
   return (
@@ -29,6 +31,14 @@ export const AppRoutes: FC = () => {
         <Route path="/403" element={<ForbiddenView />} />
         
         {/* Protected Routes with Dashboard Layout */}
+        <Route
+          path="/teams"
+          element={
+            <ProtectedRoute allowedRoles={['Organizer']}>
+              <TeamsView />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/organizer/matches/new"
           element={
@@ -50,6 +60,14 @@ export const AppRoutes: FC = () => {
           element={
             <ProtectedRoute allowedRoles={['Viewer', 'Streamer', 'Organizer']}>
               <ProfileSettingsView />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/tournaments"
+          element={
+            <ProtectedRoute allowedRoles={['Viewer', 'Streamer', 'Organizer']}>
+              <TournamentsView />
             </ProtectedRoute>
           }
         />

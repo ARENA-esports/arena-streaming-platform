@@ -115,13 +115,6 @@ public class LocalFileStorageService : IFileStorageService
             return $"{configuredBaseUrl}/uploads/{subDirectory}/{uniqueFileName}";
         }
 
-        var httpContext = _httpContextAccessor.HttpContext;
-        if (httpContext != null)
-        {
-            var request = httpContext.Request;
-            return $"{request.Scheme}://{request.Host}/uploads/{subDirectory}/{uniqueFileName}";
-        }
-
         return $"/uploads/{subDirectory}/{uniqueFileName}";
     }
 }

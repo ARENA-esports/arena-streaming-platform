@@ -1,5 +1,5 @@
 import { FC, useState } from 'react';
-import { Play, Grid, Heart, X, Menu } from 'lucide-react';
+import { Radio, Grid, X, Menu, Trophy, Users } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
@@ -12,15 +12,6 @@ export const Sidebar: FC<SidebarProps> = ({ isExpanded = false, toggleSidebar })
   const { user } = useAuth();
   const navigate = useNavigate();
   const [showLoginModal, setShowLoginModal] = useState(false);
-
-  const handleHeartClick = () => {
-    if (!user) {
-      setShowLoginModal(true);
-    } else {
-      // Navigate to following/favorites page if it existed
-      console.log('Navigate to following page');
-    }
-  };
 
   const containerStyle = {
     width: isExpanded ? '240px' : '64px',
@@ -40,7 +31,7 @@ export const Sidebar: FC<SidebarProps> = ({ isExpanded = false, toggleSidebar })
         </button>
 
         <Link to="/" className={buttonClass} style={isExpanded ? { width: '100%', justifyContent: 'flex-start' } : undefined} aria-label="Home">
-          <Play size={20} className="flex-shrink-0" />
+          <Radio size={20} className="flex-shrink-0 text-arena-crimson animate-pulse" />
           {isExpanded && <span className="font-bold text-sm tracking-wider uppercase">Live</span>}
         </Link>
         
@@ -49,10 +40,17 @@ export const Sidebar: FC<SidebarProps> = ({ isExpanded = false, toggleSidebar })
           {isExpanded && <span className="font-bold text-sm tracking-wider uppercase">Matches</span>}
         </Link>
         
-        <button className={buttonClass} style={isExpanded ? { width: '100%', justifyContent: 'flex-start' } : undefined} aria-label="Following" onClick={handleHeartClick}>
-          <Heart size={20} className="flex-shrink-0" />
-          {isExpanded && <span className="font-bold text-sm tracking-wider uppercase">Following</span>}
-        </button>
+        <Link to="/tournaments" className={buttonClass} style={isExpanded ? { width: '100%', justifyContent: 'flex-start' } : undefined} aria-label="Tournaments">
+          <Trophy size={20} className="flex-shrink-0" />
+          {isExpanded && <span className="font-bold text-sm tracking-wider uppercase">Tournaments</span>}
+        </Link>
+
+        {user?.role === 'Organizer' && (
+          <Link to="/teams" className={buttonClass} style={isExpanded ? { width: '100%', justifyContent: 'flex-start' } : undefined} aria-label="Teams">
+            <Users size={20} className="flex-shrink-0" />
+            {isExpanded && <span className="font-bold text-sm tracking-wider uppercase">Teams</span>}
+          </Link>
+        )}
         
         <div className={`rail-divider ${isExpanded ? 'w-full' : ''}`}></div>
         

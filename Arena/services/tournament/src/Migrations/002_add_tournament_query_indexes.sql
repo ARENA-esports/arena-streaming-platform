@@ -10,3 +10,4 @@
 ALTER TABLE tournaments
     ADD INDEX idx_tournaments_start_date (start_date ASC),
     ADD INDEX idx_tournaments_status_start_date (status, start_date ASC);
+

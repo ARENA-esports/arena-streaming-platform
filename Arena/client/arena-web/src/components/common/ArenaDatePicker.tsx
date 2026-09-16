@@ -65,9 +65,9 @@ export const ArenaDatePicker: React.FC<ArenaDatePickerProps> = ({
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center justify-between bg-[var(--panel-2)] border border-[var(--line)] focus:border-[#00B8FC] text-[var(--text)] rounded px-3 py-2.5 text-sm outline-none transition-colors"
+        className="w-full flex items-center justify-between bg-[var(--panel-2)] border border-[var(--line)] hover:border-[var(--prime)] focus:border-[#00B8FC] text-[var(--text)] rounded-[14px] px-3.5 py-2.5 text-sm outline-none transition-all shadow-sm"
       >
-        <span className="font-mono text-xs">
+        <span className="font-mono text-xs font-semibold">
           {value.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
           {' • '}
           {value.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}
@@ -77,7 +77,7 @@ export const ArenaDatePicker: React.FC<ArenaDatePickerProps> = ({
 
       {/* Popover Calendar Dropdown */}
       {isOpen && (
-        <div className="absolute top-full mt-2 left-0 z-50 w-80 bg-[var(--panel)] border border-[var(--line)] rounded-lg p-4 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+        <div className="absolute top-full mt-2 left-0 z-50 w-80 bg-[var(--panel)] border border-[var(--line)] rounded-[14px] p-4 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
           
           {/* Month / Year Navigator */}
           <div className="flex items-center justify-between mb-4">
@@ -88,14 +88,14 @@ export const ArenaDatePicker: React.FC<ArenaDatePickerProps> = ({
               <button
                 type="button"
                 onClick={handlePrevMonth}
-                className="p-1 rounded hover:bg-[var(--panel-2)] text-[var(--subtext)] hover:text-white"
+                className="p-1 rounded-[14px] hover:bg-[var(--panel-2)] text-[var(--subtext)] hover:text-white"
               >
                 <ChevronLeft size={16}/>
               </button>
               <button
                 type="button"
                 onClick={handleNextMonth}
-                className="p-1 rounded hover:bg-[var(--panel-2)] text-[var(--subtext)] hover:text-white"
+                className="p-1 rounded-[14px] hover:bg-[var(--panel-2)] text-[var(--subtext)] hover:text-white"
               >
                 <ChevronRight size={16}/>
               </button>
@@ -154,14 +154,14 @@ export const ArenaDatePicker: React.FC<ArenaDatePickerProps> = ({
                 const [h, m] = e.target.value.split(':').map(Number);
                 if (!isNaN(h) && !isNaN(m)) handleTimeChange(h, m);
               }}
-              className="bg-[var(--panel-2)] border border-[var(--line)] focus:border-[#00B8FC] text-[var(--text)] font-mono text-xs rounded px-2 py-1 outline-none"
+              className="bg-[var(--panel-2)] border border-[var(--line)] focus:border-[#00B8FC] text-[var(--text)] font-mono text-xs rounded-[14px] px-2.5 py-1 outline-none"
             />
           </div>
 
           <button
             type="button"
             onClick={() => setIsOpen(false)}
-            className="w-full mt-3 py-1.5 bg-[#00B8FC] hover:bg-[#0096D6] text-black font-bold text-xs uppercase font-mono rounded tracking-wider transition-colors"
+            className="w-full mt-3 py-2 bg-[#00B8FC] hover:bg-[#0096D6] text-black font-bold text-xs uppercase font-mono rounded-[14px] tracking-wider transition-all shadow-[0_0_12px_rgba(0,184,252,0.3)]"
           >
             Apply Date & Time
           </button>

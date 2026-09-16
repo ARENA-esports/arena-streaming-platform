@@ -1,20 +1,23 @@
 import { FC, useEffect, useState } from 'react';
-import { MatchResponse } from '../types';
+import { MatchScheduleResponse } from '../types';
 import { apiClient } from '../api/client';
 import MatchList from '../components/match/MatchList';
 import FeaturedMatchCarousel from '../components/match/FeaturedMatchCarousel';
 
 export const HomeView: FC = () => {
-  const [matches, setMatches] = useState<MatchResponse[]>([]);
+  const [matches, setMatches] = useState<MatchScheduleResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const fetchMatches = async () => {
       try {
-        // Fallback: If we don't have a GET /matches implemented yet, we simulate or handle it
-        // The spec implies we fetch matches. If the endpoint is missing, we'll gracefully handle it.
-        const res = await apiClient.get<MatchResponse[]>('/matches');
-        setMatches(res.data);
+        const [liveRes, scheduledRes, pastRes] = await Promise.all([
+          apiClient.get<MatchScheduleResponse[]>('/matches', { params: { status: 'Live' } }),
+          apiClient.get<MatchScheduleResponse[]>('/matches', { params: { status: 'Scheduled' } }),
+          apiClient.get<MatchScheduleResponse[]>('/matches', { params: { status: 'Ended' } })
+        ]);
+        
+        setMatches([...liveRes.data, ...scheduledRes.data, ...pastRes.data]);
       } catch (err) {
         console.error('Failed to fetch matches', err);
       } finally {
@@ -41,9 +44,9 @@ export const HomeView: FC = () => {
           </div>
         ) : (
           <>
-            {liveMatches.length > 0 && <MatchList title="Live Now" matches={liveMatches} />}
+            <MatchList title="Live Now" matches={liveMatches} />
             <MatchList title="Upcoming Matches" matches={upcomingMatches} />
-            {pastMatches.length > 0 && <MatchList title="Completed" matches={pastMatches} />}
+            {pastMatches.length > 0 && <MatchList title="Completed Matches" matches={pastMatches} />}
           </>
         )}
       </div>

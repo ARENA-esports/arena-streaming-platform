@@ -114,3 +114,26 @@ export interface UpdateMatchStatusRequest {
   status: 'Scheduled' | 'Live' | 'Ended' | 'Cancelled';
   forceOverride: boolean;
 }
+
+export interface TournamentResponse {
+  id: number;
+  name: string;
+  season_identifier: string;
+  start_date: string;
+  end_date: string;
+  status: 'Scheduled' | 'Active' | 'Completed' | 'Cancelled';
+}
+
+export interface CreateTournamentRequest {
+  name: string;
+  season_identifier: string;
+  start_date: string;
+  end_date: string;
+}
+
+export interface UpdateTournamentRequest {
+  name: string;
+  season_identifier: string;
+  start_date: string;
+  end_date: string;
+}

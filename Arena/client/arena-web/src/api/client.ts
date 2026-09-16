@@ -14,6 +14,8 @@ apiClient.interceptors.request.use((config) => {
   // Dynamically set baseURL based on the requested endpoint
   if (config.url?.startsWith('/Auth') || config.url?.startsWith('/Users')) {
     config.baseURL = import.meta.env.VITE_USER_API_URL || '/api';
+  } else if (config.url?.startsWith('/tournaments') || config.url?.startsWith('/teams')) {
+    config.baseURL = '/api';
   } else {
     config.baseURL = import.meta.env.VITE_STREAM_API_URL || '/api';
   }

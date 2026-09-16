@@ -261,5 +261,25 @@ public class MatchRepository : IMatchRepository
         return rowsAffected > 0;
     }
 
+    public async Task UpsertTeamAsync(int teamId, string teamName, string colorHex, string? logoUrl)
+    {
+        using var connection = new MySqlConnection(_connectionString);
+        await connection.OpenAsync();
 
+        const string sql = @"
+            INSERT INTO teams (team_id, team_name, color_hex, logo_url)
+            VALUES (@TeamId, @TeamName, @ColorHex, @LogoUrl)
+            ON DUPLICATE KEY UPDATE
+                team_name = VALUES(team_name),
+                color_hex = VALUES(color_hex),
+                logo_url = VALUES(logo_url);";
+
+        using var command = new MySqlCommand(sql, connection);
+        command.Parameters.AddWithValue("@TeamId", teamId);
+        command.Parameters.AddWithValue("@TeamName", teamName);
+        command.Parameters.AddWithValue("@ColorHex", colorHex);
+        command.Parameters.AddWithValue("@LogoUrl", (object?)logoUrl ?? DBNull.Value);
+
+        await command.ExecuteNonQueryAsync();
+    }
 }

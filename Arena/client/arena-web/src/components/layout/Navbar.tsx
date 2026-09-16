@@ -41,8 +41,12 @@ export const Navbar: React.FC = () => {
                   <span className="text-sm font-bold text-white">{user.username}</span>
                   <span className="text-xs text-arena-cyan uppercase tracking-widest">{user.role}</span>
                 </div>
-                <div className="h-8 w-8 rounded-full bg-arena-surface border border-arena-border flex items-center justify-center">
-                  <UserIcon size={16} className="text-arena-textMuted" />
+                <div className="h-8 w-8 rounded-full bg-arena-surface border border-arena-border flex items-center justify-center overflow-hidden shrink-0">
+                  {user.avatarUrl && user.avatarUrl.trim() !== '' ? (
+                    <img src={user.avatarUrl} alt={user.username} className="w-full h-full object-cover" />
+                  ) : (
+                    <UserIcon size={16} className="text-arena-textMuted" />
+                  )}
                 </div>
                 <button
                   onClick={() => logout()}

@@ -1,5 +1,5 @@
 import { FC, useState, useRef, useEffect } from 'react';
-import { Search, User, Settings, LogOut, Video, BarChart2, Moon, Sun, Monitor } from 'lucide-react';
+import { Search, User, Settings, LogOut, Moon, Sun, Monitor, Trophy, Users } from 'lucide-react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -69,10 +69,10 @@ export const TopBar: FC = () => {
             )}
             
             <button 
-              className="w-[34px] h-[34px] rounded-full bg-[var(--panel)] border border-[var(--line)] text-[var(--text)] flex items-center justify-center hover:border-[var(--prime)] transition-colors outline-none focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--prime)]"
+              className="w-[34px] h-[34px] rounded-full bg-[var(--panel)] border border-[var(--line)] text-[var(--text)] flex items-center justify-center hover:border-[var(--prime)] transition-colors outline-none focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--prime)] overflow-hidden shrink-0"
               onClick={() => setDropdownOpen(!dropdownOpen)}
             >
-              {(user.avatarUrl && (user.avatarUrl.startsWith('http://') || user.avatarUrl.startsWith('https://'))) ? (
+              {user.avatarUrl && user.avatarUrl.trim() !== '' ? (
                 <img src={user.avatarUrl} alt={user.username} className="w-full h-full rounded-full object-cover" />
               ) : (
                 <User size={18} />
@@ -97,8 +97,8 @@ export const TopBar: FC = () => {
                     }
                   }}
                 >
-                  <div className="w-10 h-10 rounded-full bg-arena-cyan text-black flex items-center justify-center flex-shrink-0">
-                    {(user.avatarUrl && (user.avatarUrl.startsWith('http://') || user.avatarUrl.startsWith('https://'))) ? (
+                  <div className="w-10 h-10 rounded-full bg-arena-cyan text-black flex items-center justify-center flex-shrink-0 overflow-hidden">
+                    {user.avatarUrl && user.avatarUrl.trim() !== '' ? (
                       <img src={user.avatarUrl} alt={user.username} className="w-full h-full rounded-full object-cover" />
                     ) : (
                       <User size={24} />
@@ -112,14 +112,16 @@ export const TopBar: FC = () => {
 
                 {/* Main Links */}
                 <div className="py-1 border-b border-[var(--line)]">
-                  <Link to="#" className="flex items-center gap-3 px-4 py-2 hover:bg-[var(--panel-2)] text-sm text-[var(--text)] outline-none focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--prime)]" onClick={() => setDropdownOpen(false)}>
-                    <Video size={18} />
-                    Channel
+                  <Link to="/tournaments" className="flex items-center gap-3 px-4 py-2 hover:bg-[var(--panel-2)] text-sm text-[var(--text)] outline-none focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--prime)]" onClick={() => setDropdownOpen(false)}>
+                    <Trophy size={18} />
+                    Tournaments
                   </Link>
-                  <Link to="#" className="flex items-center gap-3 px-4 py-2 hover:bg-[var(--panel-2)] text-sm text-[var(--text)] outline-none focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--prime)]" onClick={() => setDropdownOpen(false)}>
-                    <BarChart2 size={18} />
-                    Creator Dashboard
-                  </Link>
+                  {user?.role === 'Organizer' && (
+                    <Link to="/teams" className="flex items-center gap-3 px-4 py-2 hover:bg-[var(--panel-2)] text-sm text-[var(--text)] outline-none focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--prime)]" onClick={() => setDropdownOpen(false)}>
+                      <Users size={18} />
+                      Teams & Rosters
+                    </Link>
+                  )}
                 </div>
 
                 {/* Settings & Theme */}

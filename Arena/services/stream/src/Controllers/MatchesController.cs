@@ -206,4 +206,18 @@ public class MatchesController : ControllerBase
         // return 204 no content on success
         return NoContent();
     }
+
+    [HttpPut("teams/{id:int}/sync")]
+    [AllowAnonymous]
+    public async Task<IActionResult> SyncTeam(int id, [FromBody] SyncTeamRequest request)
+    {
+        await _matchRepository.UpsertTeamAsync(id, request.TeamName, request.ColorHex, request.LogoUrl);
+        return Ok(new { message = "Team synced successfully." });
+    }
 }
+
+public record SyncTeamRequest(
+    [property: System.Text.Json.Serialization.JsonPropertyName("team_name")] string TeamName,
+    [property: System.Text.Json.Serialization.JsonPropertyName("color_hex")] string ColorHex,
+    [property: System.Text.Json.Serialization.JsonPropertyName("logo_url")] string? LogoUrl
+);
