@@ -123,6 +123,39 @@ public class UserProfileService : IUserService
         };
     }
 
+    public async Task<UserProfileResponse> ChangeRoleAsync(int userId, string newRole)
+    {
+        var user = await _userRepository.GetByIdAsync(userId);
+        if (user == null)
+        {
+            throw new KeyNotFoundException("User not found.");
+        }
+
+        await _userRepository.UpdateRoleAsync(userId, newRole);
+
+        // Fetch refreshed user
+        var refreshedUser = await _userRepository.GetByIdAsync(userId);
+        if (refreshedUser == null)
+        {
+            throw new KeyNotFoundException("User not found after update.");
+        }
+
+        return new UserProfileResponse
+        {
+            UserId = refreshedUser.UserId,
+            Username = refreshedUser.Username,
+            Email = refreshedUser.Email,
+            Role = refreshedUser.Role,
+            EmailVerified = refreshedUser.EmailVerified,
+            AvatarUrl = refreshedUser.AvatarUrl,
+            DisplayName = refreshedUser.DisplayName,
+            Bio = refreshedUser.Bio,
+            BannerUrl = refreshedUser.BannerUrl,
+            CreatedAt = refreshedUser.CreatedAt,
+            UpdatedAt = refreshedUser.UpdatedAt
+        };
+    }
+
     public async Task<ChangePasswordResponse> ChangePasswordAsync(int userId, ChangePasswordRequest request)
     {
         var user = await _userRepository.GetByIdAsync(userId);

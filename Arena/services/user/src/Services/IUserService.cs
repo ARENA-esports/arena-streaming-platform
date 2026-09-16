@@ -6,6 +6,7 @@ public interface IUserService
 {
     Task<UserProfileResponse?> GetProfileAsync(int userId);
     Task<UserProfileResponse> UpdateProfileAsync(int userId, UpdateProfileRequest request);
+    Task<UserProfileResponse> ChangeRoleAsync(int userId, string newRole);
     Task<ChangePasswordResponse> ChangePasswordAsync(int userId, ChangePasswordRequest request);
     Task DeleteAccountAsync(int userId);
 }

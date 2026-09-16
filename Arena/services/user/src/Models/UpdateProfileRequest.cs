@@ -12,8 +12,6 @@ public class UpdateProfileRequest
     [MaxLength(100, ErrorMessage = "Email cannot exceed 100 characters.")]
     public string? Email { get; set; }
 
-    [Url(ErrorMessage = "Avatar URL must be a valid URL.")]
-    [MaxLength(255, ErrorMessage = "Avatar URL cannot exceed 255 characters.")]
     public string? AvatarUrl { get; set; }
 
     [MaxLength(50, ErrorMessage = "Display name cannot exceed 50 characters.")]
@@ -22,7 +20,5 @@ public class UpdateProfileRequest
     [MaxLength(300, ErrorMessage = "Bio cannot exceed 300 characters.")]
     public string? Bio { get; set; }
 
-    [Url(ErrorMessage = "Banner URL must be a valid URL.")]
-    [MaxLength(255, ErrorMessage = "Banner URL cannot exceed 255 characters.")]
     public string? BannerUrl { get; set; }
 }

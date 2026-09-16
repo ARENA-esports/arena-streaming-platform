@@ -71,7 +71,7 @@ public class UsersController : ControllerBase
     /// <param name="request">Fields to update</param>
     /// <returns>The updated user profile</returns>
     [HttpPut("me")]
-    [RequestSizeLimit(32768)]   //hard: Capped profile mutation payload size to 32KB to prevent buffer flooding
+    [RequestSizeLimit(10485760)]   // Allow profile image payload up to 10MB
     [ProducesResponseType(typeof(UserProfileResponse), 200)]
     [ProducesResponseType(typeof(ValidationProblemDetails), 400)]
     [ProducesResponseType(401)]
@@ -91,12 +91,23 @@ public class UsersController : ControllerBase
             return Unauthorized(new { message = "Invalid user identifier claim." });
         }
 
-        //hard: Stored XSS defense: ensure avatar URL uses standard HTTP/HTTPS schemes if provided
+        // Standard scheme validation allowing http, https, data:image/, and relative paths
         if (!string.IsNullOrWhiteSpace(request.AvatarUrl) &&
             !request.AvatarUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
-            !request.AvatarUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            !request.AvatarUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase) &&
+            !request.AvatarUrl.StartsWith("data:image/", StringComparison.OrdinalIgnoreCase) &&
+            !request.AvatarUrl.StartsWith("/", StringComparison.OrdinalIgnoreCase))
         {
-            return BadRequest(new { message = "Avatar URL must use http or https scheme." });
+            return BadRequest(new { message = "Avatar URL must use http, https, data:image/, or relative path scheme." });
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.BannerUrl) &&
+            !request.BannerUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
+            !request.BannerUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase) &&
+            !request.BannerUrl.StartsWith("data:image/", StringComparison.OrdinalIgnoreCase) &&
+            !request.BannerUrl.StartsWith("/", StringComparison.OrdinalIgnoreCase))
+        {
+            return BadRequest(new { message = "Banner URL must use http, https, data:image/, or relative path scheme." });
         }
         
         try
@@ -121,6 +132,46 @@ public class UsersController : ControllerBase
             //hard: CWE-209 fix- Exclude ex.Message from 500 response; log details internally
             _logger.LogError(ex, "An unhandled error occurred while updating profile for user {UserId}", userId.Value);
             return StatusCode(500, new { message = "An error occurred while updating the profile.", details = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Changes the role for the current authenticated user.
+    /// </summary>
+    /// <param name="request">New role</param>
+    /// <returns>The updated user profile</returns>
+    [HttpPut("me/role")]
+    [ProducesResponseType(typeof(UserProfileResponse), 200)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), 400)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(404)]
+    [ProducesResponseType(500)]
+    public async Task<IActionResult> ChangeRole([FromBody] ChangeRoleRequest request)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        var userId = GetCurrentUserId();
+        if (!userId.HasValue)
+        {
+            return Unauthorized(new { message = "Invalid user identifier claim." });
+        }
+
+        try
+        {
+            var updatedProfile = await _userService.ChangeRoleAsync(userId.Value, request.Role);
+            return Ok(updatedProfile);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "An unhandled error occurred while changing role for user {UserId}", userId.Value);
+            return StatusCode(500, new { message = "An error occurred while changing the role.", details = ex.Message });
         }
     }
 

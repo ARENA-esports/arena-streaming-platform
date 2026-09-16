@@ -13,6 +13,7 @@ public interface IUserRepository
     Task<bool> UpdatePasswordAsync(int userId, string passwordHash);
     Task<User?> GetByEmailExcludingUserAsync(string email, int userId);
     Task<bool> UpdateProfileAsync(int userId, string username, string email, string? avatarUrl, string? displayName, string? bio, string? bannerUrl, bool emailVerified);
+    Task<bool> UpdateRoleAsync(int userId, string role);
     Task<bool> DeleteUserAsync(int userId);
     Task<bool> VerifyEmailAsync(int userId);
 }
