@@ -11,6 +11,7 @@ jobs:
     outputs:
       user: ${{ steps.filter.outputs.user }}
       stream: ${{ steps.filter.outputs.stream }}
+      tournament: ${{ steps.filter.outputs.tournament }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -22,6 +23,9 @@ jobs:
               - 'Arena/shared/EventContracts/**'
             stream:
               - 'Arena/services/stream/**'
+              - 'Arena/shared/EventContracts/**'
+            tournament:
+              - 'Arena/services/tournament/**'
               - 'Arena/shared/EventContracts/**'
 
   # Job 2: build, push, deploy User (only if changed)
@@ -93,3 +97,38 @@ jobs:
           app-name: arena-stream
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE_STREAM }}
           images: ghcr.io/arena-esports/arena-stream:${{ github.sha }}
+
+  # Job 4: build, push, deploy Tournament (only if changed)
+  deploy-tournament:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.tournament == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./Arena
+          file: ./Arena/services/tournament/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/arena-esports/arena-tournament:latest
+            ghcr.io/arena-esports/arena-tournament:${{ github.sha }}
+
+      - name: Deploy to Azure App Service
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: arena-tournament
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE_TOURNAMENT }}
+          images: ghcr.io/arena-esports/arena-tournament:${{ github.sha }}

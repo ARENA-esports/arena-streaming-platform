@@ -12,6 +12,7 @@ jobs:
     outputs:
       user: ${{ steps.filter.outputs.user }}
       stream: ${{ steps.filter.outputs.stream }}
+      tournament: ${{ steps.filter.outputs.tournament }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -23,6 +24,9 @@ jobs:
               - 'Arena/shared/EventContracts/**'
             stream:
               - 'Arena/services/stream/**'
+              - 'Arena/shared/EventContracts/**'
+            tournament:
+              - 'Arena/services/tournament/**'
               - 'Arena/shared/EventContracts/**'
 
   # Job 2: build + test + analyze User (only if changed)
@@ -87,6 +91,40 @@ jobs:
 
       - name: Test
         run: dotnet test Arena/services/stream/tests/StreamService.Tests.csproj --no-restore --configuration Release
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:csharp"
+
+  # Job 4: build + test + analyze Tournament (only if changed)
+  build-tournament:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.tournament == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: csharp
+
+      - name: Restore
+        run: dotnet restore Arena/services/tournament/src/TournamentService.csproj
+
+      - name: Build
+        run: dotnet build Arena/services/tournament/src/TournamentService.csproj --no-restore --configuration Release
+
+      - name: Test
+        run: dotnet test Arena/services/tournament/tests/TournamentService.Tests.csproj --no-restore --configuration Release
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3

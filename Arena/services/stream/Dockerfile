@@ -5,15 +5,13 @@ WORKDIR /repo
 COPY services/stream/src/StreamService.csproj services/stream/src/
 COPY shared/EventContracts/src/EventContracts.csproj shared/EventContracts/src/
 
-RUN --mount=type=cache,id=nuget,target=/root/.nuget/packages \
-    dotnet restore services/stream/src/StreamService.csproj
+RUN dotnet restore services/stream/src/StreamService.csproj
 
 COPY services/stream/src/ services/stream/src/
 COPY shared/EventContracts/src/ shared/EventContracts/src/
 COPY infra/db-migrations/stream/ infra/db-migrations/stream/
 
-RUN --mount=type=cache,id=nuget,target=/root/.nuget/packages \
-    dotnet publish services/stream/src/StreamService.csproj -c Release -o /app/publish --no-restore
+RUN dotnet publish services/stream/src/StreamService.csproj -c Release -o /app/publish
 
 # Stage 2: Runtime
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
