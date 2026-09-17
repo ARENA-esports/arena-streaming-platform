@@ -28,24 +28,24 @@ jobs:
       - name: Wait for services to initialize
         run: |
           echo "Waiting for Docker containers to become healthy..."
-          sleep 15
+          sleep 20
           docker compose ps
 
       - name: Smoke Test User Service Health
         run: |
-          curl --fail --retry 10 --retry-delay 3 http://localhost:5168/health || exit 1
+          curl --fail --retry 15 --retry-connrefused --retry-delay 3 http://localhost:5168/health || (docker compose ps && exit 1)
 
       - name: Smoke Test Tournament Service Health
         run: |
-          curl --fail --retry 10 --retry-delay 3 http://localhost:8082/health || exit 1
+          curl --fail --retry 15 --retry-connrefused --retry-delay 3 http://localhost:8082/health || (docker compose ps && exit 1)
 
       - name: Smoke Test Stream Service Health
         run: |
-          curl --fail --retry 10 --retry-delay 3 http://localhost:5167/health || exit 1
+          curl --fail --retry 15 --retry-connrefused --retry-delay 3 http://localhost:5167/health || (docker compose ps && exit 1)
 
       - name: Smoke Test Web Frontend SPA
         run: |
-          curl --fail --retry 10 --retry-delay 3 http://localhost:5173 || exit 1
+          curl --fail --retry 15 --retry-connrefused --retry-delay 3 http://localhost:5173 || (docker compose ps && exit 1)
 
       - name: Tear down Docker Compose Stack
         if: always()
