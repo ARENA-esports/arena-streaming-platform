@@ -5,13 +5,13 @@ WORKDIR /repo
 COPY services/tournament/src/TournamentService.csproj services/tournament/src/
 COPY shared/EventContracts/src/EventContracts.csproj shared/EventContracts/src/
 
-RUN --mount=type=cache,id=nuget,target=/root/.nuget/packages \
+RUN --mount=type=cache,id=nuget-tournament,target=/root/.nuget/packages \
     dotnet restore services/tournament/src/TournamentService.csproj
 
 COPY services/tournament/src/ services/tournament/src/
 COPY shared/EventContracts/src/ shared/EventContracts/src/
 
-RUN --mount=type=cache,id=nuget,target=/root/.nuget/packages \
+RUN --mount=type=cache,id=nuget-tournament,target=/root/.nuget/packages \
     dotnet publish services/tournament/src/TournamentService.csproj -c Release -o /app/publish --no-restore
 
 # Stage 2: Runtime
