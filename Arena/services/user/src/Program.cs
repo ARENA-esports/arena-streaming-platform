@@ -157,8 +157,6 @@ for (int attempt = 1; attempt <= maxRetries; attempt++)
 {
     try
     {
-        EnsureDatabase.For.MySqlDatabase(connectionString);
-
         var upgrader = DeployChanges.To
             .MySqlDatabase(connectionString)
             .WithScriptsEmbeddedInAssembly(System.Reflection.Assembly.GetExecutingAssembly())
