@@ -140,25 +140,44 @@ var app = builder.Build();
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 if (!string.IsNullOrEmpty(connectionString))
 {
-    try
+    int maxRetries = 10;
+    int delaySeconds = 2;
+    bool migrationSucceeded = false;
+
+    for (int attempt = 1; attempt <= maxRetries; attempt++)
     {
-        EnsureDatabase.For.MySqlDatabase(connectionString);
-
-        var upgrader = DeployChanges.To
-            .MySqlDatabase(connectionString)
-            .WithScriptsEmbeddedInAssembly(System.Reflection.Assembly.GetExecutingAssembly())
-            .LogToConsole()
-            .Build();
-
-        var result = upgrader.PerformUpgrade();
-        if (!result.Successful)
+        try
         {
-            app.Logger.LogWarning("Database migration failed or database unreachable: {Error}", result.Error);
+            EnsureDatabase.For.MySqlDatabase(connectionString);
+
+            var upgrader = DeployChanges.To
+                .MySqlDatabase(connectionString)
+                .WithScriptsEmbeddedInAssembly(System.Reflection.Assembly.GetExecutingAssembly())
+                .LogToConsole()
+                .Build();
+
+            var result = upgrader.PerformUpgrade();
+            if (result.Successful)
+            {
+                migrationSucceeded = true;
+                break;
+            }
+            app.Logger.LogWarning("Migration attempt {Attempt}/{MaxRetries} failed: {Error}", attempt, maxRetries, result.Error);
+        }
+        catch (Exception ex)
+        {
+            app.Logger.LogWarning("Migration attempt {Attempt}/{MaxRetries} threw exception: {Message}", attempt, maxRetries, ex.Message);
+        }
+
+        if (attempt < maxRetries)
+        {
+            System.Threading.Thread.Sleep(TimeSpan.FromSeconds(delaySeconds));
         }
     }
-    catch (Exception ex)
+
+    if (!migrationSucceeded)
     {
-        app.Logger.LogWarning("Could not run migrations on startup: {Message}", ex.Message);
+        throw new InvalidOperationException("Failed to apply TournamentService database migrations after maximum retry attempts.");
     }
 }
 
