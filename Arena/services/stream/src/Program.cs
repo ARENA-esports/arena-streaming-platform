@@ -155,17 +155,44 @@ var app = builder.Build();      // compile service registrations and create runn
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
     ?? throw new InvalidOperationException("DefaultConnection string is not configured.");
 
-var upgrader = DeployChanges.To
-    .MySqlDatabase(connectionString)
-    .WithScriptsEmbeddedInAssembly(System.Reflection.Assembly.GetExecutingAssembly())
-    .LogToConsole()
-    .Build();
+int maxRetries = 10;
+int delaySeconds = 2;
+bool migrationSucceeded = false;
 
-var result = upgrader.PerformUpgrade();
-
-if (!result.Successful)
+for (int attempt = 1; attempt <= maxRetries; attempt++)
 {
-    throw new Exception("Database migration failed: " + result.Error);
+    try
+    {
+        EnsureDatabase.For.MySqlDatabase(connectionString);
+
+        var upgrader = DeployChanges.To
+            .MySqlDatabase(connectionString)
+            .WithScriptsEmbeddedInAssembly(System.Reflection.Assembly.GetExecutingAssembly())
+            .LogToConsole()
+            .Build();
+
+        var result = upgrader.PerformUpgrade();
+        if (result.Successful)
+        {
+            migrationSucceeded = true;
+            break;
+        }
+        app.Logger.LogWarning("StreamService migration attempt {Attempt}/{MaxRetries} failed: {Error}", attempt, maxRetries, result.Error);
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogWarning("StreamService migration attempt {Attempt}/{MaxRetries} threw exception: {Message}", attempt, maxRetries, ex.Message);
+    }
+
+    if (attempt < maxRetries)
+    {
+        System.Threading.Thread.Sleep(TimeSpan.FromSeconds(delaySeconds));
+    }
+}
+
+if (!migrationSucceeded)
+{
+    throw new InvalidOperationException("Failed to apply StreamService database migrations after maximum retry attempts.");
 }
 
 

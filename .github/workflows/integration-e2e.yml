@@ -33,19 +33,19 @@ jobs:
 
       - name: Smoke Test User Service Health
         run: |
-          curl --fail --retry 15 --retry-connrefused --retry-delay 3 http://localhost:5168/health || (docker compose ps && exit 1)
+          curl --fail --retry 15 --retry-connrefused --retry-delay 3 http://localhost:5168/health || (docker compose ps && docker compose logs && exit 1)
 
       - name: Smoke Test Tournament Service Health
         run: |
-          curl --fail --retry 15 --retry-connrefused --retry-delay 3 http://localhost:8082/health || (docker compose ps && exit 1)
+          curl --fail --retry 15 --retry-connrefused --retry-delay 3 http://localhost:8082/health || (docker compose ps && docker compose logs && exit 1)
 
       - name: Smoke Test Stream Service Health
         run: |
-          curl --fail --retry 15 --retry-connrefused --retry-delay 3 http://localhost:5167/health || (docker compose ps && exit 1)
+          curl --fail --retry 15 --retry-connrefused --retry-delay 3 http://localhost:5167/health || (docker compose ps && docker compose logs && exit 1)
 
       - name: Smoke Test Web Frontend SPA
         run: |
-          curl --fail --retry 15 --retry-connrefused --retry-delay 3 http://localhost:5173 || (docker compose ps && exit 1)
+          curl --fail --retry 15 --retry-connrefused --retry-delay 3 http://localhost:5173 || (docker compose ps && docker compose logs && exit 1)
 
       - name: Tear down Docker Compose Stack
         if: always()
