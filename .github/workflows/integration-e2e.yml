@@ -1,0 +1,49 @@
+name: Integration & E2E Tests
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+
+jobs:
+  e2e-smoke-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Arena
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Start Docker Compose Stack
+        run: docker-compose up -d --build
+
+      - name: Wait for services to initialize
+        run: |
+          echo "Waiting for Docker containers to become healthy..."
+          sleep 15
+          docker-compose ps
+
+      - name: Smoke Test User Service Health
+        run: |
+          curl --fail --retry 10 --retry-delay 3 http://localhost:5168/health || exit 1
+
+      - name: Smoke Test Tournament Service Health
+        run: |
+          curl --fail --retry 10 --retry-delay 3 http://localhost:8082/health || exit 1
+
+      - name: Smoke Test Stream Service Health
+        run: |
+          curl --fail --retry 10 --retry-delay 3 http://localhost:5167/health || exit 1
+
+      - name: Smoke Test Web Frontend SPA
+        run: |
+          curl --fail --retry 10 --retry-delay 3 http://localhost:5173 || exit 1
+
+      - name: Tear down Docker Compose Stack
+        if: always()
+        run: docker-compose down -v
