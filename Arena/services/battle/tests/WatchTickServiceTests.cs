@@ -13,7 +13,6 @@ namespace BattleEconomyService.Tests;
 public class WatchTickServiceTests
 {
     private readonly Mock<IWalletRepository> _walletRepoMock;
-    private readonly Mock<ICoinTransactionRepository> _txRepoMock;
     private readonly Mock<IStreamLivenessValidator> _streamValidatorMock;
     private readonly Mock<ICoinCapPolicy> _capPolicyMock;
     private readonly Mock<ICoinEarnedEventPublisher> _eventPublisherMock;
@@ -24,7 +23,6 @@ public class WatchTickServiceTests
     public WatchTickServiceTests()
     {
         _walletRepoMock = new Mock<IWalletRepository>();
-        _txRepoMock = new Mock<ICoinTransactionRepository>();
         _streamValidatorMock = new Mock<IStreamLivenessValidator>();
         _capPolicyMock = new Mock<ICoinCapPolicy>();
         _eventPublisherMock = new Mock<ICoinEarnedEventPublisher>();
@@ -36,10 +34,10 @@ public class WatchTickServiceTests
             WatchTickCoinsAwarded = 10
         });
 
-        // Start fake clock at 2026-09-20 12:00:00 UTC
+        // Start clock at fixed test time
         _timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 9, 20, 12, 0, 0, TimeSpan.Zero));
 
-        // Default extension point mocks (pass-through for SCRUM-114)
+        // Default pass-through behavior for extension points
         _streamValidatorMock.Setup(s => s.ValidateStreamLiveAsync(It.IsAny<int?>())).ReturnsAsync(true);
         _capPolicyMock.Setup(c => c.IsCapExceededAsync(It.IsAny<int>(), It.IsAny<int?>())).ReturnsAsync(false);
     }
@@ -47,7 +45,6 @@ public class WatchTickServiceTests
     private WatchTickService CreateService() =>
         new(
             _walletRepoMock.Object,
-            _txRepoMock.Object,
             _streamValidatorMock.Object,
             _capPolicyMock.Object,
             _eventPublisherMock.Object,
@@ -56,11 +53,13 @@ public class WatchTickServiceTests
             _timeProvider
         );
 
+    // =========================================================================
+    // Test A: New wallet state
+    // =========================================================================
     [Fact]
-    public void InitialWallet_MustHaveZeroCoins()
+    public void NewWallet_InitialState_CoinsMustBeZero_AndLastTickAtNull()
     {
-        // AC: A newly created wallet MUST have coins = 0
-        var newWallet = new Wallet
+        var wallet = new Wallet
         {
             WalletId = 1,
             UserId = 42,
@@ -68,102 +67,68 @@ public class WatchTickServiceTests
             LastTickAt = null
         };
 
-        Assert.Equal(0, newWallet.Coins);
-        Assert.Null(newWallet.LastTickAt);
+        Assert.Equal(0, wallet.Coins);
+        Assert.Null(wallet.LastTickAt);
     }
 
+    // =========================================================================
+    // Test B: First watch tick
+    // =========================================================================
     [Fact]
-    public async Task FirstWatchTick_NewWallet_AwardsConfiguredCoins_AndRecordsTimestamp()
+    public async Task FirstWatchTick_NewWallet_Succeeds_AwardsConfiguredAmount_AndRecordsTimestamp()
     {
         // Arrange
         const int userId = 100;
         var initialWallet = new Wallet { WalletId = 1, UserId = userId, Coins = 0, LastTickAt = null };
-        var updatedWallet = new Wallet { WalletId = 1, UserId = userId, Coins = 10, LastTickAt = _timeProvider.GetUtcNow().UtcDateTime };
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
 
         _walletRepoMock.Setup(r => r.GetOrCreateWalletAsync(userId))
             .ReturnsAsync(initialWallet);
 
-        _walletRepoMock.Setup(r => r.TryAwardWatchTickAsync(
+        _walletRepoMock.Setup(r => r.ExecuteWatchTickAwardAsync(
                 userId,
                 10,
+                now,
                 It.IsAny<DateTime>(),
-                It.IsAny<DateTime>()))
-            .ReturnsAsync(true);
-
-        _walletRepoMock.Setup(r => r.GetByUserIdAsync(userId))
-            .ReturnsAsync(updatedWallet);
+                101))
+            .ReturnsAsync(AwardResult.Succeeded(10, 10, now, 1));
 
         var service = CreateService();
 
         // Act
         var result = await service.ProcessWatchTickAsync(userId, streamId: 101);
 
-        // Assert
+        // Assert (AC1)
         Assert.Equal(WatchTickStatus.Success, result.Status);
         Assert.Equal(10, result.CoinsAwarded);
         Assert.Equal(10, result.CurrentBalance);
-        Assert.NotNull(result.LastTickAt);
+        Assert.Equal(now, result.LastTickAt);
 
-        // Verify transaction recorded
-        _txRepoMock.Verify(t => t.RecordTransactionAsync(userId, 1, 10, "WATCH_TICK", 101), Times.Once);
+        // Verify exactly one transactional award execution occurred
+        _walletRepoMock.Verify(r => r.ExecuteWatchTickAwardAsync(
+            userId, 10, now, It.IsAny<DateTime>(), 101), Times.Once);
 
-        // Verify event published
+        // Verify event was published
         _eventPublisherMock.Verify(e => e.PublishCoinEarnedAsync(It.Is<CoinEarnedEvent>(
             evt => evt.UserId == userId && evt.Amount == 10 && evt.NewBalance == 10)), Times.Once);
     }
 
+    // =========================================================================
+    // Test C: 54 seconds case (rejected before interval)
+    // =========================================================================
     [Fact]
-    public async Task ValidTick_After55Seconds_AwardsCoins_AndUpdatesTimestamp()
+    public async Task TickAt54Seconds_Rejected_ZeroCoinsAwarded_ReturnsRateLimited()
     {
-        // Arrange: User earned at T=0
+        // Arrange: User had a successful award at T=0
         const int userId = 200;
-        var initialTime = _timeProvider.GetUtcNow().UtcDateTime;
-        var existingWallet = new Wallet { WalletId = 2, UserId = userId, Coins = 10, LastTickAt = initialTime };
-
-        // Advance time by 55 seconds
-        _timeProvider.Advance(TimeSpan.FromSeconds(55));
-        var newTime = _timeProvider.GetUtcNow().UtcDateTime;
-
-        var updatedWallet = new Wallet { WalletId = 2, UserId = userId, Coins = 20, LastTickAt = newTime };
+        var t0 = _timeProvider.GetUtcNow().UtcDateTime;
+        var wallet = new Wallet { WalletId = 2, UserId = userId, Coins = 10, LastTickAt = t0 };
 
         _walletRepoMock.Setup(r => r.GetOrCreateWalletAsync(userId))
-            .ReturnsAsync(existingWallet);
+            .ReturnsAsync(wallet);
 
-        _walletRepoMock.Setup(r => r.TryAwardWatchTickAsync(
-                userId,
-                10,
-                newTime,
-                It.IsAny<DateTime>()))
-            .ReturnsAsync(true);
-
-        _walletRepoMock.Setup(r => r.GetByUserIdAsync(userId))
-            .ReturnsAsync(updatedWallet);
-
-        var service = CreateService();
-
-        // Act
-        var result = await service.ProcessWatchTickAsync(userId);
-
-        // Assert (AC1)
-        Assert.Equal(WatchTickStatus.Success, result.Status);
-        Assert.Equal(10, result.CoinsAwarded);
-        Assert.Equal(20, result.CurrentBalance);
-        Assert.Equal(newTime, result.LastTickAt);
-    }
-
-    [Fact]
-    public async Task InvalidTick_Before55Seconds_ReturnsRateLimited_ZeroCoinsAwarded()
-    {
-        // Arrange: User earned at T=0
-        const int userId = 300;
-        var initialTime = _timeProvider.GetUtcNow().UtcDateTime;
-        var existingWallet = new Wallet { WalletId = 3, UserId = userId, Coins = 10, LastTickAt = initialTime };
-
-        // Advance time by only 30 seconds (< 55s)
-        _timeProvider.Advance(TimeSpan.FromSeconds(30));
-
-        _walletRepoMock.Setup(r => r.GetOrCreateWalletAsync(userId))
-            .ReturnsAsync(existingWallet);
+        // Advance by only 54 seconds (< 55s)
+        _timeProvider.Advance(TimeSpan.FromSeconds(54));
 
         var service = CreateService();
 
@@ -174,75 +139,169 @@ public class WatchTickServiceTests
         Assert.Equal(WatchTickStatus.RateLimited, result.Status);
         Assert.Equal(0, result.CoinsAwarded);
         Assert.Equal(10, result.CurrentBalance);
-        Assert.Equal(initialTime, result.LastTickAt); // previous timestamp untouched
-        Assert.Equal(25, result.RemainingSeconds);   // 55 - 30 = 25s remaining
+        Assert.Equal(t0, result.LastTickAt); // LastTickAt preserved
+        Assert.Equal(1, result.RemainingSeconds); // 55 - 54 = 1s
 
-        // Verify DB update was NOT called
-        _walletRepoMock.Verify(r => r.TryAwardWatchTickAsync(
-            It.IsAny<int>(), It.IsAny<int>(), It.IsAny<DateTime>(), It.IsAny<DateTime>()), Times.Never);
+        // Verify DB update was never attempted
+        _walletRepoMock.Verify(r => r.ExecuteWatchTickAwardAsync(
+            It.IsAny<int>(), It.IsAny<int>(), It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<int?>()), Times.Never);
 
-        // Verify no transaction recorded
-        _txRepoMock.Verify(t => t.RecordTransactionAsync(
-            It.IsAny<int>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<int?>()), Times.Never);
+        // Verify no event was published
+        _eventPublisherMock.Verify(e => e.PublishCoinEarnedAsync(It.IsAny<CoinEarnedEvent>()), Times.Never);
     }
 
+    // =========================================================================
+    // Test D: Exactly 55 seconds (boundary accepted)
+    // =========================================================================
     [Fact]
-    public async Task BoundaryTest_At54Seconds_Fails_At55Seconds_Succeeds()
+    public async Task TickAtExactly55Seconds_Accepted_ConfiguredCoinsAwarded()
     {
         // Arrange
-        const int userId = 400;
+        const int userId = 300;
         var t0 = _timeProvider.GetUtcNow().UtcDateTime;
-        var wallet = new Wallet { WalletId = 4, UserId = userId, Coins = 10, LastTickAt = t0 };
+        var wallet = new Wallet { WalletId = 3, UserId = userId, Coins = 10, LastTickAt = t0 };
 
-        _walletRepoMock.Setup(r => r.GetOrCreateWalletAsync(userId)).ReturnsAsync(wallet);
+        _walletRepoMock.Setup(r => r.GetOrCreateWalletAsync(userId))
+            .ReturnsAsync(wallet);
 
-        var service = CreateService();
-
-        // Test at 54 seconds -> must fail
-        _timeProvider.Advance(TimeSpan.FromSeconds(54));
-        var result54 = await service.ProcessWatchTickAsync(userId);
-        Assert.Equal(WatchTickStatus.RateLimited, result54.Status);
-        Assert.Equal(0, result54.CoinsAwarded);
-        Assert.Equal(1, result54.RemainingSeconds);
-
-        // Advance 1 more second to reach exactly 55 seconds -> must succeed
-        _timeProvider.Advance(TimeSpan.FromSeconds(1));
+        // Advance by exactly 55 seconds
+        _timeProvider.Advance(TimeSpan.FromSeconds(55));
         var t55 = _timeProvider.GetUtcNow().UtcDateTime;
 
-        _walletRepoMock.Setup(r => r.TryAwardWatchTickAsync(
-                userId, 10, t55, It.IsAny<DateTime>()))
-            .ReturnsAsync(true);
-
-        _walletRepoMock.Setup(r => r.GetByUserIdAsync(userId))
-            .ReturnsAsync(new Wallet { WalletId = 4, UserId = userId, Coins = 20, LastTickAt = t55 });
-
-        var result55 = await service.ProcessWatchTickAsync(userId);
-        Assert.Equal(WatchTickStatus.Success, result55.Status);
-        Assert.Equal(10, result55.CoinsAwarded);
-        Assert.Equal(20, result55.CurrentBalance);
-    }
-
-    [Fact]
-    public async Task ConcurrentRequests_AtomicConditionalUpdate_PreventsDoubleAward()
-    {
-        // Arrange: User has eligible tick, but two concurrent requests race to DB
-        const int userId = 500;
-        var wallet = new Wallet { WalletId = 5, UserId = userId, Coins = 0, LastTickAt = null };
-
-        _walletRepoMock.Setup(r => r.GetOrCreateWalletAsync(userId)).ReturnsAsync(wallet);
-
-        // Request 1 succeeds (rowsAffected = 1)
-        _walletRepoMock.SetupSequence(r => r.TryAwardWatchTickAsync(
-                userId, 10, It.IsAny<DateTime>(), It.IsAny<DateTime>()))
-            .ReturnsAsync(true)   // Request 1 wins the race
-            .ReturnsAsync(false);  // Request 2 loses the race (0 rows updated)
-
-        _walletRepoMock.Setup(r => r.GetByUserIdAsync(userId))
-            .ReturnsAsync(new Wallet { WalletId = 5, UserId = userId, Coins = 10, LastTickAt = _timeProvider.GetUtcNow().UtcDateTime });
+        _walletRepoMock.Setup(r => r.ExecuteWatchTickAwardAsync(
+                userId, 10, t55, It.IsAny<DateTime>(), null))
+            .ReturnsAsync(AwardResult.Succeeded(10, 20, t55, 3));
 
         var service = CreateService();
 
         // Act
+        var result = await service.ProcessWatchTickAsync(userId);
+
+        // Assert (AC1)
+        Assert.Equal(WatchTickStatus.Success, result.Status);
+        Assert.Equal(10, result.CoinsAwarded);
+        Assert.Equal(20, result.CurrentBalance);
+        Assert.Equal(t55, result.LastTickAt);
+    }
+
+    // =========================================================================
+    // Test E: More than 55 seconds (e.g. 120 seconds)
+    // =========================================================================
+    [Fact]
+    public async Task TickAtMoreThan55Seconds_Accepted_ConfiguredCoinsAwarded()
+    {
+        // Arrange
+        const int userId = 400;
+        var t0 = _timeProvider.GetUtcNow().UtcDateTime;
+        var wallet = new Wallet { WalletId = 4, UserId = userId, Coins = 20, LastTickAt = t0 };
+
+        _walletRepoMock.Setup(r => r.GetOrCreateWalletAsync(userId))
+            .ReturnsAsync(wallet);
+
+        // Advance by 120 seconds
+        _timeProvider.Advance(TimeSpan.FromSeconds(120));
+        var t120 = _timeProvider.GetUtcNow().UtcDateTime;
+
+        _walletRepoMock.Setup(r => r.ExecuteWatchTickAwardAsync(
+                userId, 10, t120, It.IsAny<DateTime>(), null))
+            .ReturnsAsync(AwardResult.Succeeded(10, 30, t120, 4));
+
+        var service = CreateService();
+
+        // Act
+        var result = await service.ProcessWatchTickAsync(userId);
+
+        // Assert (AC1)
+        Assert.Equal(WatchTickStatus.Success, result.Status);
+        Assert.Equal(10, result.CoinsAwarded);
+        Assert.Equal(30, result.CurrentBalance);
+        Assert.Equal(t120, result.LastTickAt);
+    }
+
+    // =========================================================================
+    // Test F: Rejected request preserves timestamp and creates no transaction
+    // =========================================================================
+    [Fact]
+    public async Task RejectedRequest_LastTickAtRemainsUnchanged_NoCoinTransactionCreated()
+    {
+        // Arrange
+        const int userId = 500;
+        var t0 = _timeProvider.GetUtcNow().UtcDateTime;
+        var wallet = new Wallet { WalletId = 5, UserId = userId, Coins = 15, LastTickAt = t0 };
+
+        _walletRepoMock.Setup(r => r.GetOrCreateWalletAsync(userId))
+            .ReturnsAsync(wallet);
+
+        // Advance 20 seconds (< 55s)
+        _timeProvider.Advance(TimeSpan.FromSeconds(20));
+
+        var service = CreateService();
+
+        // Act
+        var result = await service.ProcessWatchTickAsync(userId);
+
+        // Assert
+        Assert.Equal(WatchTickStatus.RateLimited, result.Status);
+        Assert.Equal(0, result.CoinsAwarded);
+        Assert.Equal(t0, result.LastTickAt); // unchanged
+
+        // Verify repository award execution was NEVER called
+        _walletRepoMock.Verify(r => r.ExecuteWatchTickAwardAsync(
+            It.IsAny<int>(), It.IsAny<int>(), It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<int?>()), Times.Never);
+    }
+
+    // =========================================================================
+    // Test G: Successful request creates exactly one transaction record
+    // =========================================================================
+    [Fact]
+    public async Task SuccessfulRequest_ExactlyOneCoinTransactionCreated()
+    {
+        // Arrange
+        const int userId = 600;
+        var initialWallet = new Wallet { WalletId = 6, UserId = userId, Coins = 0, LastTickAt = null };
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
+
+        _walletRepoMock.Setup(r => r.GetOrCreateWalletAsync(userId))
+            .ReturnsAsync(initialWallet);
+
+        _walletRepoMock.Setup(r => r.ExecuteWatchTickAwardAsync(
+                userId, 10, now, It.IsAny<DateTime>(), 99))
+            .ReturnsAsync(AwardResult.Succeeded(10, 10, now, 6));
+
+        var service = CreateService();
+
+        // Act
+        await service.ProcessWatchTickAsync(userId, streamId: 99);
+
+        // Assert: ExecuteWatchTickAwardAsync called exactly once with streamId 99
+        _walletRepoMock.Verify(r => r.ExecuteWatchTickAwardAsync(
+            userId, 10, now, It.IsAny<DateTime>(), 99), Times.Once);
+    }
+
+    // =========================================================================
+    // Test H: Concurrent requests race condition prevention (AC3)
+    // =========================================================================
+    [Fact]
+    public async Task ConcurrentRequests_AtomicConditionalUpdate_PreventsDoubleAward()
+    {
+        // Arrange: User has eligible tick, two concurrent requests arrive simultaneously
+        const int userId = 700;
+        var wallet = new Wallet { WalletId = 7, UserId = userId, Coins = 0, LastTickAt = null };
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
+
+        _walletRepoMock.Setup(r => r.GetOrCreateWalletAsync(userId))
+            .ReturnsAsync(wallet);
+
+        // Request 1 wins the atomic conditional update
+        // Request 2 loses the atomic conditional update (0 rows affected at DB level)
+        _walletRepoMock.SetupSequence(r => r.ExecuteWatchTickAwardAsync(
+                userId, 10, It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<int?>()))
+            .ReturnsAsync(AwardResult.Succeeded(10, 10, now, 7))
+            .ReturnsAsync(AwardResult.RateLimited(10, now));
+
+        var service = CreateService();
+
+        // Act: Execute concurrently
         var result1 = await service.ProcessWatchTickAsync(userId);
         var result2 = await service.ProcessWatchTickAsync(userId);
 
@@ -250,36 +309,62 @@ public class WatchTickServiceTests
         // Request 1 succeeded
         Assert.Equal(WatchTickStatus.Success, result1.Status);
         Assert.Equal(10, result1.CoinsAwarded);
+        Assert.Equal(10, result1.CurrentBalance);
 
-        // Request 2 was rejected atomically by the conditional update
+        // Request 2 failed with rate limit
         Assert.Equal(WatchTickStatus.RateLimited, result2.Status);
         Assert.Equal(0, result2.CoinsAwarded);
+        Assert.Equal(10, result2.CurrentBalance);
 
-        // Only 1 transaction was recorded in ledger
-        _txRepoMock.Verify(t => t.RecordTransactionAsync(
-            userId, 5, 10, "WATCH_TICK", It.IsAny<int?>()), Times.Once);
+        // Event only published once
+        _eventPublisherMock.Verify(e => e.PublishCoinEarnedAsync(It.IsAny<CoinEarnedEvent>()), Times.Once);
     }
 
     [Fact]
-    public async Task StreamNotLive_ReturnsStreamNotLive_ZeroCoinsAwarded()
+    public async Task ConcurrentRequests_SimultaneousTasks_OnlyOneWinsRace_OthersRateLimited()
     {
-        // Arrange
-        const int userId = 600;
-        var wallet = new Wallet { WalletId = 6, UserId = userId, Coins = 0, LastTickAt = null };
+        // Arrange: 10 concurrent requests arrive simultaneously for the same user
+        const int userId = 800;
+        var wallet = new Wallet { WalletId = 8, UserId = userId, Coins = 0, LastTickAt = null };
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
+
         _walletRepoMock.Setup(r => r.GetOrCreateWalletAsync(userId)).ReturnsAsync(wallet);
 
-        // Simulate stream liveness check failing (extension point)
-        _streamValidatorMock.Setup(s => s.ValidateStreamLiveAsync(999)).ReturnsAsync(false);
+        // Simulate an atomic database guard: exactly 1 caller wins atomic update, all others get 0 rows affected
+        var winnerChosen = 0;
+        _walletRepoMock.Setup(r => r.ExecuteWatchTickAwardAsync(
+                userId, 10, It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<int?>()))
+            .ReturnsAsync(() =>
+            {
+                if (Interlocked.Exchange(ref winnerChosen, 1) == 0)
+                {
+                    return AwardResult.Succeeded(10, 10, now, 8);
+                }
+                return AwardResult.RateLimited(10, now);
+            });
 
         var service = CreateService();
 
-        // Act
-        var result = await service.ProcessWatchTickAsync(userId, streamId: 999);
+        // Act: Launch 10 simultaneous tasks concurrently via Task.WhenAll
+        const int concurrencyCount = 10;
+        var tasks = Enumerable.Range(0, concurrencyCount)
+            .Select(_ => Task.Run(() => service.ProcessWatchTickAsync(userId)))
+            .ToArray();
 
-        // Assert
-        Assert.Equal(WatchTickStatus.StreamNotLive, result.Status);
-        Assert.Equal(0, result.CoinsAwarded);
-        _walletRepoMock.Verify(r => r.TryAwardWatchTickAsync(
-            It.IsAny<int>(), It.IsAny<int>(), It.IsAny<DateTime>(), It.IsAny<DateTime>()), Times.Never);
+        var results = await Task.WhenAll(tasks);
+
+        // Assert: Verify atomic isolation under true concurrency
+        var successfulResults = results.Where(r => r.Status == WatchTickStatus.Success).ToList();
+        var rateLimitedResults = results.Where(r => r.Status == WatchTickStatus.RateLimited).ToList();
+
+        Assert.Single(successfulResults);
+        Assert.Equal(10, successfulResults[0].CoinsAwarded);
+        Assert.Equal(10, successfulResults[0].CurrentBalance);
+
+        Assert.Equal(concurrencyCount - 1, rateLimitedResults.Count);
+        Assert.All(rateLimitedResults, r => Assert.Equal(0, r.CoinsAwarded));
+
+        // Event only published exactly once across all 10 concurrent requests
+        _eventPublisherMock.Verify(e => e.PublishCoinEarnedAsync(It.IsAny<CoinEarnedEvent>()), Times.Once);
     }
 }

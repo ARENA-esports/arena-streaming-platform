@@ -104,6 +104,42 @@ services:
       mysql-tournament:
         condition: service_healthy
 
+  mysql-battle:
+    image: mysql:8.0
+    container_name: arena-mysql-battle
+    ports:
+      - "3310:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=rootpassword
+      - MYSQL_DATABASE=arena_battle_db
+      - MYSQL_USER=arena
+      - MYSQL_PASSWORD=arena_password
+    volumes:
+      - mysql-battle-data:/var/lib/mysql
+      - ./services/battle/src/Migrations:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-prootpassword" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  battle:
+    build:
+      context: .
+      dockerfile: services/battle/Dockerfile
+    container_name: arena-battle
+    ports:
+      - "8083:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__DefaultConnection=Server=mysql-battle;Port=3306;Database=arena_battle_db;Uid=root;Pwd=rootpassword;AllowUserVariables=True;
+      - JwtSettings__Secret=${JWT_SECRET:-Arena_Secret_Key_For_Jwt_Token_Signing_2026_SE3022_Production_Grade!}
+      - JwtSettings__Issuer=Arena.UserService
+      - JwtSettings__Audience=Arena.Platform
+    depends_on:
+      mysql-battle:
+        condition: service_healthy
+
   web:
     build:
       context: ./client/arena-web
@@ -115,7 +151,9 @@ services:
       - user
       - tournament
       - stream
+      - battle
 
 volumes:
   mysql-user-data:
   mysql-tournament-data:
+  mysql-battle-data:

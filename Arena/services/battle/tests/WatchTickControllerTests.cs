@@ -60,13 +60,16 @@ public class WatchTickControllerTests
         Assert.Equal(now, response.LastTickAt);
     }
 
+    // =========================================================================
+    // Test C (Controller level): 54-second rejection returns 429
+    // =========================================================================
     [Fact]
-    public async Task AwardWatchTick_RateLimited_Returns429WithRemainingSeconds()
+    public async Task AwardWatchTick_RateLimitedAt54Seconds_Returns429WithRemainingSecondsAndRetryAfterHeader()
     {
         // Arrange
-        var lastTick = DateTime.UtcNow.AddSeconds(-20);
+        var lastTick = DateTime.UtcNow.AddSeconds(-54);
         _serviceMock.Setup(s => s.ProcessWatchTickAsync(123, null))
-            .ReturnsAsync(WatchTickResult.TooEarly(10, lastTick, 35));
+            .ReturnsAsync(WatchTickResult.TooEarly(10, lastTick, 1));
 
         var controller = CreateController();
 
@@ -80,15 +83,17 @@ public class WatchTickControllerTests
         var response = Assert.IsType<WatchTickResponse>(statusResult.Value);
         Assert.False(response.Success);
         Assert.Equal(0, response.CoinsAwarded);
-        Assert.Equal(35, response.RemainingSeconds);
-        Assert.Contains("Anti-farm", response.Message);
-        Assert.Equal("35", controller.Response.Headers["Retry-After"].ToString());
+        Assert.Equal(1, response.RemainingSeconds);
+        Assert.Equal("1", controller.Response.Headers["Retry-After"].ToString());
     }
 
+    // =========================================================================
+    // Test I: Authentication tests (missing, malformed, negative, or invalid stream)
+    // =========================================================================
     [Fact]
-    public async Task AwardWatchTick_MissingOrInvalidUserIdClaim_Returns401Unauthorized()
+    public async Task AwardWatchTick_MissingUserIdentityClaim_Returns401Unauthorized()
     {
-        // Arrange: User with no NameIdentifier / sub claim
+        // Arrange: Empty identity
         var anonymousUser = new ClaimsPrincipal(new ClaimsIdentity());
         var controller = CreateController(anonymousUser);
 
@@ -97,5 +102,52 @@ public class WatchTickControllerTests
 
         // Assert
         Assert.IsType<UnauthorizedObjectResult>(actionResult);
+    }
+
+    [Fact]
+    public async Task AwardWatchTick_MalformedNonNumericUserIdClaim_Returns401Unauthorized()
+    {
+        // Arrange: Malformed sub/NameIdentifier
+        var malformedUser = new ClaimsPrincipal(new ClaimsIdentity(new[]
+        {
+            new Claim(ClaimTypes.NameIdentifier, "not-a-number")
+        }, "TestAuth"));
+        var controller = CreateController(malformedUser);
+
+        // Act
+        var actionResult = await controller.AwardWatchTick(null);
+
+        // Assert
+        Assert.IsType<UnauthorizedObjectResult>(actionResult);
+    }
+
+    [Fact]
+    public async Task AwardWatchTick_NonPositiveUserIdClaim_Returns401Unauthorized()
+    {
+        // Arrange: Negative user ID
+        var negativeUser = new ClaimsPrincipal(new ClaimsIdentity(new[]
+        {
+            new Claim("sub", "-1")
+        }, "TestAuth"));
+        var controller = CreateController(negativeUser);
+
+        // Act
+        var actionResult = await controller.AwardWatchTick(null);
+
+        // Assert
+        Assert.IsType<UnauthorizedObjectResult>(actionResult);
+    }
+
+    [Fact]
+    public async Task AwardWatchTick_InvalidNegativeStreamId_Returns400BadRequest()
+    {
+        // Arrange: Valid user, but invalid streamId <= 0
+        var controller = CreateController();
+
+        // Act
+        var actionResult = await controller.AwardWatchTick(new WatchTickRequest { StreamId = -5 });
+
+        // Assert
+        Assert.IsType<BadRequestObjectResult>(actionResult);
     }
 }

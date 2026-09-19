@@ -9,7 +9,6 @@ namespace BattleEconomyService.Services;
 public class WatchTickService : IWatchTickService
 {
     private readonly IWalletRepository _walletRepository;
-    private readonly ICoinTransactionRepository _transactionRepository;
     private readonly IStreamLivenessValidator _streamValidator;
     private readonly ICoinCapPolicy _capPolicy;
     private readonly ICoinEarnedEventPublisher _eventPublisher;
@@ -19,7 +18,6 @@ public class WatchTickService : IWatchTickService
 
     public WatchTickService(
         IWalletRepository walletRepository,
-        ICoinTransactionRepository transactionRepository,
         IStreamLivenessValidator streamValidator,
         ICoinCapPolicy capPolicy,
         ICoinEarnedEventPublisher eventPublisher,
@@ -28,7 +26,6 @@ public class WatchTickService : IWatchTickService
         TimeProvider? timeProvider = null)
     {
         _walletRepository = walletRepository;
-        _transactionRepository = transactionRepository;
         _streamValidator = streamValidator;
         _capPolicy = capPolicy;
         _eventPublisher = eventPublisher;
@@ -89,54 +86,43 @@ public class WatchTickService : IWatchTickService
             };
         }
 
-        // 4. Atomic conditional update at database level (AC3: race-condition double-award prevention)
-        var awarded = await _walletRepository.TryAwardWatchTickAsync(
+        // 4. Atomic conditional update & ledger recording in a single database transaction (AC3)
+        var awardResult = await _walletRepository.ExecuteWatchTickAwardAsync(
             userId,
             _options.WatchTickCoinsAwarded,
             now,
-            threshold);
+            threshold,
+            streamId);
 
-        if (!awarded)
+        if (!awardResult.Success)
         {
-            // Another concurrent request updated last_tick_at, or condition was not met
-            _logger.LogWarning("Concurrent anti-farm collision for user {UserId}", userId);
-            var currentWallet = await _walletRepository.GetByUserIdAsync(userId) ?? wallet;
+            // Another concurrent request updated last_tick_at, or interval condition was not met
+            _logger.LogWarning("Concurrent anti-farm collision or interval not met for user {UserId}", userId);
             var remaining = _options.WatchTickIntervalSeconds;
-            if (currentWallet.LastTickAt.HasValue)
+            if (awardResult.LastTickAt.HasValue)
             {
-                var elapsed = now - currentWallet.LastTickAt.Value;
+                var elapsed = now - awardResult.LastTickAt.Value;
                 if (elapsed < interval)
                 {
                     remaining = (int)Math.Ceiling((interval - elapsed).TotalSeconds);
                 }
             }
-            return WatchTickResult.TooEarly(currentWallet.Coins, currentWallet.LastTickAt, Math.Max(1, remaining));
+            return WatchTickResult.TooEarly(awardResult.CurrentBalance, awardResult.LastTickAt, Math.Max(1, remaining));
         }
 
-        // 5. Post-award: Fetch fresh balance and record ledger transaction
-        var updatedWallet = await _walletRepository.GetByUserIdAsync(userId);
-        var finalBalance = updatedWallet?.Coins ?? (wallet.Coins + _options.WatchTickCoinsAwarded);
-
-        await _transactionRepository.RecordTransactionAsync(
-            userId,
-            wallet.WalletId,
-            _options.WatchTickCoinsAwarded,
-            "WATCH_TICK",
-            streamId);
-
-        // 6. Extension point: Publish CoinEarned event (SCRUM-117)
+        // 5. Extension point: Publish CoinEarned event (SCRUM-117)
         await _eventPublisher.PublishCoinEarnedAsync(new CoinEarnedEvent(
             userId,
-            wallet.WalletId,
+            awardResult.WalletId,
             _options.WatchTickCoinsAwarded,
-            finalBalance,
+            awardResult.CurrentBalance,
             streamId,
             now));
 
         _logger.LogInformation(
             "Awarded {Coins} coins to user {UserId}. New balance: {Balance}",
-            _options.WatchTickCoinsAwarded, userId, finalBalance);
+            _options.WatchTickCoinsAwarded, userId, awardResult.CurrentBalance);
 
-        return WatchTickResult.Awarded(_options.WatchTickCoinsAwarded, finalBalance, now);
+        return WatchTickResult.Awarded(_options.WatchTickCoinsAwarded, awardResult.CurrentBalance, now);
     }
 }
