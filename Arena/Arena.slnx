@@ -21,6 +21,13 @@
   <Folder Name="/services/user/tests/">
     <Project Path="services/user/tests/UserService.Tests.csproj" />
   </Folder>
+  <Folder Name="/services/chat/" />
+  <Folder Name="/services/chat/src/">
+    <Project Path="services/chat/src/ChatService.csproj" />
+  </Folder>
+  <Folder Name="/services/chat/tests/">
+    <Project Path="services/chat/tests/ChatService.Tests.csproj" />
+  </Folder>
   <Folder Name="/shared/" />
   <Folder Name="/shared/eventContracts/" />
   <Folder Name="/shared/eventContracts/src/">

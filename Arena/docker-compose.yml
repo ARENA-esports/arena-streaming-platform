@@ -104,6 +104,41 @@ services:
       mysql-tournament:
         condition: service_healthy
 
+  mysql-chat:
+    image: mysql:8.0
+    container_name: arena-mysql-chat
+    ports:
+      - "3310:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=rootpassword
+      - MYSQL_DATABASE=arena_chat_db
+      - MYSQL_USER=arena
+      - MYSQL_PASSWORD=arena_password
+    volumes:
+      - mysql-chat-data:/var/lib/mysql
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-prootpassword" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  chat:
+    build:
+      context: .
+      dockerfile: services/chat/Dockerfile
+    container_name: arena-chat
+    ports:
+      - "5169:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__ChatDb=Server=mysql-chat;Port=3306;Database=arena_chat_db;Uid=root;Pwd=rootpassword;AllowUserVariables=True;
+      - JwtSettings__Secret=${JWT_SECRET:-Arena_Secret_Key_For_Jwt_Token_Signing_2026_SE3022_Production_Grade!}
+      - JwtSettings__Issuer=Arena.UserService
+      - JwtSettings__Audience=Arena.Platform
+    depends_on:
+      mysql-chat:
+        condition: service_healthy
+
   web:
     build:
       context: ./client/arena-web
@@ -115,7 +150,9 @@ services:
       - user
       - tournament
       - stream
+      - chat
 
 volumes:
   mysql-user-data:
   mysql-tournament-data:
+  mysql-chat-data:
