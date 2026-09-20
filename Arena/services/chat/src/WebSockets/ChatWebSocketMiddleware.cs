@@ -12,11 +12,19 @@ namespace ChatService.WebSockets;
 /// 1. JWT authentication (cookie or query param) — rejects with 401 if invalid
 /// 2. teamId query-string validation — rejects with 400 if missing
 /// 3. WebSocket upgrade (HTTP 101) on success
-/// 4. Receive loop: persist messages via repository, broadcast via FactionChannelManager
-/// 5. Cleanup on disconnect
+/// 4. History hydration — sends last 50 messages on connect
+/// 5. Receive loop: validate → persist → broadcast
+/// 6. Cleanup on disconnect with CancellationToken
 /// </summary>
 public static class ChatWebSocketMiddleware
 {
+    private const int MaxMessageLength = 500;
+
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    };
+
     public static void MapChatWebSocket(this IEndpointRouteBuilder app)
     {
         app.Map("/ws/chat", async (HttpContext context) =>
@@ -64,20 +72,26 @@ public static class ChatWebSocketMiddleware
             var connectionId = Guid.NewGuid().ToString("N");
 
             var channelManager = context.RequestServices.GetRequiredService<FactionChannelManager>();
+            var repository = context.RequestServices.GetRequiredService<IChatMessageRepository>();
+            var logger = context.RequestServices.GetRequiredService<ILogger<FactionChannelManager>>();
+
             channelManager.AddToChannel(teamId, connectionId, socket);
 
-            var logger = context.RequestServices.GetRequiredService<ILogger<FactionChannelManager>>();
             logger.LogInformation(
                 "WebSocket connected: User {UserId} ({Username}) joined Team {TeamId} channel. ConnectionId={ConnectionId}",
                 userId, usernameClaim, teamId, connectionId);
 
             try
             {
-                await HandleReceiveLoopAsync(context, socket, channelManager, teamId, connectionId, userId, usernameClaim);
+                // ── 6. History hydration — send last 50 messages on join (AC2) ──
+                await SendHistoryAsync(socket, repository, teamId);
+
+                // ── 7. Enter receive loop ──
+                await HandleReceiveLoopAsync(socket, channelManager, repository, teamId, connectionId, userId, usernameClaim, logger);
             }
             finally
             {
-                // ── 7. Cleanup on disconnect ──
+                // ── 8. Cleanup on disconnect (AC4) ──
                 channelManager.RemoveFromChannel(teamId, connectionId);
                 logger.LogInformation(
                     "WebSocket disconnected: User {UserId} left Team {TeamId} channel. ConnectionId={ConnectionId}",
@@ -87,11 +101,13 @@ public static class ChatWebSocketMiddleware
                 {
                     try
                     {
-                        await socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Connection closed", CancellationToken.None);
+                        // Timeout the close handshake to prevent deadlocking (AC4)
+                        using var closeCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                        await socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Connection closed", closeCts.Token);
                     }
                     catch
                     {
-                        // Socket already disposed or faulted — safe to ignore
+                        // Socket already disposed, faulted, or close timed out — safe to ignore
                     }
                 }
 
@@ -101,19 +117,48 @@ public static class ChatWebSocketMiddleware
     }
 
     /// <summary>
-    /// Receive loop: reads frames from the client, persists messages, and broadcasts to the faction channel.
+    /// Sends the last 50 messages as a history payload to the newly connected client (AC2).
+    /// </summary>
+    private static async Task SendHistoryAsync(WebSocket socket, IChatMessageRepository repository, int teamId)
+    {
+        var recentMessages = await repository.GetRecentByTeamAsync(teamId, 50);
+
+        var historyPayload = JsonSerializer.Serialize(new
+        {
+            type = "history",
+            messages = recentMessages.Select(m => new
+            {
+                messageId = m.MessageId,
+                teamId = m.TeamId,
+                userId = m.UserId,
+                username = m.Username,
+                content = m.Content,
+                createdAt = m.CreatedAt.ToString("o")
+            })
+        }, JsonOptions);
+
+        var payloadBytes = Encoding.UTF8.GetBytes(historyPayload);
+
+        if (socket.State == WebSocketState.Open)
+        {
+            await socket.SendAsync(payloadBytes, WebSocketMessageType.Text, true, CancellationToken.None);
+        }
+    }
+
+    /// <summary>
+    /// Receive loop: reads frames from the client, validates, persists messages, and broadcasts to the faction channel.
     /// </summary>
     private static async Task HandleReceiveLoopAsync(
-        HttpContext context,
         WebSocket socket,
         FactionChannelManager channelManager,
+        IChatMessageRepository repository,
         int teamId,
         string connectionId,
         int userId,
-        string username)
+        string username,
+        ILogger logger)
     {
         var buffer = new byte[4096];
-        var repository = context.RequestServices.GetRequiredService<IChatMessageRepository>();
 
         while (socket.State == WebSocketState.Open)
         {
@@ -124,7 +169,7 @@ public static class ChatWebSocketMiddleware
             }
             catch (WebSocketException)
             {
-                // Client disconnected abruptly
+                // Client disconnected abruptly (AC4 — no deadlock, just break)
                 break;
             }
 
@@ -137,10 +182,23 @@ public static class ChatWebSocketMiddleware
             {
                 var messageText = Encoding.UTF8.GetString(buffer, 0, result.Count).Trim();
 
-                if (string.IsNullOrWhiteSpace(messageText))
-                    continue;
+                // ── Payload validation (AC3) ──
 
-                // Persist the message (AC4)
+                // Reject empty or whitespace-only messages
+                if (string.IsNullOrWhiteSpace(messageText))
+                {
+                    await SendErrorFrameAsync(socket, "Message cannot be empty.");
+                    continue;
+                }
+
+                // Reject messages exceeding 500 characters
+                if (messageText.Length > MaxMessageLength)
+                {
+                    await SendErrorFrameAsync(socket, "Message exceeds 500 character limit.");
+                    continue;
+                }
+
+                // ── Persist the message (AC4 from Story 1) ──
                 var chatMessage = new ChatMessage
                 {
                     TeamId = teamId,
@@ -150,25 +208,61 @@ public static class ChatWebSocketMiddleware
                     CreatedAt = DateTime.UtcNow
                 };
 
-                var messageId = await repository.InsertAsync(chatMessage);
-                chatMessage.MessageId = messageId;
+                try
+                {
+                    var messageId = await repository.InsertAsync(chatMessage);
+                    chatMessage.MessageId = messageId;
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Failed to persist message from User {UserId} in Team {TeamId}", userId, teamId);
+                    await SendErrorFrameAsync(socket, "Failed to send message. Please try again.");
+                    continue;
+                }
 
-                // Build broadcast payload
+                // ── Build typed broadcast payload ──
                 var broadcastPayload = JsonSerializer.Serialize(new
                 {
+                    type = "message",
                     messageId = chatMessage.MessageId,
                     teamId = chatMessage.TeamId,
                     userId = chatMessage.UserId,
                     username = chatMessage.Username,
                     content = chatMessage.Content,
                     createdAt = chatMessage.CreatedAt.ToString("o")
-                });
+                }, JsonOptions);
 
                 var payloadBytes = Encoding.UTF8.GetBytes(broadcastPayload);
 
-                // Broadcast to all sockets in the faction channel (AC3 — faction isolation)
+                // Broadcast to all sockets in the faction channel (AC1 — sub-second async delivery)
                 await channelManager.BroadcastToChannelAsync(teamId, payloadBytes);
             }
+        }
+    }
+
+    /// <summary>
+    /// Sends an error frame back to the sender only. Not broadcast to the channel.
+    /// </summary>
+    private static async Task SendErrorFrameAsync(WebSocket socket, string errorMessage)
+    {
+        if (socket.State != WebSocketState.Open)
+            return;
+
+        var errorPayload = JsonSerializer.Serialize(new
+        {
+            type = "error",
+            message = errorMessage
+        }, JsonOptions);
+
+        var payloadBytes = Encoding.UTF8.GetBytes(errorPayload);
+
+        try
+        {
+            await socket.SendAsync(payloadBytes, WebSocketMessageType.Text, true, CancellationToken.None);
+        }
+        catch
+        {
+            // Socket died while sending error — ignore
         }
     }
 }

@@ -39,4 +39,22 @@ public class ChatMessageRepository : IChatMessageRepository
 
         return id;
     }
+
+    /// <inheritdoc />
+    public async Task<IEnumerable<ChatMessage>> GetRecentByTeamAsync(int teamId, int limit = 50)
+    {
+        using var connection = CreateConnection();
+
+        const string sql = @"
+            SELECT * FROM (
+                SELECT message_id, team_id, user_id, username, content, created_at
+                FROM chat_messages
+                WHERE team_id = @TeamId
+                ORDER BY created_at DESC
+                LIMIT @Limit
+            ) AS recent
+            ORDER BY created_at ASC;";
+
+        return await connection.QueryAsync<ChatMessage>(sql, new { TeamId = teamId, Limit = limit });
+    }
 }

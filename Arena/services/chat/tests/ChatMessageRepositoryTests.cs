@@ -98,4 +98,25 @@ public class ChatMessageRepositoryTests
         Assert.Equal("Hello faction!", message.Content);
         Assert.Equal(now, message.CreatedAt);
     }
+
+    // ══════════════════════════════════════════════
+    // Story 2 Tests (new)
+    // ══════════════════════════════════════════════
+
+    /// <summary>
+    /// Verifies that GetRecentByTeamAsync throws when connection string is missing.
+    /// </summary>
+    [Fact]
+    public async Task GetRecentByTeamAsync_WithMissingConnectionString_ThrowsInvalidOperation()
+    {
+        // Arrange — no connection string configured
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>())
+            .Build();
+
+        var repository = new ChatMessageRepository(configuration);
+
+        // Act & Assert — should throw InvalidOperationException for missing connection string
+        await Assert.ThrowsAsync<InvalidOperationException>(() => repository.GetRecentByTeamAsync(1, 50));
+    }
 }

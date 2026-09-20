@@ -1,5 +1,7 @@
 using System.Net;
 using System.Security.Claims;
+using System.Text;
+using System.Text.Json;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
@@ -23,6 +25,8 @@ public class ChatWebSocketMiddlewareTests : IAsyncDisposable
         _mockRepo = new Mock<IChatMessageRepository>();
         _mockRepo.Setup(r => r.InsertAsync(It.IsAny<ChatMessage>()))
             .ReturnsAsync(1L);
+        _mockRepo.Setup(r => r.GetRecentByTeamAsync(It.IsAny<int>(), It.IsAny<int>()))
+            .ReturnsAsync(new List<ChatMessage>());
     }
 
     public async ValueTask DisposeAsync()
@@ -91,76 +95,67 @@ public class ChatWebSocketMiddlewareTests : IAsyncDisposable
         return host;
     }
 
-    // ── AC2: Unauthenticated connection → 401 ──
+    // ══════════════════════════════════════════════
+    // Story 1 Tests (preserved)
+    // ══════════════════════════════════════════════
+
+    // ── AC2 (S1): Unauthenticated connection → 401 ──
 
     [Fact]
     public async Task Rejects_Unauthenticated_Connection_With401()
     {
-        // Arrange
         var host = await CreateTestHost(authenticateUser: false);
         var server = host.GetTestServer();
 
-        // Act — make a regular HTTP request (not WebSocket) to trigger the 401
         var client = server.CreateClient();
         var response = await client.GetAsync("/ws/chat?teamId=1");
 
-        // Assert — unauthenticated should get 401
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
-    // ── AC1: Missing teamId → 400 ──
+    // ── AC1 (S1): Missing teamId → 400 ──
 
     [Fact]
     public async Task Rejects_MissingTeamId_With400()
     {
-        // Arrange
         var host = await CreateTestHost(authenticateUser: true);
         var server = host.GetTestServer();
         var client = server.CreateClient();
 
-        // Act — no teamId parameter
         var response = await client.GetAsync("/ws/chat");
 
-        // Assert — should get 400 because it's not a WebSocket request
-        // (test HTTP client can't do WS upgrade, so it gets caught by the WebSocket check)
         Assert.True(
             response.StatusCode == HttpStatusCode.BadRequest,
             $"Expected 400, got {response.StatusCode}");
     }
 
-    // ── AC1: Valid authenticated WS request is accepted ──
+    // ── AC1 (S1): Valid authenticated WS request is accepted ──
 
     [Fact]
     public async Task Accepts_Authenticated_WebSocket_Connection()
     {
-        // Arrange
         var host = await CreateTestHost(authenticateUser: true);
         var server = host.GetTestServer();
         var wsClient = server.CreateWebSocketClient();
 
-        // Act — connect with valid teamId
         var socket = await wsClient.ConnectAsync(
             new Uri(server.BaseAddress, "/ws/chat?teamId=1"), CancellationToken.None);
 
-        // Assert — connection should be open (HTTP 101 was accepted)
         Assert.Equal(System.Net.WebSockets.WebSocketState.Open, socket.State);
 
-        // Verify the socket was registered in the channel manager
         var channelManager = host.Services.GetRequiredService<FactionChannelManager>();
         Assert.Equal(1, channelManager.GetChannelConnectionCount(1));
 
-        // Cleanup
         await socket.CloseAsync(
             System.Net.WebSockets.WebSocketCloseStatus.NormalClosure,
             "Test complete", CancellationToken.None);
     }
 
-    // ── AC4: Message is persisted on receive ──
+    // ── AC4 (S1): Message is persisted on receive ──
 
     [Fact]
     public async Task PersistsMessage_OnReceive()
     {
-        // Arrange
         var host = await CreateTestHost(authenticateUser: true);
         var server = host.GetTestServer();
         var wsClient = server.CreateWebSocketClient();
@@ -168,18 +163,18 @@ public class ChatWebSocketMiddlewareTests : IAsyncDisposable
         var socket = await wsClient.ConnectAsync(
             new Uri(server.BaseAddress, "/ws/chat?teamId=1"), CancellationToken.None);
 
-        var messageBytes = System.Text.Encoding.UTF8.GetBytes("Hello faction!");
+        // Consume the history frame first
+        await ConsumeHistoryFrame(socket);
 
-        // Act — send a message
+        var messageBytes = Encoding.UTF8.GetBytes("Hello faction!");
+
         await socket.SendAsync(
             new ArraySegment<byte>(messageBytes),
             System.Net.WebSockets.WebSocketMessageType.Text,
             true, CancellationToken.None);
 
-        // Give the server a moment to process
         await Task.Delay(200);
 
-        // Assert — repository InsertAsync was called with the correct message
         _mockRepo.Verify(r => r.InsertAsync(It.Is<ChatMessage>(m =>
             m.TeamId == 1 &&
             m.UserId == 42 &&
@@ -187,18 +182,16 @@ public class ChatWebSocketMiddlewareTests : IAsyncDisposable
             m.Content == "Hello faction!"
         )), Times.Once);
 
-        // Cleanup
         await socket.CloseAsync(
             System.Net.WebSockets.WebSocketCloseStatus.NormalClosure,
             "Test complete", CancellationToken.None);
     }
 
-    // ── AC3: Faction isolation across WebSocket connections ──
+    // ── AC3 (S1): Faction isolation across WebSocket connections ──
 
     [Fact]
     public async Task FactionIsolation_Messages_OnlyReachSameTeam()
     {
-        // Arrange
         var host = await CreateTestHost(authenticateUser: true);
         var server = host.GetTestServer();
         var wsClient = server.CreateWebSocketClient();
@@ -208,28 +201,28 @@ public class ChatWebSocketMiddlewareTests : IAsyncDisposable
         var team2Socket = await wsClient.ConnectAsync(
             new Uri(server.BaseAddress, "/ws/chat?teamId=2"), CancellationToken.None);
 
+        // Consume history frames
+        await ConsumeHistoryFrame(team1Socket);
+        await ConsumeHistoryFrame(team2Socket);
+
         var channelManager = host.Services.GetRequiredService<FactionChannelManager>();
         Assert.Equal(1, channelManager.GetChannelConnectionCount(1));
         Assert.Equal(1, channelManager.GetChannelConnectionCount(2));
 
-        // Act — send a message on team 1's channel
-        var messageBytes = System.Text.Encoding.UTF8.GetBytes("Team 1 only!");
+        var messageBytes = Encoding.UTF8.GetBytes("Team 1 only!");
         await team1Socket.SendAsync(
             new ArraySegment<byte>(messageBytes),
             System.Net.WebSockets.WebSocketMessageType.Text,
             true, CancellationToken.None);
 
-        // Give the server time to broadcast
         await Task.Delay(200);
 
-        // Assert — try to receive on team 2 (should timeout/get nothing)
         var buffer = new byte[4096];
         var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(300));
 
         try
         {
             await team2Socket.ReceiveAsync(new ArraySegment<byte>(buffer), cts.Token);
-            // If we reach here, team 2 received something — that's a failure
             Assert.Fail("Team 2 socket should not have received a message from Team 1's channel.");
         }
         catch (OperationCanceledException)
@@ -237,7 +230,6 @@ public class ChatWebSocketMiddlewareTests : IAsyncDisposable
             // Expected — team 2 received nothing (faction isolation working)
         }
 
-        // Cleanup
         await team1Socket.CloseAsync(
             System.Net.WebSockets.WebSocketCloseStatus.NormalClosure,
             "Test complete", CancellationToken.None);
@@ -246,21 +238,297 @@ public class ChatWebSocketMiddlewareTests : IAsyncDisposable
             "Test complete", CancellationToken.None);
     }
 
-    // ── AC1: Invalid teamId (zero/negative) → rejected ──
+    // ── AC1 (S1): Invalid teamId (zero/negative) → rejected ──
 
     [Fact]
     public async Task Rejects_InvalidTeamId_With400()
     {
-        // Arrange
         var host = await CreateTestHost(authenticateUser: true);
         var server = host.GetTestServer();
         var client = server.CreateClient();
 
-        // Act — teamId = 0
         var response = await client.GetAsync("/ws/chat?teamId=0");
 
-        // Assert
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    // ══════════════════════════════════════════════
+    // Story 2 Tests (new)
+    // ══════════════════════════════════════════════
+
+    // ── AC2 (S2): History hydration on join ──
+
+    [Fact]
+    public async Task SendsHistoryOnConnect_Last50Messages_ChronologicalOrder()
+    {
+        // Arrange — mock returns 3 messages in chronological order
+        var historyMessages = new List<ChatMessage>
+        {
+            new() { MessageId = 1, TeamId = 1, UserId = 10, Username = "Alice", Content = "First message", CreatedAt = DateTime.UtcNow.AddMinutes(-3) },
+            new() { MessageId = 2, TeamId = 1, UserId = 20, Username = "Bob", Content = "Second message", CreatedAt = DateTime.UtcNow.AddMinutes(-2) },
+            new() { MessageId = 3, TeamId = 1, UserId = 10, Username = "Alice", Content = "Third message", CreatedAt = DateTime.UtcNow.AddMinutes(-1) }
+        };
+        _mockRepo.Setup(r => r.GetRecentByTeamAsync(1, 50))
+            .ReturnsAsync(historyMessages);
+
+        var host = await CreateTestHost(authenticateUser: true);
+        var server = host.GetTestServer();
+        var wsClient = server.CreateWebSocketClient();
+
+        // Act — connect to team 1
+        var socket = await wsClient.ConnectAsync(
+            new Uri(server.BaseAddress, "/ws/chat?teamId=1"), CancellationToken.None);
+
+        // Read the first frame (should be history)
+        var buffer = new byte[8192];
+        var result = await socket.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
+        var json = Encoding.UTF8.GetString(buffer, 0, result.Count);
+        var doc = JsonDocument.Parse(json);
+
+        // Assert
+        Assert.Equal("history", doc.RootElement.GetProperty("type").GetString());
+        var messages = doc.RootElement.GetProperty("messages");
+        Assert.Equal(3, messages.GetArrayLength());
+        Assert.Equal("First message", messages[0].GetProperty("content").GetString());
+        Assert.Equal("Second message", messages[1].GetProperty("content").GetString());
+        Assert.Equal("Third message", messages[2].GetProperty("content").GetString());
+
+        _mockRepo.Verify(r => r.GetRecentByTeamAsync(1, 50), Times.Once);
+
+        await socket.CloseAsync(
+            System.Net.WebSockets.WebSocketCloseStatus.NormalClosure,
+            "Test complete", CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task SendsEmptyHistoryOnConnect_WhenNoMessages()
+    {
+        // Arrange — default mock returns empty list
+        var host = await CreateTestHost(authenticateUser: true);
+        var server = host.GetTestServer();
+        var wsClient = server.CreateWebSocketClient();
+
+        // Act
+        var socket = await wsClient.ConnectAsync(
+            new Uri(server.BaseAddress, "/ws/chat?teamId=99"), CancellationToken.None);
+
+        var buffer = new byte[4096];
+        var result = await socket.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
+        var json = Encoding.UTF8.GetString(buffer, 0, result.Count);
+        var doc = JsonDocument.Parse(json);
+
+        // Assert — empty history
+        Assert.Equal("history", doc.RootElement.GetProperty("type").GetString());
+        Assert.Equal(0, doc.RootElement.GetProperty("messages").GetArrayLength());
+
+        await socket.CloseAsync(
+            System.Net.WebSockets.WebSocketCloseStatus.NormalClosure,
+            "Test complete", CancellationToken.None);
+    }
+
+    // ── AC3 (S2): Payload validation ──
+
+    [Fact]
+    public async Task RejectsEmptyMessage_WithErrorFrame()
+    {
+        var host = await CreateTestHost(authenticateUser: true);
+        var server = host.GetTestServer();
+        var wsClient = server.CreateWebSocketClient();
+
+        var socket = await wsClient.ConnectAsync(
+            new Uri(server.BaseAddress, "/ws/chat?teamId=1"), CancellationToken.None);
+
+        await ConsumeHistoryFrame(socket);
+
+        // Act — send empty string
+        await socket.SendAsync(
+            new ArraySegment<byte>(Encoding.UTF8.GetBytes("")),
+            System.Net.WebSockets.WebSocketMessageType.Text,
+            true, CancellationToken.None);
+
+        await Task.Delay(200);
+
+        // Assert — receive error frame
+        var (type, message) = await ReceiveTypedFrame(socket);
+        Assert.Equal("error", type);
+        Assert.Equal("Message cannot be empty.", message);
+
+        // Verify message was NOT persisted
+        _mockRepo.Verify(r => r.InsertAsync(It.IsAny<ChatMessage>()), Times.Never);
+
+        await socket.CloseAsync(
+            System.Net.WebSockets.WebSocketCloseStatus.NormalClosure,
+            "Test complete", CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task RejectsWhitespaceOnlyMessage_WithErrorFrame()
+    {
+        var host = await CreateTestHost(authenticateUser: true);
+        var server = host.GetTestServer();
+        var wsClient = server.CreateWebSocketClient();
+
+        var socket = await wsClient.ConnectAsync(
+            new Uri(server.BaseAddress, "/ws/chat?teamId=1"), CancellationToken.None);
+
+        await ConsumeHistoryFrame(socket);
+
+        // Act — send whitespace only
+        await socket.SendAsync(
+            new ArraySegment<byte>(Encoding.UTF8.GetBytes("   \t\n  ")),
+            System.Net.WebSockets.WebSocketMessageType.Text,
+            true, CancellationToken.None);
+
+        await Task.Delay(200);
+
+        var (type, message) = await ReceiveTypedFrame(socket);
+        Assert.Equal("error", type);
+        Assert.Equal("Message cannot be empty.", message);
+
+        _mockRepo.Verify(r => r.InsertAsync(It.IsAny<ChatMessage>()), Times.Never);
+
+        await socket.CloseAsync(
+            System.Net.WebSockets.WebSocketCloseStatus.NormalClosure,
+            "Test complete", CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task RejectsMessageOver500Chars_WithErrorFrame()
+    {
+        var host = await CreateTestHost(authenticateUser: true);
+        var server = host.GetTestServer();
+        var wsClient = server.CreateWebSocketClient();
+
+        var socket = await wsClient.ConnectAsync(
+            new Uri(server.BaseAddress, "/ws/chat?teamId=1"), CancellationToken.None);
+
+        await ConsumeHistoryFrame(socket);
+
+        // Act — send a message that's 501 characters
+        var longMessage = new string('A', 501);
+        await socket.SendAsync(
+            new ArraySegment<byte>(Encoding.UTF8.GetBytes(longMessage)),
+            System.Net.WebSockets.WebSocketMessageType.Text,
+            true, CancellationToken.None);
+
+        await Task.Delay(200);
+
+        var (type, message) = await ReceiveTypedFrame(socket);
+        Assert.Equal("error", type);
+        Assert.Equal("Message exceeds 500 character limit.", message);
+
+        _mockRepo.Verify(r => r.InsertAsync(It.IsAny<ChatMessage>()), Times.Never);
+
+        await socket.CloseAsync(
+            System.Net.WebSockets.WebSocketCloseStatus.NormalClosure,
+            "Test complete", CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task ValidMessage_IsBroadcast_WithTypeField()
+    {
+        var host = await CreateTestHost(authenticateUser: true);
+        var server = host.GetTestServer();
+        var wsClient = server.CreateWebSocketClient();
+
+        var socket = await wsClient.ConnectAsync(
+            new Uri(server.BaseAddress, "/ws/chat?teamId=1"), CancellationToken.None);
+
+        await ConsumeHistoryFrame(socket);
+
+        // Act — send a valid message
+        await socket.SendAsync(
+            new ArraySegment<byte>(Encoding.UTF8.GetBytes("Valid message!")),
+            System.Net.WebSockets.WebSocketMessageType.Text,
+            true, CancellationToken.None);
+
+        // Read the broadcast frame
+        var buffer = new byte[4096];
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+        var result = await socket.ReceiveAsync(new ArraySegment<byte>(buffer), cts.Token);
+        var json = Encoding.UTF8.GetString(buffer, 0, result.Count);
+        var doc = JsonDocument.Parse(json);
+
+        // Assert — broadcast has type "message"
+        Assert.Equal("message", doc.RootElement.GetProperty("type").GetString());
+        Assert.Equal("Valid message!", doc.RootElement.GetProperty("content").GetString());
+        Assert.Equal(42, doc.RootElement.GetProperty("userId").GetInt32());
+        Assert.Equal("TestUser", doc.RootElement.GetProperty("username").GetString());
+
+        await socket.CloseAsync(
+            System.Net.WebSockets.WebSocketCloseStatus.NormalClosure,
+            "Test complete", CancellationToken.None);
+    }
+
+    // ── AC1 (S2): Sub-second delivery ──
+
+    [Fact]
+    public async Task BroadcastDelivery_CompletesWithinOneSecond()
+    {
+        var host = await CreateTestHost(authenticateUser: true);
+        var server = host.GetTestServer();
+        var wsClient = server.CreateWebSocketClient();
+
+        var socket = await wsClient.ConnectAsync(
+            new Uri(server.BaseAddress, "/ws/chat?teamId=1"), CancellationToken.None);
+
+        await ConsumeHistoryFrame(socket);
+
+        // Act — send a message and measure round-trip
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+        await socket.SendAsync(
+            new ArraySegment<byte>(Encoding.UTF8.GetBytes("Latency test")),
+            System.Net.WebSockets.WebSocketMessageType.Text,
+            true, CancellationToken.None);
+
+        var buffer = new byte[4096];
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+        await socket.ReceiveAsync(new ArraySegment<byte>(buffer), cts.Token);
+
+        stopwatch.Stop();
+
+        // Assert — delivery within 1 second (AC1 NFR)
+        Assert.True(stopwatch.ElapsedMilliseconds < 1000,
+            $"Broadcast delivery took {stopwatch.ElapsedMilliseconds}ms, expected < 1000ms");
+
+        await socket.CloseAsync(
+            System.Net.WebSockets.WebSocketCloseStatus.NormalClosure,
+            "Test complete", CancellationToken.None);
+    }
+
+    // ══════════════════════════════════════════════
+    // Helpers
+    // ══════════════════════════════════════════════
+
+    /// <summary>
+    /// Consumes the initial history frame that is sent on every connection.
+    /// Call this after connecting before sending/receiving other frames.
+    /// </summary>
+    private static async Task ConsumeHistoryFrame(System.Net.WebSockets.WebSocket socket)
+    {
+        var buffer = new byte[8192];
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+        await socket.ReceiveAsync(new ArraySegment<byte>(buffer), cts.Token);
+    }
+
+    /// <summary>
+    /// Reads a single typed JSON frame and extracts the type and message fields.
+    /// </summary>
+    private static async Task<(string type, string message)> ReceiveTypedFrame(System.Net.WebSockets.WebSocket socket)
+    {
+        var buffer = new byte[4096];
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+        var result = await socket.ReceiveAsync(new ArraySegment<byte>(buffer), cts.Token);
+        var json = Encoding.UTF8.GetString(buffer, 0, result.Count);
+        var doc = JsonDocument.Parse(json);
+
+        var type = doc.RootElement.GetProperty("type").GetString() ?? "";
+        var message = doc.RootElement.TryGetProperty("message", out var msgProp)
+            ? msgProp.GetString() ?? ""
+            : "";
+
+        return (type, message);
     }
 }
 
@@ -279,7 +547,6 @@ internal class TestAuthHandler : Microsoft.AspNetCore.Authentication.Authenticat
 
     protected override Task<Microsoft.AspNetCore.Authentication.AuthenticateResult> HandleAuthenticateAsync()
     {
-        // Check if the user was set by middleware (for authenticated tests)
         if (Context.User.Identity?.IsAuthenticated == true)
         {
             var ticket = new Microsoft.AspNetCore.Authentication.AuthenticationTicket(

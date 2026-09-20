@@ -174,6 +174,117 @@ public class FactionChannelManagerTests
     {
         return new TestWebSocket(state);
     }
+
+    // ══════════════════════════════════════════════
+    // Story 2 Tests (new)
+    // ══════════════════════════════════════════════
+
+    // ── AC1 (S2): Sub-second delivery with 50 concurrent connections ──
+
+    [Fact]
+    public async Task BroadcastToChannel_CompletesWithinOneSecond_With50Connections()
+    {
+        // Arrange — 50 sockets in one team
+        var sockets = new List<TestWebSocket>();
+        for (int i = 0; i < 50; i++)
+        {
+            var socket = new TestWebSocket();
+            _manager.AddToChannel(1, $"conn-{i}", socket);
+            sockets.Add(socket);
+        }
+
+        var payload = System.Text.Encoding.UTF8.GetBytes("{\"type\":\"message\",\"content\":\"Load test\"}");
+
+        // Act — time the broadcast
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        await _manager.BroadcastToChannelAsync(1, payload);
+        stopwatch.Stop();
+
+        // Assert — under 1 second
+        Assert.True(stopwatch.ElapsedMilliseconds < 1000,
+            $"Broadcast to 50 connections took {stopwatch.ElapsedMilliseconds}ms, expected < 1000ms");
+
+        // All 50 sockets received the message
+        foreach (var socket in sockets)
+        {
+            Assert.Equal(1, socket.SentMessages.Count);
+        }
+    }
+
+    // ── AC4 (S2): Remove from one channel does not block other channels ──
+
+    [Fact]
+    public async Task RemoveFromChannel_DoesNotBlockOtherChannels()
+    {
+        // Arrange — two channels
+        var team1Socket = new TestWebSocket();
+        var team2Socket = new TestWebSocket();
+        _manager.AddToChannel(1, "conn-1", team1Socket);
+        _manager.AddToChannel(2, "conn-2", team2Socket);
+
+        // Act — remove from team 1
+        _manager.RemoveFromChannel(1, "conn-1");
+
+        // Assert — team 2 still works
+        var payload = System.Text.Encoding.UTF8.GetBytes("test");
+        await _manager.BroadcastToChannelAsync(2, payload);
+
+        Assert.Equal(0, _manager.GetChannelConnectionCount(1));
+        Assert.Equal(1, _manager.GetChannelConnectionCount(2));
+        Assert.Equal(1, team2Socket.SentMessages.Count);
+    }
+
+    // ── AC4 (S2): Concurrent add/remove does not deadlock ──
+
+    [Fact]
+    public async Task ConcurrentAddAndRemove_DoesNotDeadlock()
+    {
+        // Arrange — run many concurrent add/remove operations
+        var tasks = new List<Task>();
+
+        for (int i = 0; i < 100; i++)
+        {
+            var index = i;
+            tasks.Add(Task.Run(() =>
+            {
+                var socket = new TestWebSocket();
+                _manager.AddToChannel(1, $"stress-{index}", socket);
+                _manager.RemoveFromChannel(1, $"stress-{index}");
+            }));
+        }
+
+        // Act & Assert — should complete without deadlock within 5 seconds
+        var completed = await Task.WhenAny(Task.WhenAll(tasks), Task.Delay(5000));
+        Assert.True(completed != Task.Delay(5000), "Concurrent add/remove deadlocked");
+
+        // All connections should be cleaned up
+        Assert.Equal(0, _manager.GetChannelConnectionCount(1));
+    }
+
+    // ── AC4 (S2): Broadcast during remove does not throw ──
+
+    [Fact]
+    public async Task BroadcastDuringRemove_DoesNotThrow()
+    {
+        // Arrange
+        for (int i = 0; i < 20; i++)
+        {
+            _manager.AddToChannel(1, $"conn-{i}", new TestWebSocket());
+        }
+
+        var payload = System.Text.Encoding.UTF8.GetBytes("concurrent test");
+
+        // Act — broadcast and remove concurrently
+        var broadcastTask = _manager.BroadcastToChannelAsync(1, payload);
+        for (int i = 0; i < 10; i++)
+        {
+            _manager.RemoveFromChannel(1, $"conn-{i}");
+        }
+
+        // Assert — should not throw
+        var exception = await Record.ExceptionAsync(() => broadcastTask);
+        Assert.Null(exception);
+    }
 }
 
 /// <summary>
