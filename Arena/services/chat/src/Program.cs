@@ -37,7 +37,8 @@ DefaultTypeMap.MatchNamesWithUnderscores = true;
 
 // ── DI Registrations ──
 builder.Services.AddSingleton<FactionChannelManager>();
-builder.Services.AddScoped<IChatMessageRepository, ChatMessageRepository>();
+builder.Services.AddSingleton<IChatMessageRepository, ChatMessageRepository>();
+builder.Services.AddSingleton<IChatTeamCacheRepository, ChatTeamCacheRepository>();
 
 // ── JWT Authentication ──
 var jwtSecret = builder.Configuration["JwtSettings:Secret"]

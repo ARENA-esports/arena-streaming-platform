@@ -73,7 +73,15 @@ public static class ChatWebSocketMiddleware
 
             var channelManager = context.RequestServices.GetRequiredService<FactionChannelManager>();
             var repository = context.RequestServices.GetRequiredService<IChatMessageRepository>();
+            var teamCacheRepo = context.RequestServices.GetRequiredService<IChatTeamCacheRepository>();
             var logger = context.RequestServices.GetRequiredService<ILogger<FactionChannelManager>>();
+
+            var teamInfo = await teamCacheRepo.GetByIdAsync(teamId) ?? new ChatTeamCache 
+            { 
+                TeamId = teamId, 
+                TeamName = $"Team {teamId}", 
+                TeamColor = "#FFFFFF" 
+            };
 
             channelManager.AddToChannel(teamId, connectionId, socket);
 
@@ -84,10 +92,10 @@ public static class ChatWebSocketMiddleware
             try
             {
                 // ── 6. History hydration — send last 50 messages on join (AC2) ──
-                await SendHistoryAsync(socket, repository, teamId);
+                await SendHistoryAsync(socket, repository, teamInfo);
 
                 // ── 7. Enter receive loop ──
-                await HandleReceiveLoopAsync(socket, channelManager, repository, teamId, connectionId, userId, usernameClaim, logger);
+                await HandleReceiveLoopAsync(socket, channelManager, repository, teamInfo, connectionId, userId, usernameClaim, logger);
             }
             finally
             {
@@ -119,9 +127,9 @@ public static class ChatWebSocketMiddleware
     /// <summary>
     /// Sends the last 50 messages as a history payload to the newly connected client (AC2).
     /// </summary>
-    private static async Task SendHistoryAsync(WebSocket socket, IChatMessageRepository repository, int teamId)
+    private static async Task SendHistoryAsync(WebSocket socket, IChatMessageRepository repository, ChatTeamCache teamInfo)
     {
-        var recentMessages = await repository.GetRecentByTeamAsync(teamId, 50);
+        var recentMessages = await repository.GetRecentByTeamAsync(teamInfo.TeamId, 50);
 
         var historyPayload = JsonSerializer.Serialize(new
         {
@@ -130,6 +138,8 @@ public static class ChatWebSocketMiddleware
             {
                 messageId = m.MessageId,
                 teamId = m.TeamId,
+                teamName = teamInfo.TeamName,
+                teamColor = teamInfo.TeamColor,
                 userId = m.UserId,
                 username = m.Username,
                 content = m.Content,
@@ -152,7 +162,7 @@ public static class ChatWebSocketMiddleware
         WebSocket socket,
         FactionChannelManager channelManager,
         IChatMessageRepository repository,
-        int teamId,
+        ChatTeamCache teamInfo,
         string connectionId,
         int userId,
         string username,
@@ -201,7 +211,7 @@ public static class ChatWebSocketMiddleware
                 // ── Persist the message (AC4 from Story 1) ──
                 var chatMessage = new ChatMessage
                 {
-                    TeamId = teamId,
+                    TeamId = teamInfo.TeamId,
                     UserId = userId,
                     Username = username,
                     Content = messageText,
@@ -215,7 +225,7 @@ public static class ChatWebSocketMiddleware
                 }
                 catch (Exception ex)
                 {
-                    logger.LogError(ex, "Failed to persist message from User {UserId} in Team {TeamId}", userId, teamId);
+                    logger.LogError(ex, "Failed to persist message from User {UserId} in Team {TeamId}", userId, teamInfo.TeamId);
                     await SendErrorFrameAsync(socket, "Failed to send message. Please try again.");
                     continue;
                 }
@@ -226,6 +236,8 @@ public static class ChatWebSocketMiddleware
                     type = "message",
                     messageId = chatMessage.MessageId,
                     teamId = chatMessage.TeamId,
+                    teamName = teamInfo.TeamName,
+                    teamColor = teamInfo.TeamColor,
                     userId = chatMessage.UserId,
                     username = chatMessage.Username,
                     content = chatMessage.Content,
@@ -235,7 +247,7 @@ public static class ChatWebSocketMiddleware
                 var payloadBytes = Encoding.UTF8.GetBytes(broadcastPayload);
 
                 // Broadcast to all sockets in the faction channel (AC1 — sub-second async delivery)
-                await channelManager.BroadcastToChannelAsync(teamId, payloadBytes);
+                await channelManager.BroadcastToChannelAsync(teamInfo.TeamId, payloadBytes);
             }
         }
     }

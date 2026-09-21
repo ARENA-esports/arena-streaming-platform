@@ -18,6 +18,7 @@ namespace ChatService.Tests;
 public class ChatWebSocketMiddlewareTests : IAsyncDisposable
 {
     private readonly Mock<IChatMessageRepository> _mockRepo;
+    private readonly Mock<IChatTeamCacheRepository> _mockTeamRepo;
     private IHost? _host;
 
     public ChatWebSocketMiddlewareTests()
@@ -27,6 +28,10 @@ public class ChatWebSocketMiddlewareTests : IAsyncDisposable
             .ReturnsAsync(1L);
         _mockRepo.Setup(r => r.GetRecentByTeamAsync(It.IsAny<int>(), It.IsAny<int>()))
             .ReturnsAsync(new List<ChatMessage>());
+
+        _mockTeamRepo = new Mock<IChatTeamCacheRepository>();
+        _mockTeamRepo.Setup(r => r.GetByIdAsync(1))
+            .ReturnsAsync(new ChatTeamCache { TeamId = 1, TeamName = "Alpha", TeamColor = "#FF0000" });
     }
 
     public async ValueTask DisposeAsync()
@@ -52,6 +57,7 @@ public class ChatWebSocketMiddlewareTests : IAsyncDisposable
                 {
                     services.AddSingleton<FactionChannelManager>();
                     services.AddSingleton<IChatMessageRepository>(_mockRepo.Object);
+                    services.AddSingleton<IChatTeamCacheRepository>(_mockTeamRepo.Object);
                     services.AddRouting();
                     services.AddAuthorization();
                     services.AddAuthentication("Test")
@@ -289,7 +295,12 @@ public class ChatWebSocketMiddlewareTests : IAsyncDisposable
         Assert.Equal("history", doc.RootElement.GetProperty("type").GetString());
         var messages = doc.RootElement.GetProperty("messages");
         Assert.Equal(3, messages.GetArrayLength());
-        Assert.Equal("First message", messages[0].GetProperty("content").GetString());
+        
+        var firstMsg = messages[0];
+        Assert.Equal("First message", firstMsg.GetProperty("content").GetString());
+        Assert.Equal("Alpha", firstMsg.GetProperty("teamName").GetString());
+        Assert.Equal("#FF0000", firstMsg.GetProperty("teamColor").GetString());
+        
         Assert.Equal("Second message", messages[1].GetProperty("content").GetString());
         Assert.Equal("Third message", messages[2].GetProperty("content").GetString());
 
@@ -454,6 +465,40 @@ public class ChatWebSocketMiddlewareTests : IAsyncDisposable
         Assert.Equal("Valid message!", doc.RootElement.GetProperty("content").GetString());
         Assert.Equal(42, doc.RootElement.GetProperty("userId").GetInt32());
         Assert.Equal("TestUser", doc.RootElement.GetProperty("username").GetString());
+        Assert.Equal("Alpha", doc.RootElement.GetProperty("teamName").GetString());
+        Assert.Equal("#FF0000", doc.RootElement.GetProperty("teamColor").GetString());
+
+        await socket.CloseAsync(
+            System.Net.WebSockets.WebSocketCloseStatus.NormalClosure,
+            "Test complete", CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task ValidMessage_WithMissingMetadata_UsesFallback()
+    {
+        var host = await CreateTestHost(authenticateUser: true);
+        var server = host.GetTestServer();
+        var wsClient = server.CreateWebSocketClient();
+
+        // Team 999 has no mock setup (returns null)
+        var socket = await wsClient.ConnectAsync(
+            new Uri(server.BaseAddress, "/ws/chat?teamId=999"), CancellationToken.None);
+
+        await ConsumeHistoryFrame(socket);
+
+        await socket.SendAsync(
+            new ArraySegment<byte>(Encoding.UTF8.GetBytes("Fallback test!")),
+            System.Net.WebSockets.WebSocketMessageType.Text,
+            true, CancellationToken.None);
+
+        var buffer = new byte[4096];
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+        var result = await socket.ReceiveAsync(new ArraySegment<byte>(buffer), cts.Token);
+        var json = Encoding.UTF8.GetString(buffer, 0, result.Count);
+        var doc = JsonDocument.Parse(json);
+
+        Assert.Equal("Team 999", doc.RootElement.GetProperty("teamName").GetString());
+        Assert.Equal("#FFFFFF", doc.RootElement.GetProperty("teamColor").GetString());
 
         await socket.CloseAsync(
             System.Net.WebSockets.WebSocketCloseStatus.NormalClosure,
