@@ -150,4 +150,84 @@ public class WatchTickControllerTests
         // Assert
         Assert.IsType<BadRequestObjectResult>(actionResult);
     }
+
+    // =========================================================================
+    // SCRUM-115 Controller Tests: CapExceeded -> HTTP 429
+    // =========================================================================
+
+    [Fact]
+    public async Task AwardWatchTick_CapExceeded_Returns429TooManyRequests()
+    {
+        // Arrange
+        _serviceMock.Setup(s => s.ProcessWatchTickAsync(123, 101))
+            .ReturnsAsync(new WatchTickResult
+            {
+                Status = WatchTickStatus.CapExceeded,
+                CoinsAwarded = 0,
+                CurrentBalance = 50,
+                Message = "Coin cap reached for this stream window."
+            });
+
+        var controller = CreateController();
+
+        // Act
+        var actionResult = await controller.AwardWatchTick(new WatchTickRequest { StreamId = 101 });
+
+        // Assert
+        var statusResult = Assert.IsType<ObjectResult>(actionResult);
+        Assert.Equal(StatusCodes.Status429TooManyRequests, statusResult.StatusCode);
+
+        var response = Assert.IsType<WatchTickResponse>(statusResult.Value);
+        Assert.False(response.Success);
+        Assert.Equal(0, response.CoinsAwarded);
+        Assert.Equal(50, response.CurrentBalance);
+    }
+
+    [Fact]
+    public async Task AwardWatchTick_CapExceeded_ResponseHasZeroCoins()
+    {
+        // Arrange
+        _serviceMock.Setup(s => s.ProcessWatchTickAsync(123, null))
+            .ReturnsAsync(new WatchTickResult
+            {
+                Status = WatchTickStatus.CapExceeded,
+                CoinsAwarded = 0,
+                CurrentBalance = 50,
+                Message = "Coin cap reached for this stream window."
+            });
+
+        var controller = CreateController();
+
+        // Act
+        var actionResult = await controller.AwardWatchTick(null);
+
+        // Assert
+        var statusResult = Assert.IsType<ObjectResult>(actionResult);
+        Assert.Equal(StatusCodes.Status429TooManyRequests, statusResult.StatusCode);
+
+        var response = Assert.IsType<WatchTickResponse>(statusResult.Value);
+        Assert.Equal(0, response.CoinsAwarded);
+        Assert.False(response.Success);
+    }
+
+    [Fact]
+    public async Task AwardWatchTick_RateLimited_StillReturns429WithRetryAfterHeader()
+    {
+        // Verify existing SCRUM-114 RateLimited 429 behavior is unaffected
+        var lastTick = DateTime.UtcNow.AddSeconds(-20);
+        _serviceMock.Setup(s => s.ProcessWatchTickAsync(123, null))
+            .ReturnsAsync(WatchTickResult.TooEarly(10, lastTick, 35));
+
+        var controller = CreateController();
+        var actionResult = await controller.AwardWatchTick(null);
+
+        var statusResult = Assert.IsType<ObjectResult>(actionResult);
+        Assert.Equal(StatusCodes.Status429TooManyRequests, statusResult.StatusCode);
+
+        var response = Assert.IsType<WatchTickResponse>(statusResult.Value);
+        Assert.False(response.Success);
+        Assert.Equal(0, response.CoinsAwarded);
+        Assert.Equal(35, response.RemainingSeconds);
+        Assert.Equal("35", controller.Response.Headers["Retry-After"].ToString());
+    }
 }

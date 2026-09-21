@@ -30,7 +30,7 @@ public class WatchTickController : ControllerBase
     /// <response code="200">Watch tick recorded successfully; coins awarded.</response>
     /// <response code="400">Invalid request payload or stream ID.</response>
     /// <response code="401">Missing, expired, or invalid JWT authentication token.</response>
-    /// <response code="429">Anti-farm check triggered; minimum interval (55 seconds) between awards has not elapsed.</response>
+    /// <response code="429">Anti-farm or coin-cap check triggered; minimum interval not elapsed, or 5-minute window ceiling reached.</response>
     [HttpPost("watch-tick")]
     [Authorize]
     [ProducesResponseType(typeof(WatchTickResponse), StatusCodes.Status200OK)]
@@ -58,7 +58,20 @@ public class WatchTickController : ControllerBase
         // 3. Process watch tick through the business layer
         var result = await _watchTickService.ProcessWatchTickAsync(userId, request?.StreamId);
 
-        // 4. Handle rate-limited anti-farm violation (AC2)
+        // 4. Handle coin-cap violation (SCRUM-115 AC1) — 5-minute rolling window ceiling reached
+        if (result.Status == WatchTickStatus.CapExceeded)
+        {
+            return StatusCode(StatusCodes.Status429TooManyRequests, new WatchTickResponse
+            {
+                Success = false,
+                CoinsAwarded = 0,
+                CurrentBalance = result.CurrentBalance,
+                LastTickAt = result.LastTickAt,
+                Message = result.Message
+            });
+        }
+
+        // 5. Handle rate-limited anti-farm violation (AC2)
         if (result.Status == WatchTickStatus.RateLimited)
         {
             if (result.RemainingSeconds.HasValue)
@@ -77,7 +90,7 @@ public class WatchTickController : ControllerBase
             });
         }
 
-        // 5. Handle successful award (AC1)
+        // 6. Handle successful award
         if (result.Status == WatchTickStatus.Success)
         {
             return Ok(new WatchTickResponse

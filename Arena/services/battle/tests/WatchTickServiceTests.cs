@@ -367,4 +367,265 @@ public class WatchTickServiceTests
         // Event only published exactly once across all 10 concurrent requests
         _eventPublisherMock.Verify(e => e.PublishCoinEarnedAsync(It.IsAny<CoinEarnedEvent>()), Times.Once);
     }
+
+    // =========================================================================
+    // SCRUM-115 Tests: Sliding-window coin cap (ICoinCapPolicy)
+    // =========================================================================
+
+    // Test J: Cap exceeded → service returns CapExceeded status
+    [Fact]
+    public async Task CapExceeded_PolicyReturnsTrue_ServiceReturnsCapExceededStatus()
+    {
+        // Arrange
+        const int userId = 1001;
+        const int streamId = 101;
+        var wallet = new Wallet { WalletId = 10, UserId = userId, Coins = 50, LastTickAt = null };
+
+        _walletRepoMock.Setup(r => r.GetOrCreateWalletAsync(userId)).ReturnsAsync(wallet);
+        _capPolicyMock.Setup(c => c.IsCapExceededAsync(userId, streamId)).ReturnsAsync(true);
+
+        var service = CreateService();
+
+        // Act
+        var result = await service.ProcessWatchTickAsync(userId, streamId);
+
+        // Assert (AC1)
+        Assert.Equal(WatchTickStatus.CapExceeded, result.Status);
+    }
+
+    // Test K: Cap exceeded → zero coins awarded
+    [Fact]
+    public async Task CapExceeded_PolicyReturnsTrue_ZeroCoinsAwarded()
+    {
+        const int userId = 1002;
+        const int streamId = 101;
+        var wallet = new Wallet { WalletId = 11, UserId = userId, Coins = 50, LastTickAt = null };
+
+        _walletRepoMock.Setup(r => r.GetOrCreateWalletAsync(userId)).ReturnsAsync(wallet);
+        _capPolicyMock.Setup(c => c.IsCapExceededAsync(userId, streamId)).ReturnsAsync(true);
+
+        var service = CreateService();
+        var result = await service.ProcessWatchTickAsync(userId, streamId);
+
+        Assert.Equal(0, result.CoinsAwarded);
+    }
+
+    // Test L: Cap exceeded → wallet balance unchanged (no award DB call)
+    [Fact]
+    public async Task CapExceeded_PolicyReturnsTrue_WalletBalanceUnchanged()
+    {
+        const int userId = 1003;
+        const int streamId = 101;
+        const int originalBalance = 50;
+        var wallet = new Wallet { WalletId = 12, UserId = userId, Coins = originalBalance, LastTickAt = null };
+
+        _walletRepoMock.Setup(r => r.GetOrCreateWalletAsync(userId)).ReturnsAsync(wallet);
+        _capPolicyMock.Setup(c => c.IsCapExceededAsync(userId, streamId)).ReturnsAsync(true);
+
+        var service = CreateService();
+        var result = await service.ProcessWatchTickAsync(userId, streamId);
+
+        // Balance reported in response equals original (unchanged) balance
+        Assert.Equal(originalBalance, result.CurrentBalance);
+
+        // Verify no atomic DB award was attempted
+        _walletRepoMock.Verify(r => r.ExecuteWatchTickAwardAsync(
+            It.IsAny<int>(), It.IsAny<int>(), It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<int?>()), Times.Never);
+    }
+
+    // Test M: Cap exceeded → no coin transaction inserted
+    [Fact]
+    public async Task CapExceeded_PolicyReturnsTrue_NoCoinTransactionInserted()
+    {
+        const int userId = 1004;
+        const int streamId = 101;
+        var wallet = new Wallet { WalletId = 13, UserId = userId, Coins = 50, LastTickAt = null };
+
+        _walletRepoMock.Setup(r => r.GetOrCreateWalletAsync(userId)).ReturnsAsync(wallet);
+        _capPolicyMock.Setup(c => c.IsCapExceededAsync(userId, streamId)).ReturnsAsync(true);
+
+        var service = CreateService();
+        await service.ProcessWatchTickAsync(userId, streamId);
+
+        // ExecuteWatchTickAwardAsync (which inserts the ledger record) must never be called
+        _walletRepoMock.Verify(r => r.ExecuteWatchTickAwardAsync(
+            It.IsAny<int>(), It.IsAny<int>(), It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<int?>()), Times.Never);
+
+        // No CoinEarned event published
+        _eventPublisherMock.Verify(e => e.PublishCoinEarnedAsync(It.IsAny<CoinEarnedEvent>()), Times.Never);
+    }
+
+    // Test N: Cap not exceeded → normal award proceeds
+    [Fact]
+    public async Task CapNotExceeded_PolicyReturnsFalse_NormalAwardProceeds()
+    {
+        const int userId = 1005;
+        const int streamId = 101;
+        var wallet = new Wallet { WalletId = 14, UserId = userId, Coins = 40, LastTickAt = null };
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
+
+        _walletRepoMock.Setup(r => r.GetOrCreateWalletAsync(userId)).ReturnsAsync(wallet);
+        _capPolicyMock.Setup(c => c.IsCapExceededAsync(userId, streamId)).ReturnsAsync(false);
+        _walletRepoMock.Setup(r => r.ExecuteWatchTickAwardAsync(
+                userId, 10, now, It.IsAny<DateTime>(), streamId))
+            .ReturnsAsync(AwardResult.Succeeded(10, 50, now, 14));
+
+        var service = CreateService();
+        var result = await service.ProcessWatchTickAsync(userId, streamId);
+
+        Assert.Equal(WatchTickStatus.Success, result.Status);
+        Assert.Equal(10, result.CoinsAwarded);
+        Assert.Equal(50, result.CurrentBalance);
+    }
+
+    // Test O: Window rollover — cap policy returns false after window expires → earning allowed (AC2)
+    [Fact]
+    public async Task WindowRollover_AfterWindowExpires_CapPolicyReturnsFalse_EarningAllowed()
+    {
+        // Arrange: cap policy returns false (window has rolled over)
+        const int userId = 1006;
+        const int streamId = 101;
+        var wallet = new Wallet { WalletId = 15, UserId = userId, Coins = 50, LastTickAt = null };
+
+        // Advance clock past the 5-minute window
+        _timeProvider.Advance(TimeSpan.FromSeconds(301));
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
+
+        _walletRepoMock.Setup(r => r.GetOrCreateWalletAsync(userId)).ReturnsAsync(wallet);
+        // Policy returns false after rollover (new window has zero earned)
+        _capPolicyMock.Setup(c => c.IsCapExceededAsync(userId, streamId)).ReturnsAsync(false);
+        _walletRepoMock.Setup(r => r.ExecuteWatchTickAwardAsync(
+                userId, 10, now, It.IsAny<DateTime>(), streamId))
+            .ReturnsAsync(AwardResult.Succeeded(10, 60, now, 15));
+
+        var service = CreateService();
+        var result = await service.ProcessWatchTickAsync(userId, streamId);
+
+        Assert.Equal(WatchTickStatus.Success, result.Status);
+        Assert.Equal(10, result.CoinsAwarded);
+    }
+
+    // Test P (AC3): Cap on Stream A does not affect Stream B evaluation
+    [Fact]
+    public async Task CapOnStreamA_DoesNotAffectStreamB()
+    {
+        const int userId = 1007;
+        const int streamA = 101;
+        const int streamB = 202;
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
+
+        var wallet = new Wallet { WalletId = 16, UserId = userId, Coins = 50, LastTickAt = null };
+        _walletRepoMock.Setup(r => r.GetOrCreateWalletAsync(userId)).ReturnsAsync(wallet);
+
+        // Stream A is capped
+        _capPolicyMock.Setup(c => c.IsCapExceededAsync(userId, streamA)).ReturnsAsync(true);
+        // Stream B is not capped
+        _capPolicyMock.Setup(c => c.IsCapExceededAsync(userId, streamB)).ReturnsAsync(false);
+
+        _walletRepoMock.Setup(r => r.ExecuteWatchTickAwardAsync(
+                userId, 10, now, It.IsAny<DateTime>(), streamB))
+            .ReturnsAsync(AwardResult.Succeeded(10, 60, now, 16));
+
+        var service = CreateService();
+
+        // Act
+        var resultA = await service.ProcessWatchTickAsync(userId, streamA);
+        var resultB = await service.ProcessWatchTickAsync(userId, streamB);
+
+        // Assert
+        Assert.Equal(WatchTickStatus.CapExceeded, resultA.Status);
+        Assert.Equal(0, resultA.CoinsAwarded);
+
+        Assert.Equal(WatchTickStatus.Success, resultB.Status);
+        Assert.Equal(10, resultB.CoinsAwarded);
+    }
+
+    // Test Q: Concurrency / flooding when cap is reached → all concurrent requests rejected with CapExceeded
+    [Fact]
+    public async Task ConcurrentRequests_WhenCapAlreadyReached_AllConcurrentRequestsRejected()
+    {
+        const int userId = 1008;
+        const int streamId = 101;
+        var wallet = new Wallet { WalletId = 17, UserId = userId, Coins = 50, LastTickAt = null };
+
+        _walletRepoMock.Setup(r => r.GetOrCreateWalletAsync(userId)).ReturnsAsync(wallet);
+        _capPolicyMock.Setup(c => c.IsCapExceededAsync(userId, streamId)).ReturnsAsync(true);
+
+        var service = CreateService();
+
+        const int concurrencyCount = 10;
+        var tasks = Enumerable.Range(0, concurrencyCount)
+            .Select(_ => Task.Run(() => service.ProcessWatchTickAsync(userId, streamId)))
+            .ToArray();
+
+        var results = await Task.WhenAll(tasks);
+
+        // All 10 requests must return CapExceeded with 0 coins
+        Assert.All(results, r =>
+        {
+            Assert.Equal(WatchTickStatus.CapExceeded, r.Status);
+            Assert.Equal(0, r.CoinsAwarded);
+            Assert.Equal(50, r.CurrentBalance);
+        });
+
+        // Award method must never be called
+        _walletRepoMock.Verify(r => r.ExecuteWatchTickAwardAsync(
+            It.IsAny<int>(), It.IsAny<int>(), It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<int?>()), Times.Never);
+
+        // No event emitted
+        _eventPublisherMock.Verify(e => e.PublishCoinEarnedAsync(It.IsAny<CoinEarnedEvent>()), Times.Never);
+    }
+
+    // Test R: Concurrency / flooding near cap limit (at 40 coins) → only one can win, cap is not breached
+    [Fact]
+    public async Task ConcurrentRequests_NearCapLimit_OnlyOneCanWin_CapNotBreached()
+    {
+        const int userId = 1009;
+        const int streamId = 101;
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
+        var wallet = new Wallet { WalletId = 18, UserId = userId, Coins = 40, LastTickAt = null };
+
+        _walletRepoMock.Setup(r => r.GetOrCreateWalletAsync(userId)).ReturnsAsync(wallet);
+        _capPolicyMock.Setup(c => c.IsCapExceededAsync(userId, streamId)).ReturnsAsync(false);
+
+        var winnerChosen = 0;
+        _walletRepoMock.Setup(r => r.ExecuteWatchTickAwardAsync(
+                userId, 10, It.IsAny<DateTime>(), It.IsAny<DateTime>(), streamId))
+            .ReturnsAsync(() =>
+            {
+                if (Interlocked.Exchange(ref winnerChosen, 1) == 0)
+                {
+                    return AwardResult.Succeeded(10, 50, now, 18);
+                }
+                return AwardResult.RateLimited(50, now);
+            });
+
+        var service = CreateService();
+
+        const int concurrencyCount = 10;
+        var tasks = Enumerable.Range(0, concurrencyCount)
+            .Select(_ => Task.Run(() => service.ProcessWatchTickAsync(userId, streamId)))
+            .ToArray();
+
+        var results = await Task.WhenAll(tasks);
+
+        var successfulResults = results.Where(r => r.Status == WatchTickStatus.Success).ToList();
+        var rateLimitedResults = results.Where(r => r.Status == WatchTickStatus.RateLimited).ToList();
+
+        // Exactly one request succeeded and brought the balance to 50 (cap)
+        Assert.Single(successfulResults);
+        Assert.Equal(10, successfulResults[0].CoinsAwarded);
+        Assert.Equal(50, successfulResults[0].CurrentBalance);
+
+        // Remaining 9 requests were rate-limited with zero coins awarded
+        Assert.Equal(concurrencyCount - 1, rateLimitedResults.Count);
+        Assert.All(rateLimitedResults, r => Assert.Equal(0, r.CoinsAwarded));
+
+        // Total coins awarded across all 10 concurrent requests cannot exceed 10
+        var totalCoinsAwarded = results.Sum(r => r.CoinsAwarded);
+        Assert.Equal(10, totalCoinsAwarded);
+
+        // Exactly one CoinEarned event published
+        _eventPublisherMock.Verify(e => e.PublishCoinEarnedAsync(It.IsAny<CoinEarnedEvent>()), Times.Once);
+    }
 }

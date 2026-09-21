@@ -33,7 +33,7 @@ builder.Services.AddScoped<ICoinTransactionRepository, CoinTransactionRepository
 // Register Services and Extension Points
 builder.Services.AddScoped<IWatchTickService, WatchTickService>();
 builder.Services.AddScoped<IStreamLivenessValidator, PassThroughStreamLivenessValidator>();
-builder.Services.AddScoped<ICoinCapPolicy, NoOpCoinCapPolicy>();
+builder.Services.AddScoped<ICoinCapPolicy, SlidingWindowCoinCapPolicy>();
 builder.Services.AddScoped<ICoinEarnedEventPublisher, NoOpCoinEarnedEventPublisher>();
 
 // Restrictive CORS policy for Arena web clients
