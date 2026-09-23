@@ -17,6 +17,7 @@
     <PackageReference Include="MySqlConnector" Version="2.6.2" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="10.2.3" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.22.0" />
+    <PackageReference Include="Microsoft.Extensions.Http.Polly" Version="10.0.12" />
     <PackageReference Include="dbup-mysql" Version="6.1.0" />
     <EmbeddedResource Include="Migrations\*.sql" />
   </ItemGroup>

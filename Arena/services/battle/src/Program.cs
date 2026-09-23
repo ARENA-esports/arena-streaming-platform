@@ -3,8 +3,10 @@ using System.Text;
 using Dapper;
 using DbUp;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
+using Polly;
 using BattleEconomyService.Configuration;
 using BattleEconomyService.Repositories;
 using BattleEconomyService.Services;
@@ -22,6 +24,8 @@ builder.Services.AddProblemDetails();
 // Configuration Options
 builder.Services.Configure<EconomyOptions>(
     builder.Configuration.GetSection(EconomyOptions.SectionName));
+builder.Services.Configure<StreamServiceOptions>(
+    builder.Configuration.GetSection(StreamServiceOptions.SectionName));
 
 // Singleton TimeProvider for deterministic time operations
 builder.Services.AddSingleton(TimeProvider.System);
@@ -29,6 +33,19 @@ builder.Services.AddSingleton(TimeProvider.System);
 // Register Repositories
 builder.Services.AddScoped<IWalletRepository, WalletRepository>();
 builder.Services.AddScoped<ICoinTransactionRepository, CoinTransactionRepository>();
+
+// Register StreamService HTTP Client with Polly resilience (SCRUM-118)
+builder.Services.AddHttpClient<IStreamServiceClient, StreamServiceClient>((sp, client) =>
+{
+    var options = sp.GetRequiredService<IOptions<StreamServiceOptions>>().Value;
+    var baseUrl = options.BaseUrl.TrimEnd('/') + "/";
+    client.BaseAddress = new Uri(baseUrl);
+    client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+})
+.AddTransientHttpErrorPolicy(policy => policy.WaitAndRetryAsync(
+    retryCount: 1,
+    sleepDurationProvider: _ => TimeSpan.FromMilliseconds(100)
+));
 
 // Register Services and Extension Points
 builder.Services.AddScoped<IWatchTickService, WatchTickService>();
