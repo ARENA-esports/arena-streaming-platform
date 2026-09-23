@@ -6,6 +6,7 @@ using TournamentService.DTOs;
 using TournamentService.Exceptions;
 using TournamentService.Repositories;
 using TournamentService.Services;
+using EventContracts;
 
 namespace TournamentService.Controllers;
 
@@ -17,17 +18,20 @@ public class TeamsController : ControllerBase
     private static readonly Regex HexColorPattern = new(CreateTeamRequest.HexColorRegex, RegexOptions.Compiled);
     private readonly ITeamRepository _teamRepository;
     private readonly IFileStorageService _fileStorageService;
+    private readonly IKafkaProducerService _kafkaProducer;
     private readonly IConfiguration _configuration;
     private readonly ILogger<TeamsController> _logger;
 
     public TeamsController(
         ITeamRepository teamRepository,
         IFileStorageService fileStorageService,
+        IKafkaProducerService kafkaProducer,
         IConfiguration configuration,
         ILogger<TeamsController> logger)
     {
         _teamRepository = teamRepository;
         _fileStorageService = fileStorageService;
+        _kafkaProducer = kafkaProducer;
         _configuration = configuration;
         _logger = logger;
     }
@@ -106,6 +110,15 @@ public class TeamsController : ControllerBase
             _logger.LogInformation("Team {TeamId} '{TeamName}' registered with color {ColorHex}", teamId, request.TeamName, trimmedColor);
 
             await SyncTeamToStreamServiceAsync(teamId, request.TeamName.Trim(), trimmedColor, null);
+
+            // Publish Kafka event for downstream consumers (e.g., Chat Service cache)
+            await _kafkaProducer.PublishTeamChangedAsync(new TeamChangedEvent
+            {
+                TeamId = teamId,
+                TeamName = request.TeamName.Trim(),
+                ColorHex = trimmedColor,
+                ChangeType = "Created"
+            });
 
             var createdTeam = await _teamRepository.GetTeamByIdAsync(teamId)
                 ?? new TeamResponse(teamId, request.TeamName.Trim(), trimmedColor);
@@ -187,6 +200,15 @@ public class TeamsController : ControllerBase
             if (result != null)
             {
                 await SyncTeamToStreamServiceAsync(id, result.TeamName, result.ColorHex, result.LogoUrl);
+
+                // Publish Kafka event for downstream consumers (e.g., Chat Service cache)
+                await _kafkaProducer.PublishTeamChangedAsync(new TeamChangedEvent
+                {
+                    TeamId = id,
+                    TeamName = result.TeamName,
+                    ColorHex = result.ColorHex,
+                    ChangeType = "Updated"
+                });
             }
             return Ok(result);
         }

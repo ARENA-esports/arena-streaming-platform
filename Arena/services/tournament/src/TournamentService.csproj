@@ -9,6 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Confluent.Kafka" Version="2.15.1" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.11" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.11" />
     <PackageReference Include="MySqlConnector" Version="2.6.2" />

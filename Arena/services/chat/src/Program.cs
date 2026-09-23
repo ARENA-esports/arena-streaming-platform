@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using ChatService.Repositories;
 using ChatService.WebSockets;
+using ChatService.Consumers;
 using DbUp;
 using System.Security.Claims;
 
@@ -39,6 +40,9 @@ DefaultTypeMap.MatchNamesWithUnderscores = true;
 builder.Services.AddSingleton<FactionChannelManager>();
 builder.Services.AddSingleton<IChatMessageRepository, ChatMessageRepository>();
 builder.Services.AddSingleton<IChatTeamCacheRepository, ChatTeamCacheRepository>();
+
+// ── Kafka Consumer ──
+builder.Services.AddHostedService<TeamCacheConsumer>();
 
 // ── JWT Authentication ──
 var jwtSecret = builder.Configuration["JwtSettings:Secret"]
