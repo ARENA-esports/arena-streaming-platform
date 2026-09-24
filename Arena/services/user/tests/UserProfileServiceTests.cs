@@ -92,7 +92,7 @@ public class UserProfileServiceTests
             .ReturnsAsync(originalUser)
             .ReturnsAsync(updatedUser);
         _mockUserRepo.Setup(r => r.GetByUsernameExcludingUserAsync("new_name", 10)).ReturnsAsync((User?)null);
-        _mockUserRepo.Setup(r => r.UpdateProfileAsync(10, "new_name", "old@arena.gg", "https://cdn.arena.gg/new.png", true))
+        _mockUserRepo.Setup(r => r.UpdateProfileAsync(10, "new_name", "old@arena.gg", "https://cdn.arena.gg/new.png", null, null, null, true))
             .ReturnsAsync(true);
 
         var request = new UpdateProfileRequest
@@ -109,7 +109,7 @@ public class UserProfileServiceTests
         Assert.Equal("new_name", result.Username);
         Assert.Equal("https://cdn.arena.gg/new.png", result.AvatarUrl);
         Assert.True(result.EmailVerified);
-        _mockUserRepo.Verify(r => r.UpdateProfileAsync(10, "new_name", "old@arena.gg", "https://cdn.arena.gg/new.png", true), Times.Once);
+        _mockUserRepo.Verify(r => r.UpdateProfileAsync(10, "new_name", "old@arena.gg", "https://cdn.arena.gg/new.png", null, null, null, true), Times.Once);
     }
 
     [Fact]
@@ -137,7 +137,7 @@ public class UserProfileServiceTests
             .ReturnsAsync(originalUser)
             .ReturnsAsync(updatedUser);
         _mockUserRepo.Setup(r => r.GetByEmailExcludingUserAsync("brandnew@arena.gg", 10)).ReturnsAsync((User?)null);
-        _mockUserRepo.Setup(r => r.UpdateProfileAsync(10, "name", "brandnew@arena.gg", null, false))
+        _mockUserRepo.Setup(r => r.UpdateProfileAsync(10, "name", "brandnew@arena.gg", null, null, null, null, false))
             .ReturnsAsync(true);
 
         var request = new UpdateProfileRequest
@@ -152,7 +152,7 @@ public class UserProfileServiceTests
         Assert.NotNull(result);
         Assert.Equal("brandnew@arena.gg", result.Email);
         Assert.False(result.EmailVerified);
-        _mockUserRepo.Verify(r => r.UpdateProfileAsync(10, "name", "brandnew@arena.gg", null, false), Times.Once);
+        _mockUserRepo.Verify(r => r.UpdateProfileAsync(10, "name", "brandnew@arena.gg", null, null, null, null, false), Times.Once);
     }
 
     [Fact]
@@ -170,7 +170,7 @@ public class UserProfileServiceTests
         // Act & Assert
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => _profileService.UpdateProfileAsync(10, request));
         Assert.Equal("Username is already taken.", ex.Message);
-        _mockUserRepo.Verify(r => r.UpdateProfileAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<bool>()), Times.Never);
+        _mockUserRepo.Verify(r => r.UpdateProfileAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<bool>()), Times.Never);
     }
 
     [Fact]
@@ -188,7 +188,7 @@ public class UserProfileServiceTests
         // Act & Assert
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => _profileService.UpdateProfileAsync(10, request));
         Assert.Equal("Email is already registered.", ex.Message);
-        _mockUserRepo.Verify(r => r.UpdateProfileAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<bool>()), Times.Never);
+        _mockUserRepo.Verify(r => r.UpdateProfileAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<bool>()), Times.Never);
     }
 
     [Fact]

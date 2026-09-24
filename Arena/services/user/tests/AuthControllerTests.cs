@@ -1,6 +1,8 @@
 using System.Security.Claims;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using Moq;
 using UserService.Controllers;
 using UserService.Models;
@@ -12,12 +14,22 @@ namespace UserService.Tests;
 public class AuthControllerTests
 {
     private readonly Mock<IAuthService> _mockAuthService;
+    private readonly Mock<ILogger<AuthController>> _mockLogger;
+    private readonly Mock<IWebHostEnvironment> _mockEnv;
     private readonly AuthController _controller;
 
     public AuthControllerTests()
     {
         _mockAuthService = new Mock<IAuthService>();
-        _controller = new AuthController(_mockAuthService.Object);
+        _mockLogger = new Mock<ILogger<AuthController>>();
+        _mockEnv = new Mock<IWebHostEnvironment>();
+        _controller = new AuthController(_mockAuthService.Object, _mockLogger.Object, _mockEnv.Object)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext()
+            }
+        };
     }
 
     [Fact]
