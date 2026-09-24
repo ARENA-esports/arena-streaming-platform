@@ -26,6 +26,8 @@ builder.Services.Configure<EconomyOptions>(
     builder.Configuration.GetSection(EconomyOptions.SectionName));
 builder.Services.Configure<StreamServiceOptions>(
     builder.Configuration.GetSection(StreamServiceOptions.SectionName));
+builder.Services.Configure<KafkaOptions>(
+    builder.Configuration.GetSection(KafkaOptions.SectionName));
 
 // Singleton TimeProvider for deterministic time operations
 builder.Services.AddSingleton(TimeProvider.System);
@@ -51,7 +53,10 @@ builder.Services.AddHttpClient<IStreamServiceClient, StreamServiceClient>((sp, c
 builder.Services.AddScoped<IWatchTickService, WatchTickService>();
 builder.Services.AddScoped<IStreamLivenessValidator, HttpStreamLivenessValidator>();
 builder.Services.AddScoped<ICoinCapPolicy, SlidingWindowCoinCapPolicy>();
-builder.Services.AddScoped<ICoinEarnedEventPublisher, NoOpCoinEarnedEventPublisher>();
+// SCRUM-117: real Kafka publisher registered as Singleton — IProducer<> is thread-safe
+// and long-lived; ASP.NET Core disposes Singleton IDisposables on application shutdown,
+// which triggers the 5-second flush before the librdkafka handle is released.
+builder.Services.AddSingleton<ICoinEarnedEventPublisher, KafkaCoinEarnedEventPublisher>();
 
 // Restrictive CORS policy for Arena web clients
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
