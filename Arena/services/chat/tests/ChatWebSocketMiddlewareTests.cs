@@ -9,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Moq;
 using ChatService.Repositories;
+using ChatService.Services;
 using ChatService.WebSockets;
 using ChatService.Entities;
 using Xunit;
@@ -19,6 +20,8 @@ public class ChatWebSocketMiddlewareTests : IAsyncDisposable
 {
     private readonly Mock<IChatMessageRepository> _mockRepo;
     private readonly Mock<IChatTeamCacheRepository> _mockTeamRepo;
+    private readonly Mock<IChatMuteRepository> _mockMuteRepo;
+    private readonly IProfanityFilter _profanityFilter;
     private IHost? _host;
 
     public ChatWebSocketMiddlewareTests()
@@ -32,6 +35,11 @@ public class ChatWebSocketMiddlewareTests : IAsyncDisposable
         _mockTeamRepo = new Mock<IChatTeamCacheRepository>();
         _mockTeamRepo.Setup(r => r.GetByIdAsync(1))
             .ReturnsAsync(new ChatTeamCache { TeamId = 1, TeamName = "Alpha", TeamColor = "#FF0000" });
+
+        _mockMuteRepo = new Mock<IChatMuteRepository>();
+        _mockMuteRepo.Setup(r => r.IsUserMutedAsync(It.IsAny<int>())).ReturnsAsync(false);
+
+        _profanityFilter = new ProfanityFilter();
     }
 
     public async ValueTask DisposeAsync()
@@ -58,6 +66,8 @@ public class ChatWebSocketMiddlewareTests : IAsyncDisposable
                     services.AddSingleton<FactionChannelManager>();
                     services.AddSingleton<IChatMessageRepository>(_mockRepo.Object);
                     services.AddSingleton<IChatTeamCacheRepository>(_mockTeamRepo.Object);
+                    services.AddSingleton<IChatMuteRepository>(_mockMuteRepo.Object);
+                    services.AddSingleton<IProfanityFilter>(_profanityFilter);
                     services.AddRouting();
                     services.AddAuthorization();
                     services.AddAuthentication("Test")
@@ -575,7 +585,102 @@ public class ChatWebSocketMiddlewareTests : IAsyncDisposable
 
         return (type, message);
     }
+
+    // ══════════════════════════════════════════════
+    // Story 5 Tests — Moderation
+    // ══════════════════════════════════════════════
+
+    // ── AC3 (S5): Muted user's message is silently rejected ──
+
+    [Fact]
+    public async Task MutedUser_MessageDropped_ReturnsErrorFrame()
+    {
+        // Arrange: mark user 42 as muted
+        _mockMuteRepo.Setup(r => r.IsUserMutedAsync(42)).ReturnsAsync(true);
+
+        var host = await CreateTestHost(authenticateUser: true);
+        var wsClient = host.GetTestServer().CreateWebSocketClient();
+        var ws = await wsClient.ConnectAsync(
+            new Uri("ws://localhost/ws/chat?teamId=1"), CancellationToken.None);
+
+        // Read and discard history frame
+        await ConsumeHistoryFrame(ws);
+
+        // Act: send a message as muted user
+        var payload = Encoding.UTF8.GetBytes("hello from muted user");
+        await ws.SendAsync(payload, System.Net.WebSockets.WebSocketMessageType.Text, true, CancellationToken.None);
+
+        // Assert: receive error frame, message never persisted
+        var (type, message) = await ReceiveTypedFrame(ws);
+        Assert.Equal("error", type);
+        Assert.Contains("muted", message, StringComparison.OrdinalIgnoreCase);
+
+        // Verify InsertAsync was never called (message dropped before persist)
+        _mockRepo.Verify(r => r.InsertAsync(It.IsAny<ChatMessage>()), Times.Never);
+
+        await ws.CloseAsync(System.Net.WebSockets.WebSocketCloseStatus.NormalClosure, "done", CancellationToken.None);
+
+        // Reset mute mock for other tests
+        _mockMuteRepo.Setup(r => r.IsUserMutedAsync(42)).ReturnsAsync(false);
+    }
+
+    // ── AC1 (S5): Profanity words are scrubbed with *** before broadcast ──
+
+    [Fact]
+    public async Task ProfanityMessage_WordsScrubbedBeforeBroadcast()
+    {
+        var host = await CreateTestHost(authenticateUser: true);
+        var wsClient = host.GetTestServer().CreateWebSocketClient();
+        var ws = await wsClient.ConnectAsync(
+            new Uri("ws://localhost/ws/chat?teamId=1"), CancellationToken.None);
+
+        // Read and discard history frame
+        await ConsumeHistoryFrame(ws);
+
+        // Act: send a message with a profanity word
+        var payload = Encoding.UTF8.GetBytes("what the damn is this");
+        await ws.SendAsync(payload, System.Net.WebSockets.WebSocketMessageType.Text, true, CancellationToken.None);
+
+        // Assert: broadcast frame should have the word scrubbed
+        var buffer = new byte[4096];
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+        var result = await ws.ReceiveAsync(new ArraySegment<byte>(buffer), cts.Token);
+        var json = Encoding.UTF8.GetString(buffer, 0, result.Count);
+        using var doc = JsonDocument.Parse(json);
+        var content = doc.RootElement.GetProperty("content").GetString();
+        Assert.Equal("what the *** is this", content);
+
+        await ws.CloseAsync(System.Net.WebSockets.WebSocketCloseStatus.NormalClosure, "done", CancellationToken.None);
+    }
+
+    // ── AC1 (S5): Scrubbed version is what gets persisted to DB ──
+
+    [Fact]
+    public async Task ProfanityMessage_ScrubbedVersionPersisted()
+    {
+        var host = await CreateTestHost(authenticateUser: true);
+        var wsClient = host.GetTestServer().CreateWebSocketClient();
+        var ws = await wsClient.ConnectAsync(
+            new Uri("ws://localhost/ws/chat?teamId=1"), CancellationToken.None);
+
+        // Read and discard history frame
+        await ConsumeHistoryFrame(ws);
+
+        // Act: send a message with profanity
+        var payload = Encoding.UTF8.GetBytes("this is damn wrong");
+        await ws.SendAsync(payload, System.Net.WebSockets.WebSocketMessageType.Text, true, CancellationToken.None);
+
+        // Wait for the broadcast to arrive
+        await ConsumeHistoryFrame(ws); // reuse to consume any frame
+
+        // Assert: the message persisted to the DB was the scrubbed version
+        _mockRepo.Verify(r => r.InsertAsync(It.Is<ChatMessage>(m =>
+            m.Content == "this is *** wrong")), Times.Once);
+
+        await ws.CloseAsync(System.Net.WebSockets.WebSocketCloseStatus.NormalClosure, "done", CancellationToken.None);
+    }
 }
+
 
 /// <summary>
 /// Test authentication handler that passes through without real JWT validation.

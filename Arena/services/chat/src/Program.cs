@@ -5,6 +5,7 @@ using Microsoft.IdentityModel.Tokens;
 using ChatService.Repositories;
 using ChatService.WebSockets;
 using ChatService.Consumers;
+using ChatService.Services;
 using DbUp;
 using System.Security.Claims;
 
@@ -40,6 +41,8 @@ DefaultTypeMap.MatchNamesWithUnderscores = true;
 builder.Services.AddSingleton<FactionChannelManager>();
 builder.Services.AddSingleton<IChatMessageRepository, ChatMessageRepository>();
 builder.Services.AddSingleton<IChatTeamCacheRepository, ChatTeamCacheRepository>();
+builder.Services.AddSingleton<IChatMuteRepository, ChatMuteRepository>();
+builder.Services.AddSingleton<IProfanityFilter, ProfanityFilter>();
 
 // ── Kafka Consumer ──
 builder.Services.AddHostedService<TeamCacheConsumer>();

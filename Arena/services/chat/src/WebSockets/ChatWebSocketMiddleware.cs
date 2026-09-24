@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using ChatService.Entities;
 using ChatService.Repositories;
+using ChatService.Services;
 
 namespace ChatService.WebSockets;
 
@@ -74,6 +75,8 @@ public static class ChatWebSocketMiddleware
             var channelManager = context.RequestServices.GetRequiredService<FactionChannelManager>();
             var repository = context.RequestServices.GetRequiredService<IChatMessageRepository>();
             var teamCacheRepo = context.RequestServices.GetRequiredService<IChatTeamCacheRepository>();
+            var muteRepo = context.RequestServices.GetRequiredService<IChatMuteRepository>();
+            var profanityFilter = context.RequestServices.GetRequiredService<IProfanityFilter>();
             var logger = context.RequestServices.GetRequiredService<ILogger<FactionChannelManager>>();
 
             var teamInfo = await teamCacheRepo.GetByIdAsync(teamId) ?? new ChatTeamCache 
@@ -95,7 +98,7 @@ public static class ChatWebSocketMiddleware
                 await SendHistoryAsync(socket, repository, teamInfo);
 
                 // ── 7. Enter receive loop ──
-                await HandleReceiveLoopAsync(socket, channelManager, repository, teamInfo, connectionId, userId, usernameClaim, logger);
+                await HandleReceiveLoopAsync(socket, channelManager, repository, muteRepo, profanityFilter, teamInfo, connectionId, userId, usernameClaim, logger);
             }
             finally
             {
@@ -162,6 +165,8 @@ public static class ChatWebSocketMiddleware
         WebSocket socket,
         FactionChannelManager channelManager,
         IChatMessageRepository repository,
+        IChatMuteRepository muteRepo,
+        IProfanityFilter profanityFilter,
         ChatTeamCache teamInfo,
         string connectionId,
         int userId,
@@ -207,6 +212,16 @@ public static class ChatWebSocketMiddleware
                     await SendErrorFrameAsync(socket, "Message exceeds 500 character limit.");
                     continue;
                 }
+
+                // ── Mute check (Story 5, AC3 — Muted Message Drop) ──
+                if (await muteRepo.IsUserMutedAsync(userId))
+                {
+                    await SendErrorFrameAsync(socket, "You are currently muted.");
+                    continue;
+                }
+
+                // ── Profanity filter (Story 5, AC1 — Profanity Scrubbing) ──
+                messageText = profanityFilter.Scrub(messageText);
 
                 // ── Persist the message (AC4 from Story 1) ──
                 var chatMessage = new ChatMessage
