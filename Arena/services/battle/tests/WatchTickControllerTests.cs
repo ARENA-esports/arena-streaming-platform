@@ -230,4 +230,102 @@ public class WatchTickControllerTests
         Assert.Equal(35, response.RemainingSeconds);
         Assert.Equal("35", controller.Response.Headers["Retry-After"].ToString());
     }
+
+    // =========================================================================
+    // SCRUM-118 Controller Tests: StreamNotLive -> HTTP 400
+    // =========================================================================
+
+    [Fact]
+    public async Task AwardWatchTick_StreamNotLive_Returns400BadRequest()
+    {
+        // Arrange
+        const int balance = 30;
+        _serviceMock.Setup(s => s.ProcessWatchTickAsync(123, 101))
+            .ReturnsAsync(new WatchTickResult
+            {
+                Status = WatchTickStatus.StreamNotLive,
+                CoinsAwarded = 0,
+                CurrentBalance = balance,
+                Message = "Stream is not currently live."
+            });
+
+        var controller = CreateController();
+
+        // Act
+        var actionResult = await controller.AwardWatchTick(new WatchTickRequest { StreamId = 101 });
+
+        // Assert
+        var badRequest = Assert.IsType<BadRequestObjectResult>(actionResult);
+        Assert.Equal(StatusCodes.Status400BadRequest, badRequest.StatusCode);
+    }
+
+    [Fact]
+    public async Task AwardWatchTick_StreamNotLive_ReturnsStructuredWatchTickResponse()
+    {
+        // The response must be a typed WatchTickResponse, not an anonymous object.
+        const int balance = 30;
+        _serviceMock.Setup(s => s.ProcessWatchTickAsync(123, 101))
+            .ReturnsAsync(new WatchTickResult
+            {
+                Status = WatchTickStatus.StreamNotLive,
+                CoinsAwarded = 0,
+                CurrentBalance = balance,
+                Message = "Stream is not currently live."
+            });
+
+        var controller = CreateController();
+
+        var actionResult = await controller.AwardWatchTick(new WatchTickRequest { StreamId = 101 });
+
+        var badRequest = Assert.IsType<BadRequestObjectResult>(actionResult);
+        Assert.IsType<WatchTickResponse>(badRequest.Value);
+    }
+
+    [Fact]
+    public async Task AwardWatchTick_StreamNotLive_ResponseHasZeroCoins()
+    {
+        const int balance = 30;
+        _serviceMock.Setup(s => s.ProcessWatchTickAsync(123, 101))
+            .ReturnsAsync(new WatchTickResult
+            {
+                Status = WatchTickStatus.StreamNotLive,
+                CoinsAwarded = 0,
+                CurrentBalance = balance,
+                Message = "Stream is not currently live."
+            });
+
+        var controller = CreateController();
+        var actionResult = await controller.AwardWatchTick(new WatchTickRequest { StreamId = 101 });
+
+        var badRequest = Assert.IsType<BadRequestObjectResult>(actionResult);
+        var response = Assert.IsType<WatchTickResponse>(badRequest.Value);
+
+        Assert.Equal(0, response.CoinsAwarded);
+    }
+
+    [Fact]
+    public async Task AwardWatchTick_StreamNotLive_ResponseIndicatesFailureAndPreservesBalance()
+    {
+        const int balance = 30;
+        _serviceMock.Setup(s => s.ProcessWatchTickAsync(123, 101))
+            .ReturnsAsync(new WatchTickResult
+            {
+                Status = WatchTickStatus.StreamNotLive,
+                CoinsAwarded = 0,
+                CurrentBalance = balance,
+                Message = "Stream is not currently live."
+            });
+
+        var controller = CreateController();
+        var actionResult = await controller.AwardWatchTick(new WatchTickRequest { StreamId = 101 });
+
+        var badRequest = Assert.IsType<BadRequestObjectResult>(actionResult);
+        var response = Assert.IsType<WatchTickResponse>(badRequest.Value);
+
+        Assert.False(response.Success);
+        Assert.Equal(0, response.CoinsAwarded);
+        Assert.Equal(balance, response.CurrentBalance);
+        Assert.False(string.IsNullOrWhiteSpace(response.Message));
+    }
 }
+

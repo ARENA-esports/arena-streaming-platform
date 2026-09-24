@@ -28,14 +28,14 @@ public class WatchTickController : ControllerBase
     /// <param name="request">Optional watch tick payload containing stream context.</param>
     /// <returns>Updated coin balance on success, or HTTP 429 if the anti-farm check fails.</returns>
     /// <response code="200">Watch tick recorded successfully; coins awarded.</response>
-    /// <response code="400">Invalid request payload or stream ID.</response>
+    /// <response code="400">Invalid request payload, invalid stream ID, or stream is not currently live (SCRUM-118).</response>
     /// <response code="401">Missing, expired, or invalid JWT authentication token.</response>
     /// <response code="429">Anti-farm or coin-cap check triggered; minimum interval not elapsed, or 5-minute window ceiling reached.</response>
     [HttpPost("watch-tick")]
     [Authorize]
     [ProducesResponseType(typeof(WatchTickResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(WatchTickResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(WatchTickResponse), StatusCodes.Status429TooManyRequests)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> AwardWatchTick([FromBody] WatchTickRequest? request)
     {
@@ -90,7 +90,20 @@ public class WatchTickController : ControllerBase
             });
         }
 
-        // 6. Handle successful award
+        // 6. Handle stream not live (SCRUM-118 AC2)
+        if (result.Status == WatchTickStatus.StreamNotLive)
+        {
+            return BadRequest(new WatchTickResponse
+            {
+                Success = false,
+                CoinsAwarded = 0,
+                CurrentBalance = result.CurrentBalance,
+                LastTickAt = result.LastTickAt,
+                Message = result.Message
+            });
+        }
+
+        // 7. Handle successful award
         if (result.Status == WatchTickStatus.Success)
         {
             return Ok(new WatchTickResponse
@@ -103,6 +116,13 @@ public class WatchTickController : ControllerBase
             });
         }
 
-        return BadRequest(new { message = result.Message });
+        return BadRequest(new WatchTickResponse
+        {
+            Success = false,
+            CoinsAwarded = 0,
+            CurrentBalance = result.CurrentBalance,
+            LastTickAt = result.LastTickAt,
+            Message = result.Message
+        });
     }
 }
