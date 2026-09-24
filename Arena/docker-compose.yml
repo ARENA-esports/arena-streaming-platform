@@ -136,9 +136,13 @@ services:
       - JwtSettings__Secret=${JWT_SECRET:-Arena_Secret_Key_For_Jwt_Token_Signing_2026_SE3022_Production_Grade!}
       - JwtSettings__Issuer=Arena.UserService
       - JwtSettings__Audience=Arena.Platform
+      # SCRUM-118: override StreamService BaseUrl for Docker Compose internal networking
+      - StreamService__BaseUrl=http://stream:8080
     depends_on:
       mysql-battle:
         condition: service_healthy
+      stream:
+        condition: service_started
 
   web:
     build:
