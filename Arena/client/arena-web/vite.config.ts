@@ -28,6 +28,10 @@ export default defineConfig({
         target: 'http://127.0.0.1:8082', // Tournament Service Static Uploads
         changeOrigin: true,
       },
+      '/api/economy': {
+        target: 'http://127.0.0.1:8083', // Battle Economy Service
+        changeOrigin: true,
+      },
       '/api': {
         target: 'http://127.0.0.1:5167', // Stream Service
         changeOrigin: true,
