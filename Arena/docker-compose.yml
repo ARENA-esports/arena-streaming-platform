@@ -104,6 +104,78 @@ services:
       mysql-tournament:
         condition: service_healthy
 
+  mysql-battle:
+    image: mysql:8.0
+    container_name: arena-mysql-battle
+    ports:
+      - "3310:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=rootpassword
+      - MYSQL_DATABASE=arena_battle_db
+      - MYSQL_USER=arena
+      - MYSQL_PASSWORD=arena_password
+    volumes:
+      - mysql-battle-data:/var/lib/mysql
+      - ./services/battle/src/Migrations:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-prootpassword" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  kafka:
+    image: apache/kafka:3.9.0
+    container_name: arena-kafka
+    ports:
+      - "9092:9092"
+    environment:
+      # KRaft mode — no ZooKeeper required
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+      # Two listeners: PLAINTEXT_HOST for host access, PLAINTEXT for Docker-internal
+      KAFKA_LISTENERS: PLAINTEXT_HOST://0.0.0.0:9092,PLAINTEXT://0.0.0.0:29092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT_HOST://localhost:9092,PLAINTEXT://kafka:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT_HOST:PLAINTEXT,PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      CLUSTER_ID: arena-kafka-cluster-01
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: [ "CMD", "bash", "-c", "echo > /dev/tcp/localhost/9092" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  battle:
+    build:
+      context: .
+      dockerfile: services/battle/Dockerfile
+    container_name: arena-battle
+    ports:
+      - "8083:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__DefaultConnection=Server=mysql-battle;Port=3306;Database=arena_battle_db;Uid=root;Pwd=rootpassword;AllowUserVariables=True;
+      - JwtSettings__Secret=${JWT_SECRET:-Arena_Secret_Key_For_Jwt_Token_Signing_2026_SE3022_Production_Grade!}
+      - JwtSettings__Issuer=Arena.UserService
+      - JwtSettings__Audience=Arena.Platform
+      # SCRUM-118: override StreamService BaseUrl for Docker Compose internal networking
+      - StreamService__BaseUrl=http://stream:8080
+      # SCRUM-117: Kafka internal Docker bootstrap address (overrides localhost:9092 default)
+      - Kafka__BootstrapServers=kafka:29092
+    depends_on:
+      mysql-battle:
+        condition: service_healthy
+      stream:
+        condition: service_started
+      kafka:
+        condition: service_healthy
+
   web:
     build:
       context: ./client/arena-web
@@ -115,7 +187,10 @@ services:
       - user
       - tournament
       - stream
+      - battle
 
 volumes:
   mysql-user-data:
   mysql-tournament-data:
+  mysql-battle-data:
+  kafka-data:
