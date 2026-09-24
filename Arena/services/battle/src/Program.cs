@@ -49,7 +49,7 @@ builder.Services.AddHttpClient<IStreamServiceClient, StreamServiceClient>((sp, c
 
 // Register Services and Extension Points
 builder.Services.AddScoped<IWatchTickService, WatchTickService>();
-builder.Services.AddScoped<IStreamLivenessValidator, PassThroughStreamLivenessValidator>();
+builder.Services.AddScoped<IStreamLivenessValidator, HttpStreamLivenessValidator>();
 builder.Services.AddScoped<ICoinCapPolicy, SlidingWindowCoinCapPolicy>();
 builder.Services.AddScoped<ICoinEarnedEventPublisher, NoOpCoinEarnedEventPublisher>();
 
