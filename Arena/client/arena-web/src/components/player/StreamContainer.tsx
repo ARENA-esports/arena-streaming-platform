@@ -3,9 +3,11 @@ import { TwitchPlayer } from '../player/TwitchPlayer';
 
 interface StreamContainerProps {
     apiChannelName?: string;
+    onPlay?: () => void;
+    onPause?: () => void;
 }
 
-export const StreamContainer: React.FC<StreamContainerProps> = ({ apiChannelName }) => {
+export const StreamContainer: React.FC<StreamContainerProps> = ({ apiChannelName, onPlay, onPause }) => {
     // Check if channel from API is missing or a mock channel
     const isMockOrEmpty = !apiChannelName || apiChannelName.startsWith('mock_');
     const envOverrideChannel = import.meta.env.VITE_TWITCH_TEST_CHANNEL;
@@ -78,7 +80,7 @@ export const StreamContainer: React.FC<StreamContainerProps> = ({ apiChannelName
             </div>
 
             {/* Embedded Player Tile */}
-            <TwitchPlayer channel={activeChannel} />
+            <TwitchPlayer channel={activeChannel} onPlay={onPlay} onPause={onPause} />
             <p className="text-[10px] text-gray-400 text-center mt-1">
                 Seeing Error? Please disable your ad-blocker or tracking prevention for this site.
             </p>

@@ -7,6 +7,8 @@ module.exports = {
     '^@/(.*)$': '<rootDir>/src/$1',
   },
   setupFilesAfterEnv: ['<rootDir>/tests/setupTests.ts'],
+  // Explicitly allow ALL project source files to be transformed (override Jest 30 defaults)
+  transformIgnorePatterns: ['/node_modules/'],
   transform: {
     '^.+\\.tsx?$': [
       '<rootDir>/tests/customTransformer.cjs',
