@@ -22,16 +22,32 @@ const mockSuccessResponse: WatchTickResponse = {
   message: 'Coins awarded successfully',
 };
 
+/** Helper to simulate document visibility changes in jsdom. */
+function setDocumentVisibility(state: 'visible' | 'hidden') {
+  Object.defineProperty(document, 'visibilityState', {
+    configurable: true,
+    value: state,
+    writable: true,
+  });
+  act(() => {
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+}
+
 describe('useWatchHeartbeat', () => {
   beforeEach(() => {
     jest.useFakeTimers();
     jest.clearAllMocks();
+    setDocumentVisibility('visible');
     mockRecordWatchTick.mockResolvedValue(mockSuccessResponse);
   });
 
   afterEach(() => {
     jest.useRealTimers();
+    setDocumentVisibility('visible');
   });
+
+  // ── Existing Step 3 Behaviors ─────────────────────────────────────────────
 
   it('does not send watch-tick requests while isPlaying is false', async () => {
     renderHook(() => useWatchHeartbeat({ streamId: 101, isPlaying: false }));
@@ -49,13 +65,11 @@ describe('useWatchHeartbeat', () => {
       useWatchHeartbeat({ streamId: 101, isPlaying })
     );
 
-    // No calls initially while paused
     await act(async () => {
       jest.advanceTimersByTime(WATCH_HEARTBEAT_INTERVAL_MS);
     });
     expect(mockRecordWatchTick).not.toHaveBeenCalled();
 
-    // Transition to playing
     isPlaying = true;
     rerender();
 
@@ -107,15 +121,12 @@ describe('useWatchHeartbeat', () => {
     });
     expect(mockRecordWatchTick).toHaveBeenCalledTimes(1);
 
-    // Pause playback
     isPlaying = false;
     rerender();
 
-    // Advance two more intervals while paused
     await act(async () => {
       jest.advanceTimersByTime(WATCH_HEARTBEAT_INTERVAL_MS * 2);
     });
-    // Call count must remain 1
     expect(mockRecordWatchTick).toHaveBeenCalledTimes(1);
   });
 
@@ -142,7 +153,6 @@ describe('useWatchHeartbeat', () => {
       useWatchHeartbeat({ streamId: 505, isPlaying: true })
     );
 
-    // Multiple rerenders with identical active state
     rerender();
     rerender();
     rerender();
@@ -150,8 +160,6 @@ describe('useWatchHeartbeat', () => {
     await act(async () => {
       jest.advanceTimersByTime(WATCH_HEARTBEAT_INTERVAL_MS);
     });
-
-    // Should only have ticked once, not 4 times
     expect(mockRecordWatchTick).toHaveBeenCalledTimes(1);
 
     await act(async () => {
@@ -211,5 +219,127 @@ describe('useWatchHeartbeat', () => {
 
     expect(mockRecordWatchTick).toHaveBeenCalledTimes(1);
     expect(mockRecordWatchTick).toHaveBeenCalledWith(undefined);
+  });
+
+  // ── Step 4 Page Visibility API Integration ────────────────────────────────
+
+  it('does not send requests while document is hidden on initial render', async () => {
+    setDocumentVisibility('hidden');
+
+    renderHook(() => useWatchHeartbeat({ streamId: 901, isPlaying: true }));
+
+    await act(async () => {
+      jest.advanceTimersByTime(WATCH_HEARTBEAT_INTERVAL_MS * 2);
+    });
+
+    expect(mockRecordWatchTick).not.toHaveBeenCalled();
+  });
+
+  it('pauses an active heartbeat immediately when visibility becomes hidden', async () => {
+    renderHook(() => useWatchHeartbeat({ streamId: 902, isPlaying: true }));
+
+    // Tick 1 after 60s while visible
+    await act(async () => {
+      jest.advanceTimersByTime(WATCH_HEARTBEAT_INTERVAL_MS);
+    });
+    expect(mockRecordWatchTick).toHaveBeenCalledTimes(1);
+
+    // Switch to hidden
+    setDocumentVisibility('hidden');
+
+    // Advance by several intervals while hidden — zero new requests dispatched
+    await act(async () => {
+      jest.advanceTimersByTime(WATCH_HEARTBEAT_INTERVAL_MS * 3);
+    });
+    expect(mockRecordWatchTick).toHaveBeenCalledTimes(1);
+  });
+
+  it('resumes heartbeat when visibility changes back to visible without immediate tick', async () => {
+    renderHook(() => useWatchHeartbeat({ streamId: 903, isPlaying: true }));
+
+    // Tick 1
+    await act(async () => {
+      jest.advanceTimersByTime(WATCH_HEARTBEAT_INTERVAL_MS);
+    });
+    expect(mockRecordWatchTick).toHaveBeenCalledTimes(1);
+
+    // Hide tab
+    setDocumentVisibility('hidden');
+    await act(async () => {
+      jest.advanceTimersByTime(WATCH_HEARTBEAT_INTERVAL_MS * 2);
+    });
+    expect(mockRecordWatchTick).toHaveBeenCalledTimes(1);
+
+    // Return to visible tab
+    setDocumentVisibility('visible');
+
+    // Must NOT send an immediate request merely on becoming visible
+    expect(mockRecordWatchTick).toHaveBeenCalledTimes(1);
+
+    // Must wait for the full 60-second interval before next tick
+    await act(async () => {
+      jest.advanceTimersByTime(WATCH_HEARTBEAT_INTERVAL_MS - 1);
+    });
+    expect(mockRecordWatchTick).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      jest.advanceTimersByTime(1);
+    });
+    expect(mockRecordWatchTick).toHaveBeenCalledTimes(2);
+  });
+
+  it('remains inactive when isPlaying is false even after visibility becomes visible', async () => {
+    setDocumentVisibility('hidden');
+
+    renderHook(() => useWatchHeartbeat({ streamId: 904, isPlaying: false }));
+
+    // Becoming visible while isPlaying is false
+    setDocumentVisibility('visible');
+
+    await act(async () => {
+      jest.advanceTimersByTime(WATCH_HEARTBEAT_INTERVAL_MS * 2);
+    });
+
+    expect(mockRecordWatchTick).not.toHaveBeenCalled();
+  });
+
+  it('does not create duplicate timers during repeated visibility changes', async () => {
+    renderHook(() => useWatchHeartbeat({ streamId: 905, isPlaying: true }));
+
+    // Rapid visibility toggling
+    setDocumentVisibility('hidden');
+    setDocumentVisibility('visible');
+    setDocumentVisibility('hidden');
+    setDocumentVisibility('visible');
+
+    // Advance 60s
+    await act(async () => {
+      jest.advanceTimersByTime(WATCH_HEARTBEAT_INTERVAL_MS);
+    });
+
+    // Exactly 1 tick should occur, not multiple
+    expect(mockRecordWatchTick).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      jest.advanceTimersByTime(WATCH_HEARTBEAT_INTERVAL_MS);
+    });
+    expect(mockRecordWatchTick).toHaveBeenCalledTimes(2);
+  });
+
+  it('removes the visibilitychange event listener on unmount', () => {
+    const removeEventListenerSpy = jest.spyOn(document, 'removeEventListener');
+
+    const { unmount } = renderHook(() =>
+      useWatchHeartbeat({ streamId: 906, isPlaying: true })
+    );
+
+    unmount();
+
+    expect(removeEventListenerSpy).toHaveBeenCalledWith(
+      'visibilitychange',
+      expect.any(Function)
+    );
+
+    removeEventListenerSpy.mockRestore();
   });
 });

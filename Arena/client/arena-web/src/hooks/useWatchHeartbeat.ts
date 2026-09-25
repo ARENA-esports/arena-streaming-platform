@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { economyService } from '../api/economyService';
 import { WatchTickRequest, WatchTickResponse } from '../types';
 
@@ -19,7 +19,8 @@ export interface UseWatchHeartbeatOptions {
 
 /**
  * Core hook for client-side viewer watch heartbeat.
- * Sends POST /api/economy/watch-tick every 60 seconds while playback is active.
+ * Sends POST /api/economy/watch-tick every 60 seconds while playback is active
+ * and the document is visible (Page Visibility API).
  *
  * Supports both object options: `useWatchHeartbeat({ streamId, isPlaying })`
  * and positional arguments: `useWatchHeartbeat(streamId, isPlaying)`.
@@ -32,9 +33,9 @@ export function useWatchHeartbeat(
     typeof optionsOrStreamId === 'object' && optionsOrStreamId !== null
       ? optionsOrStreamId
       : {
-          streamId: optionsOrStreamId,
-          isPlaying: isPlayingArg,
-        };
+        streamId: optionsOrStreamId,
+        isPlaying: isPlayingArg,
+      };
 
   const {
     streamId,
@@ -43,6 +44,27 @@ export function useWatchHeartbeat(
     onSuccess,
     onError,
   } = options;
+
+  // Track document visibility state via Page Visibility API
+  const [isDocumentVisible, setIsDocumentVisible] = useState<boolean>(() => {
+    if (typeof document !== 'undefined') {
+      return document.visibilityState === 'visible';
+    }
+    return true;
+  });
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+
+    const handleVisibilityChange = () => {
+      setIsDocumentVisible(document.visibilityState === 'visible');
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
 
   const onSuccessRef = useRef(onSuccess);
   const onErrorRef = useRef(onError);
@@ -55,8 +77,10 @@ export function useWatchHeartbeat(
     onErrorRef.current = onError;
   }, [onError]);
 
+  const shouldRunHeartbeat = isPlaying && isDocumentVisible;
+
   useEffect(() => {
-    if (!isPlaying) {
+    if (!shouldRunHeartbeat) {
       return;
     }
 
@@ -68,8 +92,8 @@ export function useWatchHeartbeat(
             : typeof streamId === 'string' &&
               !isNaN(Number(streamId)) &&
               streamId.trim() !== ''
-            ? Number(streamId)
-            : undefined;
+              ? Number(streamId)
+              : undefined;
 
         const payload: WatchTickRequest | undefined =
           numericStreamId !== undefined ? { streamId: numericStreamId } : undefined;
@@ -85,5 +109,5 @@ export function useWatchHeartbeat(
     return () => {
       clearInterval(intervalId);
     };
-  }, [isPlaying, streamId, intervalMs]);
+  }, [shouldRunHeartbeat, streamId, intervalMs]);
 }
