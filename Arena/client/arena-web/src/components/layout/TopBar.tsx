@@ -3,6 +3,7 @@ import { Search, User, Settings, LogOut, Moon, Sun, Monitor, Trophy, Users } fro
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
+import WalletBalance from '../common/WalletBalance';
 
 export const TopBar: FC = () => {
   const { user, logout } = useAuth();
@@ -68,6 +69,8 @@ export const TopBar: FC = () => {
               </Link>
             )}
             
+            <WalletBalance />
+
             <button 
               className="w-[34px] h-[34px] rounded-full bg-[var(--panel)] border border-[var(--line)] text-[var(--text)] flex items-center justify-center hover:border-[var(--prime)] transition-colors outline-none focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--prime)] overflow-hidden shrink-0"
               onClick={() => setDropdownOpen(!dropdownOpen)}
