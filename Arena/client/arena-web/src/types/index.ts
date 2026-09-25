@@ -150,3 +150,7 @@ export interface WatchTickResponse {
   remainingSeconds?: number;
   message: string;
 }
+
+export interface WalletBalanceResponse {
+  balance: number;
+}
