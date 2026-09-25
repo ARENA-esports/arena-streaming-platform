@@ -7,6 +7,7 @@ import { StreamContainer } from '../components/player/StreamContainer';
 import Badge from '../components/common/Badge';
 import Button from '../components/common/Button';
 import { useAuth } from '../context/AuthContext';
+import { useWallet } from '../context/WalletContext';
 import EditMatchModal from '../components/match/EditMatchModal';
 import DeleteMatchModal from '../components/match/DeleteMatchModal';
 import BattleBar from '../components/match/BattleBar';
@@ -20,6 +21,7 @@ export const MatchRoomView: React.FC = () => {
   const { matchId } = useParams<{ matchId: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { updateBalance } = useWallet();
 
   const { status, match, stream, error } = useMatchStatus(matchId);
   const { isPlaying, onPlay, onPause, resetPlayback } = useTwitchPlayback();
@@ -40,6 +42,11 @@ export const MatchRoomView: React.FC = () => {
   useWatchHeartbeat({
     streamId: stream?.id,
     isPlaying: isHeartbeatEligible,
+    onSuccess: (response) => {
+      if (response.success && response.currentBalance !== undefined) {
+        updateBalance(response.currentBalance);
+      }
+    }
   });
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);

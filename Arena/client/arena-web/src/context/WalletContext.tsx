@@ -7,6 +7,7 @@ interface WalletContextType {
   isLoading: boolean;
   error: Error | null;
   setBalance: React.Dispatch<React.SetStateAction<number>>;
+  updateBalance: (newBalance: number) => void;
 }
 
 const WalletContext = createContext<WalletContextType | undefined>(undefined);
@@ -43,8 +44,12 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     fetchBalance();
   }, [token, user]);
 
+  const updateBalance = (newBalance: number) => {
+    setBalance(newBalance);
+  };
+
   return (
-    <WalletContext.Provider value={{ balance, isLoading, error, setBalance }}>
+    <WalletContext.Provider value={{ balance, isLoading, error, setBalance, updateBalance }}>
       {children}
     </WalletContext.Provider>
   );

@@ -3,6 +3,7 @@ import { render, act, fireEvent } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { MatchRoomView } from '../src/views/MatchRoomView';
 import { useAuth } from '../src/context/AuthContext';
+import { useWallet } from '../src/context/WalletContext';
 import { useMatchStatus } from '../src/hooks/useMatchStatus';
 import { economyService } from '../src/api/economyService';
 
@@ -10,6 +11,10 @@ import { economyService } from '../src/api/economyService';
 
 jest.mock('../src/context/AuthContext', () => ({
   useAuth: jest.fn(),
+}));
+
+jest.mock('../src/context/WalletContext', () => ({
+  useWallet: jest.fn(),
 }));
 
 jest.mock('../src/hooks/useMatchStatus', () => ({
@@ -40,6 +45,7 @@ jest.mock('../src/components/player/StreamContainer', () => ({
 }));
 
 const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
+const mockUseWallet = useWallet as jest.MockedFunction<typeof useWallet>;
 const mockUseMatchStatus = useMatchStatus as jest.MockedFunction<typeof useMatchStatus>;
 const mockRecordWatchTick = economyService.recordWatchTick as jest.MockedFunction<
   typeof economyService.recordWatchTick
@@ -65,6 +71,13 @@ describe('MatchRoomView — Watch Heartbeat Integration', () => {
       currentBalance: 200,
       lastTickAt: '2026-09-25T12:00:00Z',
       message: 'Coins awarded',
+    });
+    mockUseWallet.mockReturnValue({
+      balance: 100,
+      isLoading: false,
+      error: null,
+      setBalance: jest.fn(),
+      updateBalance: jest.fn(),
     });
   });
 
@@ -417,5 +430,62 @@ describe('MatchRoomView — Watch Heartbeat Integration', () => {
     });
 
     expect(mockRecordWatchTick).not.toHaveBeenCalled();
+  });
+
+  it('updates wallet balance when watch tick succeeds', async () => {
+    mockUseAuth.mockReturnValue({
+      user: {
+        userId: 1,
+        username: 'ViewerUser',
+        email: 'viewer@test.com',
+        role: 'Viewer',
+      },
+      token: 'jwt-token',
+      isLoading: false,
+      login: jest.fn(),
+      logout: jest.fn(),
+      refreshProfile: jest.fn(),
+    });
+
+    mockUseMatchStatus.mockReturnValue({
+      status: 'Live',
+      match: {
+        matchId: 101,
+        teamAId: 1,
+        teamBId: 2,
+        scheduledTime: '2026-09-25T12:00:00Z',
+        status: 'Live',
+      },
+      stream: {
+        id: 789,
+        matchId: 101,
+        channelName: 'Arena_streams',
+        status: 'Live',
+        twitchUrl: 'https://twitch.tv/Arena_streams',
+      },
+      error: null,
+    });
+
+    const mockUpdateBalance = jest.fn();
+    mockUseWallet.mockReturnValue({
+      balance: 100,
+      isLoading: false,
+      error: null,
+      setBalance: jest.fn(),
+      updateBalance: mockUpdateBalance,
+    });
+
+    const { getByTestId } = renderMatchRoom('101');
+
+    act(() => {
+      fireEvent.click(getByTestId('stream-play-btn'));
+    });
+
+    await act(async () => {
+      jest.advanceTimersByTime(60000);
+    });
+
+    expect(mockRecordWatchTick).toHaveBeenCalledTimes(1);
+    expect(mockUpdateBalance).toHaveBeenCalledWith(200);
   });
 });

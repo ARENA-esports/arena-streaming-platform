@@ -46,14 +46,14 @@ export const TopBar: FC = () => {
     <header className="topbar">
       <Link to="/" className="brand" style={{ marginLeft: '24px' }}>aren<span>a</span></Link>
       <div className="search-wrap hidden sm:block relative">
-        <Search 
-          size={16} 
-          className="absolute left-3 top-1/2 -translate-y-1/2 text-arena-textMuted cursor-pointer hover:text-arena-cyan transition-colors" 
+        <Search
+          size={16}
+          className="absolute left-3 top-1/2 -translate-y-1/2 text-arena-textMuted cursor-pointer hover:text-arena-cyan transition-colors"
           onClick={executeSearch}
         />
-        <input 
-          type="text" 
-          placeholder="Search by Team ID..." 
+        <input
+          type="text"
+          placeholder="Search by Team ID..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           onKeyDown={handleSearchKeyPress}
@@ -68,10 +68,10 @@ export const TopBar: FC = () => {
                 Schedule
               </Link>
             )}
-            
+
             <WalletBalance />
 
-            <button 
+            <button
               className="w-[34px] h-[34px] rounded-full bg-[var(--panel)] border border-[var(--line)] text-[var(--text)] flex items-center justify-center hover:border-[var(--prime)] transition-colors outline-none focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--prime)] overflow-hidden shrink-0"
               onClick={() => setDropdownOpen(!dropdownOpen)}
             >
@@ -84,9 +84,9 @@ export const TopBar: FC = () => {
 
             {dropdownOpen && (
               <div className="absolute top-12 right-0 w-64 bg-arena-surface border border-arena-border rounded-md shadow-lg py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
-                
+
                 {/* Profile Header */}
-                <div 
+                <div
                   className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--panel-2)] cursor-pointer border-b border-[var(--line)] outline-none focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--prime)]"
                   tabIndex={0}
                   onClick={() => {
@@ -133,8 +133,8 @@ export const TopBar: FC = () => {
                     <Settings size={18} />
                     Settings
                   </Link>
-                  
-                  <button 
+
+                  <button
                     className="w-full flex items-center justify-between px-4 py-2 hover:bg-[var(--panel-2)] text-sm text-[var(--text)] outline-none focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--prime)] mt-1 border-t border-[var(--line)]"
                     onClick={toggleTheme}
                   >
@@ -150,7 +150,7 @@ export const TopBar: FC = () => {
 
                 {/* Logout */}
                 <div className="py-1">
-                  <button 
+                  <button
                     className="w-full flex items-center gap-3 px-4 py-2 hover:bg-[var(--panel-2)] text-sm text-[var(--text)] outline-none focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--prime)]"
                     onClick={handleLogout}
                   >
@@ -169,8 +169,8 @@ export const TopBar: FC = () => {
             {location.pathname !== '/signup' && (
               <Link to="/signup" className="btn-solid" style={{ textDecoration: 'none' }}>Sign Up</Link>
             )}
-            
-            <button 
+
+            <button
               className="w-[34px] h-[34px] rounded-full bg-[var(--panel)] border border-[var(--line)] text-[var(--text)] flex items-center justify-center hover:border-[var(--prime)] transition-colors outline-none focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--prime)]"
               onClick={() => setDropdownOpen(!dropdownOpen)}
             >
@@ -180,7 +180,7 @@ export const TopBar: FC = () => {
             {dropdownOpen && (
               <div className="absolute top-12 right-0 w-64 bg-arena-surface border border-arena-border rounded-md shadow-lg py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
                 <div className="py-1 border-b border-arena-border">
-                  <button 
+                  <button
                     className="w-full flex items-center justify-between px-4 py-2 hover:bg-[var(--panel-2)] text-sm text-[var(--text)] outline-none focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--prime)]"
                     onClick={toggleTheme}
                   >
@@ -194,7 +194,7 @@ export const TopBar: FC = () => {
                   </button>
                 </div>
                 <div className="py-1">
-                  <Link 
+                  <Link
                     to="/login"
                     className="flex items-center gap-3 px-4 py-2 hover:bg-arena-surfaceHover text-sm text-arena-text"
                     onClick={() => setDropdownOpen(false)}
