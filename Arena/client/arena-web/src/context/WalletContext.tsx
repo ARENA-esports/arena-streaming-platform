@@ -8,6 +8,7 @@ interface WalletContextType {
   error: Error | null;
   setBalance: React.Dispatch<React.SetStateAction<number>>;
   updateBalance: (newBalance: number) => void;
+  optimisticSpend: (amount: number) => { success: boolean; rollback: () => void };
 }
 
 const WalletContext = createContext<WalletContextType | undefined>(undefined);
@@ -48,8 +49,23 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setBalance(newBalance);
   };
 
+  const optimisticSpend = (amount: number) => {
+    if (balance >= amount) {
+      const previousBalance = balance;
+      setBalance(balance - amount);
+      return {
+        success: true,
+        rollback: () => setBalance(previousBalance),
+      };
+    }
+    return {
+      success: false,
+      rollback: () => {},
+    };
+  };
+
   return (
-    <WalletContext.Provider value={{ balance, isLoading, error, setBalance, updateBalance }}>
+    <WalletContext.Provider value={{ balance, isLoading, error, setBalance, updateBalance, optimisticSpend }}>
       {children}
     </WalletContext.Provider>
   );
