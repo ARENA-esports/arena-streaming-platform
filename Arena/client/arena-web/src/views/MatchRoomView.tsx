@@ -31,10 +31,11 @@ export const MatchRoomView: React.FC = () => {
     }
   }, [status, matchId, resetPlayback]);
 
-  // Heartbeat is active ONLY for authenticated viewers watching an active Live match
+  // Heartbeat is active ONLY for authenticated viewers watching an active Live match with a valid stream
   const isViewer = Boolean(user && user.role === 'Viewer');
   const isLiveMatch = status === 'Live' && Boolean(match);
-  const isHeartbeatEligible = isViewer && isLiveMatch && isPlaying;
+  const hasValidStream = typeof stream?.id === 'number' && stream.id > 0;
+  const isHeartbeatEligible = isViewer && isLiveMatch && hasValidStream && isPlaying;
 
   useWatchHeartbeat({
     streamId: stream?.id,

@@ -377,4 +377,45 @@ describe('MatchRoomView — Watch Heartbeat Integration', () => {
     // Zero additional ticks after unmount
     expect(mockRecordWatchTick).toHaveBeenCalledTimes(1);
   });
+
+  it('does not activate heartbeat if stream.id is missing or unavailable even when match is Live', async () => {
+    mockUseAuth.mockReturnValue({
+      user: {
+        userId: 1,
+        username: 'ViewerUser',
+        email: 'viewer@test.com',
+        role: 'Viewer',
+      },
+      token: 'jwt-token',
+      isLoading: false,
+      login: jest.fn(),
+      logout: jest.fn(),
+      refreshProfile: jest.fn(),
+    });
+
+    mockUseMatchStatus.mockReturnValue({
+      status: 'Live',
+      match: {
+        matchId: 101,
+        teamAId: 1,
+        teamBId: 2,
+        scheduledTime: '2026-09-25T12:00:00Z',
+        status: 'Live',
+      },
+      stream: null, // Stream not yet linked or resolved
+      error: null,
+    });
+
+    const { getByTestId } = renderMatchRoom('101');
+
+    act(() => {
+      fireEvent.click(getByTestId('stream-play-btn'));
+    });
+
+    await act(async () => {
+      jest.advanceTimersByTime(60000 * 3);
+    });
+
+    expect(mockRecordWatchTick).not.toHaveBeenCalled();
+  });
 });
