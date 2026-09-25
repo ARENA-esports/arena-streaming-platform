@@ -137,3 +137,16 @@ export interface UpdateTournamentRequest {
   start_date: string;
   end_date: string;
 }
+
+export interface WatchTickRequest {
+  streamId?: number;
+}
+
+export interface WatchTickResponse {
+  success: boolean;
+  coinsAwarded: number;
+  currentBalance: number;
+  lastTickAt: string | null;
+  remainingSeconds?: number;
+  message: string;
+}
