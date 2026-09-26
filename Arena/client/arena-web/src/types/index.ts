@@ -137,3 +137,32 @@ export interface UpdateTournamentRequest {
   start_date: string;
   end_date: string;
 }
+
+// ── Chat Types ──
+
+export interface ChatMessage {
+  messageId: number;
+  teamId: number;
+  teamName: string;
+  teamColor: string;
+  userId: number;
+  username: string;
+  content: string;
+  createdAt: string;
+}
+
+export interface ChatHistoryFrame {
+  type: 'history';
+  messages: ChatMessage[];
+}
+
+export interface ChatMessageFrame extends ChatMessage {
+  type: 'message';
+}
+
+export interface ChatErrorFrame {
+  type: 'error';
+  message: string;
+}
+
+export type ChatFrame = ChatHistoryFrame | ChatMessageFrame | ChatErrorFrame;

@@ -33,14 +33,14 @@ class MatchRoomPage(BasePage):
     """Encapsulates locators and actions for the Match Room view."""
 
     # ── Locators ──────────────────────────────────────────────────────────
-    # TeamSelector placeholder
+    # TeamSelector
     TEAM_SELECTOR = (By.XPATH,
-        "//div[contains(text(),'TeamSelector Placeholder')]"
+        "//div[contains(text(),'TeamSelector Placeholder') or contains(text(),'Choose Your Faction') or contains(@id,'team-select')]"
     )
 
-    # FactionChat placeholder
+    # FactionChat
     FACTION_CHAT = (By.XPATH,
-        "//div[contains(text(),'FactionChat Placeholder')]"
+        "//div[contains(text(),'FactionChat Placeholder') or contains(text(),'Faction Chat') or @id='faction-chat-panel']"
     )
 
     # Status badge (Badge component renders a <span> with status text)

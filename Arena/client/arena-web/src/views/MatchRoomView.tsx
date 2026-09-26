@@ -24,6 +24,7 @@ export const MatchRoomView: React.FC = () => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('team');
+  const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
 
   if (status === 'loading') {
     return (
@@ -122,10 +123,10 @@ export const MatchRoomView: React.FC = () => {
           </div>
 
           <div className={activeTab === 'team' ? 'block' : 'hidden lg:block'}>
-            <TeamSelector matchId={match.matchId} />
+            <TeamSelector matchId={match.matchId} onTeamSelect={setSelectedTeamId} />
           </div>
           <div className={`h-[600px] lg:h-auto min-w-0 ${activeTab === 'chat' ? 'block' : 'hidden lg:block'}`}>
-            <FactionChat matchId={match.matchId} />
+            <FactionChat teamId={selectedTeamId} />
           </div>
           <div className={activeTab === 'battle' ? 'block' : 'hidden lg:block'}>
             <BattleBar matchId={match.matchId} />
