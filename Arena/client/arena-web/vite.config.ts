@@ -12,6 +12,15 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
+      '/ws/chat': {
+        target: 'http://127.0.0.1:5169', // Chat Service WebSocket
+        ws: true,
+        changeOrigin: true,
+      },
+      '/api/chat': {
+        target: 'http://127.0.0.1:5169', // Chat Service REST (moderation)
+        changeOrigin: true,
+      },
       '/api/Auth': {
         target: 'http://127.0.0.1:5168', // User Service
         changeOrigin: true,
