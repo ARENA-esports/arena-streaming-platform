@@ -16,6 +16,10 @@ apiClient.interceptors.request.use((config) => {
     config.baseURL = import.meta.env.VITE_USER_API_URL || '/api';
   } else if (config.url?.startsWith('/tournaments') || config.url?.startsWith('/teams')) {
     config.baseURL = '/api';
+  } else if (config.url?.startsWith('/economy')) {
+    config.baseURL = import.meta.env.VITE_ECONOMY_API_URL || '/api';
+  } else if (config.url?.startsWith('/api/economy')) {
+    config.baseURL = import.meta.env.VITE_ECONOMY_API_URL || '';
   } else {
     config.baseURL = import.meta.env.VITE_STREAM_API_URL || '/api';
   }

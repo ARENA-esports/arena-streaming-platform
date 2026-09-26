@@ -1,10 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useMatchStatus } from '../hooks/useMatchStatus';
+import { useTwitchPlayback } from '../hooks/useTwitchPlayback';
+import { useWatchHeartbeat } from '../hooks/useWatchHeartbeat';
 import { StreamContainer } from '../components/player/StreamContainer';
 import Badge from '../components/common/Badge';
 import Button from '../components/common/Button';
 import { useAuth } from '../context/AuthContext';
+import { useWallet } from '../context/WalletContext';
 import EditMatchModal from '../components/match/EditMatchModal';
 import DeleteMatchModal from '../components/match/DeleteMatchModal';
 import BattleBar from '../components/match/BattleBar';
@@ -18,9 +21,34 @@ export const MatchRoomView: React.FC = () => {
   const { matchId } = useParams<{ matchId: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  
+  const { updateBalance } = useWallet();
+
   const { status, match, stream, error } = useMatchStatus(matchId);
-  
+  const { isPlaying, onPlay, onPause, resetPlayback } = useTwitchPlayback();
+
+  // Reset playback state if the match status leaves 'Live' or match changes
+  useEffect(() => {
+    if (status !== 'Live') {
+      resetPlayback();
+    }
+  }, [status, matchId, resetPlayback]);
+
+  // Heartbeat is active ONLY for authenticated viewers watching an active Live match with a valid stream
+  const isViewer = Boolean(user && user.role === 'Viewer');
+  const isLiveMatch = status === 'Live' && Boolean(match);
+  const hasValidStream = typeof stream?.id === 'number' && stream.id > 0;
+  const isHeartbeatEligible = isViewer && isLiveMatch && hasValidStream && isPlaying;
+
+  useWatchHeartbeat({
+    streamId: stream?.id,
+    isPlaying: isHeartbeatEligible,
+    onSuccess: (response) => {
+      if (response.success && response.currentBalance !== undefined) {
+        updateBalance(response.currentBalance);
+      }
+    }
+  });
+
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('team');
@@ -75,14 +103,14 @@ export const MatchRoomView: React.FC = () => {
 
         {user?.role === 'Organizer' && (
           <div className="flex items-center space-x-4">
-            <Button 
+            <Button
               variant="secondary"
               size="md"
               onClick={() => setIsEditModalOpen(true)}
             >
               EDIT
             </Button>
-            <Button 
+            <Button
               variant="danger"
               size="md"
               onClick={() => setIsDeleteModalOpen(true)}
@@ -97,7 +125,13 @@ export const MatchRoomView: React.FC = () => {
         {/* Video Player Section - Dynamic tile swapping */}
         <div className="lg:col-start-1 flex flex-col gap-3 min-w-0">
           {status === 'Scheduled' && <ScheduledView match={match} />}
-          {status === 'Live' && <StreamContainer apiChannelName={stream?.channelName} />}
+          {status === 'Live' && (
+            <StreamContainer
+              apiChannelName={stream?.channelName}
+              onPlay={onPlay}
+              onPause={onPause}
+            />
+          )}
           {status === 'Ended' && <EndedView match={match} />}
           {status === 'Cancelled' && <CancelledView match={match} />}
         </div>
@@ -110,11 +144,10 @@ export const MatchRoomView: React.FC = () => {
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`px-4 py-3 flex-1 text-sm font-bold uppercase tracking-wider transition-colors duration-200 ${
-                  activeTab === tab 
-                    ? 'border-b-2 border-arena-cyan text-arena-text' 
+                className={`px-4 py-3 flex-1 text-sm font-bold uppercase tracking-wider transition-colors duration-200 ${activeTab === tab
+                    ? 'border-b-2 border-arena-cyan text-arena-text'
                     : 'text-arena-textMuted hover:text-arena-text'
-                }`}
+                  }`}
               >
                 {tab}
               </button>
