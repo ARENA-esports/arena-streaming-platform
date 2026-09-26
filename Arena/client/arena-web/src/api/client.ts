@@ -20,6 +20,9 @@ apiClient.interceptors.request.use((config) => {
     config.baseURL = import.meta.env.VITE_ECONOMY_API_URL || '/api';
   } else if (config.url?.startsWith('/api/economy')) {
     config.baseURL = import.meta.env.VITE_ECONOMY_API_URL || '';
+  } else if (config.url?.startsWith('/wallet')) {
+    // SCRUM-116: wallet balance lives in the Battle/Economy service
+    config.baseURL = import.meta.env.VITE_ECONOMY_API_URL || '/api';
   } else {
     config.baseURL = import.meta.env.VITE_STREAM_API_URL || '/api';
   }
