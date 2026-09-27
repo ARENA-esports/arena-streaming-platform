@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.HttpOverrides;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
@@ -18,6 +19,14 @@ if (!string.IsNullOrEmpty(appInsightsConnString))
 {
     builder.Services.AddApplicationInsightsTelemetry();
 }
+
+// configure services before builder.Build();
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownIPNetworks.Clear();
+    options.KnownProxies.Clear();
+});
 
 // Add services to the container.
 builder.Services.AddControllers();
@@ -93,8 +102,7 @@ if (!string.IsNullOrEmpty(rsaPublicKeyPem))
 
 if (signingKeys.Count == 0)
 {
-    const string fallbackSecret = "Arena_Secret_Key_For_Jwt_Token_Signing_2026_SE3022_Production_Grade!";
-    signingKeys.Add(new SymmetricSecurityKey(Encoding.UTF8.GetBytes(fallbackSecret)));
+    throw new InvalidOperationException("JwtSettings:Secret is not configured.");
 }
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -181,6 +189,8 @@ if (!string.IsNullOrEmpty(connectionString))
     }
 }
 
+// middleware
+app.UseForwardedHeaders();
 // Exception Handling middleware
 app.UseExceptionHandler();
 

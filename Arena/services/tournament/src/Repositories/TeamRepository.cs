@@ -232,17 +232,26 @@ public class TeamRepository : ITeamRepository
     /// <inheritdoc />
     public async Task<bool> RemovePlayerFromTeamAsync(int teamId, int playerId)
     {
+        // open new mysql connection using raw ado.net
         using var connection = new MySqlConnection(_connectionString);
         await connection.OpenAsync();
 
+        /*
+            soft delete(don't use delete from team_players)
+            Permanently deleting the row would break historical tournament match records
+            Instead set is_active = FALSE so the player is deactivated but their history remains
+        */
         const string sql = @"
-            DELETE FROM team_players
-            WHERE player_id = @PlayerId AND team_id = @TeamId;";
+        UPDATE team_players
+        SET is_active = FALSE
+        WHERE player_id = @PlayerId AND team_id = @TeamId;";
 
+        // Bind parameters safely to prevent SQL injection
         using var command = new MySqlCommand(sql, connection);
         command.Parameters.AddWithValue("@PlayerId", playerId);
         command.Parameters.AddWithValue("@TeamId", teamId);
 
+        // Execute the update query and return true if a record was actually updated
         var rowsAffected = await command.ExecuteNonQueryAsync();
         return rowsAffected > 0;
     }
