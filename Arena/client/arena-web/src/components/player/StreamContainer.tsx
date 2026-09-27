@@ -3,9 +3,10 @@ import { TwitchPlayer } from '../player/TwitchPlayer';
 
 interface StreamContainerProps {
     apiChannelName?: string;
+    onChannelChange?: (channelName: string) => void;
 }
 
-export const StreamContainer: React.FC<StreamContainerProps> = ({ apiChannelName }) => {
+export const StreamContainer: React.FC<StreamContainerProps> = ({ apiChannelName, onChannelChange }) => {
     // Check if channel from API is missing or a mock channel
     const isMockOrEmpty = !apiChannelName || apiChannelName.startsWith('mock_');
     const envOverrideChannel = import.meta.env.VITE_TWITCH_TEST_CHANNEL;
@@ -20,11 +21,21 @@ export const StreamContainer: React.FC<StreamContainerProps> = ({ apiChannelName
     const [inputVal, setInputVal] = useState<string>(initialChannel);
 
     useEffect(() => {
-        if (!isMockOrEmpty && apiChannelName && !envOverrideChannel) {
-            setDevChannel(apiChannelName);
-            setInputVal(apiChannelName);
-        }
+        const nextChannel = (!isMockOrEmpty && apiChannelName && !envOverrideChannel)
+            ? apiChannelName
+            : initialChannel;
+        setDevChannel(nextChannel);
+        setInputVal(nextChannel);
+        onChannelChange?.(nextChannel);
     }, [apiChannelName, isMockOrEmpty, envOverrideChannel]);
+
+    const handleSelectChannel = (channel: string) => {
+        const trimmed = channel.trim();
+        if (!trimmed) return;
+        setDevChannel(trimmed);
+        setInputVal(trimmed);
+        onChannelChange?.(trimmed);
+    };
 
     const activeChannel = devChannel;
 
@@ -41,14 +52,14 @@ export const StreamContainer: React.FC<StreamContainerProps> = ({ apiChannelName
                         value={inputVal}
                         onChange={(e) => setInputVal(e.target.value)}
                         onKeyDown={(e) => {
-                            if (e.key === 'Enter') setDevChannel(inputVal);
+                            if (e.key === 'Enter') handleSelectChannel(inputVal);
                         }}
                         placeholder="Type live Twitch channel..."
                         className="w-full bg-arena-bg px-2.5 py-1 rounded border border-arena-border text-white placeholder-gray-500 focus:outline-none focus:border-arena-cyan text-xs font-mono"
                     />
                     <button
                         type="button"
-                        onClick={() => setDevChannel(inputVal)}
+                        onClick={() => handleSelectChannel(inputVal)}
                         className="px-3 py-1 bg-arena-cyan text-black font-semibold hover:bg-arena-cyan/80 rounded transition-colors whitespace-nowrap">
                         Load Stream
                     </button>
@@ -61,10 +72,7 @@ export const StreamContainer: React.FC<StreamContainerProps> = ({ apiChannelName
                         <button
                             key={preset}
                             type="button"
-                            onClick={() => {
-                                setInputVal(preset);
-                                setDevChannel(preset);
-                            }}
+                            onClick={() => handleSelectChannel(preset)}
                             className={`px-2 py-0.5 rounded text-[11px] font-mono transition-colors ${
                                 activeChannel === preset
                                     ? 'bg-arena-cyan/30 text-arena-cyan border border-arena-cyan/50 font-bold'

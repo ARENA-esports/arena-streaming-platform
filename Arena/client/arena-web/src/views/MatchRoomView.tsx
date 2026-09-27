@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useMatchStatus } from '../hooks/useMatchStatus';
 import { StreamContainer } from '../components/player/StreamContainer';
@@ -25,6 +25,25 @@ export const MatchRoomView: React.FC = () => {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('team');
   const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
+  const [teamsData, setTeamsData] = useState<{ teamA: any; teamB: any } | null>(null);
+  const [activeChannel, setActiveChannel] = useState<string>('');
+
+  const handleTeamsLoaded = useCallback((teamA: any, teamB: any) => {
+    setTeamsData({ teamA, teamB });
+  }, []);
+
+  const teamsMap = teamsData
+    ? {
+        [teamsData.teamA.teamId]: {
+          name: teamsData.teamA.name,
+          color: teamsData.teamA.colorHex || '#EF4444',
+        },
+        [teamsData.teamB.teamId]: {
+          name: teamsData.teamB.name,
+          color: teamsData.teamB.colorHex || '#00B8FC',
+        },
+      }
+    : undefined;
 
   if (status === 'loading') {
     return (
@@ -36,7 +55,7 @@ export const MatchRoomView: React.FC = () => {
 
   if (status === 'notFound') {
     return (
-      <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="w-full max-w-[1920px] mx-auto px-4 py-8">
         <div className="bg-arena-surface border border-arena-border border-dashed p-12 text-center rounded-[14px]">
           <h2 className="text-2xl font-bold text-white mb-2">Match Not Found</h2>
           <button onClick={() => navigate('/')} className="text-arena-cyan hover:underline font-semibold text-sm">Return Home</button>
@@ -47,7 +66,7 @@ export const MatchRoomView: React.FC = () => {
 
   if (status === 'error') {
     return (
-      <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="w-full max-w-[1920px] mx-auto px-4 py-8">
         <div className="bg-arena-surface border border-arena-crimson/50 p-12 text-center rounded-[14px]">
           <h2 className="text-2xl font-bold text-white mb-2">Error Loading Match</h2>
           <p className="text-arena-textMuted mb-4">{error?.message || 'An unexpected error occurred.'}</p>
@@ -60,10 +79,10 @@ export const MatchRoomView: React.FC = () => {
   if (!match) return null;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="mb-6 flex justify-between items-center">
+    <div className="w-full max-w-[1920px] mx-auto px-3 sm:px-6 lg:px-8 py-5">
+      <div className="mb-4 flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-white mb-2">
+          <h1 className="text-2xl sm:text-3xl font-bold text-white mb-1.5">
             Match Overview
           </h1>
           <div className="flex items-center space-x-4">
@@ -94,16 +113,21 @@ export const MatchRoomView: React.FC = () => {
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[3fr_1fr] gap-4 w-full h-full py-4">
-        {/* Video Player Section - Dynamic tile swapping */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_390px] xl:grid-cols-[1fr_430px] 2xl:grid-cols-[1fr_470px] gap-6 w-full items-start py-2">
+        {/* Video Player Section - Expands to take advantage of wide empty space */}
         <div className="lg:col-start-1 flex flex-col gap-3 min-w-0">
           {status === 'Scheduled' && <ScheduledView match={match} />}
-          {status === 'Live' && <StreamContainer apiChannelName={stream?.channelName} />}
+          {status === 'Live' && (
+            <StreamContainer 
+              apiChannelName={stream?.channelName} 
+              onChannelChange={setActiveChannel}
+            />
+          )}
           {status === 'Ended' && <EndedView match={match} />}
           {status === 'Cancelled' && <CancelledView match={match} />}
         </div>
 
-        {/* Panel Group - Always mounted in right column, visibility toggled on mobile */}
+        {/* Panel Group - Widened chat and team selector column */}
         <div className="lg:col-start-2 flex flex-col gap-4 min-w-0">
           {/* Tab switcher - mobile only */}
           <div className="flex lg:hidden border-b border-arena-border mb-2">
@@ -123,10 +147,23 @@ export const MatchRoomView: React.FC = () => {
           </div>
 
           <div className={activeTab === 'team' ? 'block' : 'hidden lg:block'}>
-            <TeamSelector matchId={match.matchId} onTeamSelect={setSelectedTeamId} />
+            <TeamSelector
+              matchId={match.matchId}
+              selectedTeamId={selectedTeamId}
+              onTeamSelect={setSelectedTeamId}
+              onTeamsLoaded={handleTeamsLoaded}
+            />
           </div>
-          <div className={`h-[600px] lg:h-auto min-w-0 ${activeTab === 'chat' ? 'block' : 'hidden lg:block'}`}>
-            <FactionChat teamId={selectedTeamId} />
+          <div className={`h-[560px] xl:h-[620px] min-w-0 ${activeTab === 'chat' ? 'block' : 'hidden lg:block'}`}>
+            <FactionChat
+              matchId={match.matchId}
+              teamAId={match.teamAId}
+              teamBId={match.teamBId}
+              selectedTeamId={selectedTeamId}
+              teamsMap={teamsMap}
+              onSelectTeam={setSelectedTeamId}
+              activeChannel={activeChannel}
+            />
           </div>
           <div className={activeTab === 'battle' ? 'block' : 'hidden lg:block'}>
             <BattleBar matchId={match.matchId} />

@@ -25,6 +25,18 @@ export default defineConfig({
         target: 'http://127.0.0.1:5168', // User Service
         changeOrigin: true,
       },
+      '/api/auth': {
+        target: 'http://127.0.0.1:5168', // User Service
+        changeOrigin: true,
+      },
+      '/api/Users': {
+        target: 'http://127.0.0.1:5168', // User Service
+        changeOrigin: true,
+      },
+      '/api/users': {
+        target: 'http://127.0.0.1:5168', // User Service
+        changeOrigin: true,
+      },
       '/api/tournaments': {
         target: 'http://127.0.0.1:8082', // Tournament Service
         changeOrigin: true,
