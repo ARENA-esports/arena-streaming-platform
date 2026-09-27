@@ -1,9 +1,9 @@
+using Microsoft.AspNetCore.HttpOverrides;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Threading.RateLimiting;
 using System.Text;
-using Dapper;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.AspNetCore.RateLimiting;
@@ -20,6 +20,14 @@ if (!string.IsNullOrEmpty(appInsightsConnString))
 {
     builder.Services.AddApplicationInsightsTelemetry();
 }
+
+// configure services before builder.Build();
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownIPNetworks.Clear();
+    options.KnownProxies.Clear();
+});
 
 // Add services to the container
 builder.Services.AddControllers();
@@ -76,8 +84,6 @@ builder.Services.AddRateLimiter(options =>
                 QueueLimit = 2
             }));
 });
-// Dapper configuration
-DefaultTypeMap.MatchNamesWithUnderscores = true;
 
 // Repositories and Services
 builder.Services.AddScoped<IUserRepository, UserRepository>();
@@ -187,6 +193,8 @@ if (!migrationSucceeded)
     throw new InvalidOperationException("Failed to apply UserService database migrations after maximum retry attempts.");
 }
 
+// middleware
+app.UseForwardedHeaders();
 // Exception Handling at the very top of the HTTP pipeline
 app.UseExceptionHandler();
 
