@@ -39,6 +39,52 @@ const useAnimatedNumber = (value: number, duration: number = 800) => {
 export const WalletBalance: React.FC = () => {
   const { balance, isLoading } = useWallet();
   const animatedBalance = useAnimatedNumber(balance);
+  const [rewardDelta, setRewardDelta] = useState<number | null>(null);
+  const [isHighlighted, setIsHighlighted] = useState(false);
+  const prevBalanceRef = useRef<number | null>(null);
+  const isHydratedRef = useRef(false);
+  const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (isLoading) {
+      return;
+    }
+
+    // First time balance is loaded from the context -> record baseline hydration without showing reward badge
+    if (!isHydratedRef.current) {
+      isHydratedRef.current = true;
+      prevBalanceRef.current = balance;
+      return;
+    }
+
+    if (prevBalanceRef.current !== null) {
+      const diff = balance - prevBalanceRef.current;
+      if (diff > 0) {
+        // Balance increased (e.g. watch reward tick) -> show transient floating badge
+        setRewardDelta(diff);
+        setIsHighlighted(true);
+
+        if (dismissTimerRef.current) {
+          clearTimeout(dismissTimerRef.current);
+        }
+
+        dismissTimerRef.current = setTimeout(() => {
+          setRewardDelta(null);
+          setIsHighlighted(false);
+        }, 1200);
+      }
+    }
+
+    prevBalanceRef.current = balance;
+  }, [balance, isLoading]);
+
+  useEffect(() => {
+    return () => {
+      if (dismissTimerRef.current) {
+        clearTimeout(dismissTimerRef.current);
+      }
+    };
+  }, []);
 
   if (isLoading) {
     return (
@@ -50,12 +96,27 @@ export const WalletBalance: React.FC = () => {
   }
 
   return (
-    <div 
-      className="flex items-center gap-1.5 px-3 py-1 bg-[var(--panel)] border border-[var(--prime)]/50 rounded-full text-[var(--prime)] text-sm font-bold transition-all"
-      title="Current Coin Balance"
-    >
-      <Coins size={14} />
-      <span>{animatedBalance.toLocaleString()}</span>
+    <div className="relative inline-flex items-center">
+      <div
+        className={`flex items-center gap-1.5 px-3 py-1 bg-[var(--panel)] border rounded-full text-[var(--prime)] text-sm font-bold transition-all duration-300 ${
+          isHighlighted
+            ? 'border-[var(--prime)] ring-2 ring-[var(--prime)]/50 shadow-[0_0_12px_rgba(0,184,252,0.4)] scale-105'
+            : 'border-[var(--prime)]/50'
+        }`}
+        title="Current Coin Balance"
+      >
+        <Coins size={14} />
+        <span>{animatedBalance.toLocaleString()}</span>
+      </div>
+
+      {rewardDelta !== null && (
+        <div
+          data-testid="wallet-reward-badge"
+          className="absolute -top-7 right-0 pointer-events-none px-2 py-0.5 rounded-full bg-[var(--panel)] border border-[var(--prime)]/80 text-[var(--prime)] text-xs font-bold shadow-[0_0_10px_rgba(0,184,252,0.4)] whitespace-nowrap animate-coin-float z-20"
+        >
+          +{rewardDelta} Coins
+        </div>
+      )}
     </div>
   );
 };

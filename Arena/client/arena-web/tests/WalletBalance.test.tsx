@@ -23,6 +23,8 @@ describe('WalletBalance', () => {
       isLoading: true,
       error: null,
       setBalance: jest.fn(),
+      updateBalance: jest.fn(),
+      optimisticSpend: jest.fn(),
     });
 
     render(<WalletBalance />);
@@ -37,6 +39,8 @@ describe('WalletBalance', () => {
       isLoading: false,
       error: null,
       setBalance: jest.fn(),
+      updateBalance: jest.fn(),
+      optimisticSpend: jest.fn(),
     });
 
     render(<WalletBalance />);
@@ -52,6 +56,8 @@ describe('WalletBalance', () => {
       isLoading: false,
       error: null,
       setBalance: jest.fn(),
+      updateBalance: jest.fn(),
+      optimisticSpend: jest.fn(),
     });
 
     const { rerender } = render(<WalletBalance />);
@@ -63,6 +69,8 @@ describe('WalletBalance', () => {
       isLoading: false,
       error: null,
       setBalance: jest.fn(),
+      updateBalance: jest.fn(),
+      optimisticSpend: jest.fn(),
     });
 
     rerender(<WalletBalance />);
@@ -90,13 +98,15 @@ describe('WalletBalance', () => {
     expect(screen.getByText('500')).toBeInTheDocument();
   });
 
-  it('handles balance decreases correctly', () => {
+  it('handles balance decreases correctly without showing +coins', () => {
     // Initial balance
     mockUseWallet.mockReturnValue({
       balance: 500,
       isLoading: false,
       error: null,
       setBalance: jest.fn(),
+      updateBalance: jest.fn(),
+      optimisticSpend: jest.fn(),
     });
 
     const { rerender } = render(<WalletBalance />);
@@ -108,6 +118,8 @@ describe('WalletBalance', () => {
       isLoading: false,
       error: null,
       setBalance: jest.fn(),
+      updateBalance: jest.fn(),
+      optimisticSpend: jest.fn(),
     });
 
     rerender(<WalletBalance />);
@@ -118,5 +130,82 @@ describe('WalletBalance', () => {
     });
 
     expect(screen.getByText('100')).toBeInTheDocument();
+    expect(screen.queryByTestId('wallet-reward-badge')).not.toBeInTheDocument();
+    expect(screen.queryByText(/\+.*Coins/i)).not.toBeInTheDocument();
+  });
+
+  it('initial hydration does not show +coins reward badge', () => {
+    // First render during loading
+    mockUseWallet.mockReturnValue({
+      balance: 0,
+      isLoading: true,
+      error: null,
+      setBalance: jest.fn(),
+      updateBalance: jest.fn(),
+      optimisticSpend: jest.fn(),
+    });
+
+    const { rerender } = render(<WalletBalance />);
+
+    // Hydration completes with loaded balance
+    mockUseWallet.mockReturnValue({
+      balance: 100,
+      isLoading: false,
+      error: null,
+      setBalance: jest.fn(),
+      updateBalance: jest.fn(),
+      optimisticSpend: jest.fn(),
+    });
+
+    rerender(<WalletBalance />);
+
+    // Advance animation timers
+    act(() => {
+      jest.advanceTimersByTime(800);
+    });
+
+    expect(screen.getByText('100')).toBeInTheDocument();
+    // Must NOT display a transient +100 Coins badge
+    expect(screen.queryByTestId('wallet-reward-badge')).not.toBeInTheDocument();
+    expect(screen.queryByText('+100 Coins')).not.toBeInTheDocument();
+  });
+
+  it('shows +X Coins floating badge on watch reward increase and auto-dismisses', () => {
+    mockUseWallet.mockReturnValue({
+      balance: 100,
+      isLoading: false,
+      error: null,
+      setBalance: jest.fn(),
+      updateBalance: jest.fn(),
+      optimisticSpend: jest.fn(),
+    });
+
+    const { rerender } = render(<WalletBalance />);
+    expect(screen.getByText('100')).toBeInTheDocument();
+    expect(screen.queryByTestId('wallet-reward-badge')).not.toBeInTheDocument();
+
+    // Trigger reward increase (+10 Coins)
+    mockUseWallet.mockReturnValue({
+      balance: 110,
+      isLoading: false,
+      error: null,
+      setBalance: jest.fn(),
+      updateBalance: jest.fn(),
+      optimisticSpend: jest.fn(),
+    });
+
+    rerender(<WalletBalance />);
+
+    // Floating badge must be rendered with +10 Coins
+    expect(screen.getByTestId('wallet-reward-badge')).toBeInTheDocument();
+    expect(screen.getByText('+10 Coins')).toBeInTheDocument();
+
+    // Auto-dismiss after 1200ms
+    act(() => {
+      jest.advanceTimersByTime(1200);
+    });
+
+    expect(screen.queryByTestId('wallet-reward-badge')).not.toBeInTheDocument();
+    expect(screen.queryByText('+10 Coins')).not.toBeInTheDocument();
   });
 });

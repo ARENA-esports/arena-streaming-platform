@@ -95,7 +95,8 @@ export interface LinkStreamRequest {
 }
 
 export interface StreamResponse {
-  id: number;
+  id?: number;
+  streamId?: number;
   matchId: number;
   channelName: string;
   status: 'Scheduled' | 'Live' | 'Ended';

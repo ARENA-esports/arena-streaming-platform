@@ -6,6 +6,7 @@ import { useTwitchPlayback } from '../hooks/useTwitchPlayback';
 import { useWatchHeartbeat } from '../hooks/useWatchHeartbeat';
 import { StreamContainer } from '../components/player/StreamContainer';
 import Badge from '../components/common/Badge';
+import WatchRewardStatus from '../components/match/WatchRewardStatus';
 import Button from '../components/common/Button';
 import { useAuth } from '../context/AuthContext';
 import { useWallet } from '../context/WalletContext';
@@ -26,30 +27,53 @@ export const MatchRoomView: React.FC = () => {
   const { updateBalance } = useWallet();
   const { notify } = useNotification();
   const hasNotifiedCapRef = useRef(false);
+  const [isCapped, setIsCapped] = useState(false);
+  const [isStreamNotLive, setIsStreamNotLive] = useState(false);
+  const [isDocumentVisible, setIsDocumentVisible] = useState(() =>
+    typeof document !== 'undefined' ? document.visibilityState === 'visible' : true
+  );
 
   const { status, match, stream, error } = useMatchStatus(matchId);
   const { isPlaying, onPlay, onPause, resetPlayback } = useTwitchPlayback();
 
-  // Reset playback state if the match status leaves 'Live' or match changes
+  // Listen to browser tab visibility changes
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      setIsDocumentVisible(typeof document !== 'undefined' ? document.visibilityState === 'visible' : true);
+    };
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      return () => {
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+      };
+    }
+  }, []);
+
+  // Reset playback and reward states if the match status leaves 'Live' or match changes
   useEffect(() => {
     if (status !== 'Live') {
       resetPlayback();
+      setIsCapped(false);
+      setIsStreamNotLive(false);
     }
   }, [status, matchId, resetPlayback]);
 
   // Heartbeat is active ONLY for authenticated viewers watching an active Live match with a valid stream
   const isViewer = Boolean(user && user.role === 'Viewer');
   const isLiveMatch = status === 'Live' && Boolean(match);
-  const hasValidStream = typeof stream?.id === 'number' && stream.id > 0;
+  const streamId = stream?.streamId ?? stream?.id;
+  const hasValidStream = typeof streamId === 'number' && streamId > 0;
   const isHeartbeatEligible = isViewer && isLiveMatch && hasValidStream && isPlaying;
 
   useWatchHeartbeat({
-    streamId: stream?.id,
+    streamId,
     isPlaying: isHeartbeatEligible,
     onSuccess: (response) => {
       if (response.success && response.currentBalance !== undefined) {
         updateBalance(response.currentBalance);
         hasNotifiedCapRef.current = false;
+        setIsCapped(false);
+        setIsStreamNotLive(false);
       }
     },
     onError: (err: unknown) => {
@@ -68,6 +92,7 @@ export const MatchRoomView: React.FC = () => {
           // SCRUM-115: Coin cap reached -> debounced informational notification
           const isCapMessage = typeof message === 'string' && message.toLowerCase().includes('cap');
           if (isCapMessage || (remainingSeconds === undefined && retryAfter === undefined)) {
+            setIsCapped(true);
             if (!hasNotifiedCapRef.current) {
               hasNotifiedCapRef.current = true;
               notify(message || 'Coin cap reached for this stream window.', 'info');
@@ -77,6 +102,7 @@ export const MatchRoomView: React.FC = () => {
         } else if (status === 400) {
           // SCRUM-118: Stream not live rejection -> informational notification
           if (message === 'Stream is not currently live.') {
+            setIsStreamNotLive(true);
             notify(message, 'info');
             return;
           }
@@ -135,6 +161,15 @@ export const MatchRoomView: React.FC = () => {
           </h1>
           <div className="flex items-center space-x-4">
             <Badge status={match.status} />
+            <WatchRewardStatus
+              isViewer={isViewer}
+              isLiveMatch={isLiveMatch}
+              hasValidStream={hasValidStream}
+              isPlaying={isPlaying}
+              isDocumentVisible={isDocumentVisible}
+              isCapped={isCapped}
+              isStreamNotLive={isStreamNotLive}
+            />
             <span className="text-sm text-arena-textMuted font-mono">
               Scheduled: {new Date(match.scheduledTime).toLocaleString()}
             </span>

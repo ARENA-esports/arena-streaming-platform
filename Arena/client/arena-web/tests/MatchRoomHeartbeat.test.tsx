@@ -792,4 +792,131 @@ describe('MatchRoomView — Watch Heartbeat Integration', () => {
     expect(mockNotify).not.toHaveBeenCalled();
     expect(mockUpdateBalance).not.toHaveBeenCalled();
   });
+
+  // ── WatchRewardStatus UI Integration ──────────────────────────────────────────
+
+  it('renders WatchRewardStatus and transitions states: paused -> earning -> capped', async () => {
+    setupLiveViewer();
+    const mockUpdateBalance = jest.fn();
+    mockUseWallet.mockReturnValue({
+      balance: 100,
+      isLoading: false,
+      error: null,
+      setBalance: jest.fn(),
+      updateBalance: mockUpdateBalance,
+    });
+
+    const { getByTestId, getByText } = renderMatchRoom('101');
+
+    // Before playback: Rewards Paused
+    expect(getByText('Rewards Paused')).toBeInTheDocument();
+
+    // Start playback: Earning Coins
+    act(() => {
+      fireEvent.click(getByTestId('stream-play-btn'));
+    });
+    expect(getByText('Earning Coins')).toBeInTheDocument();
+
+    // Next tick fails with SCRUM-115 cap rejection
+    mockRecordWatchTick.mockRejectedValue(
+      createAxiosError(429, {
+        success: false,
+        coinsAwarded: 0,
+        currentBalance: 100,
+        message: 'Coin cap reached for this stream window.',
+      })
+    );
+
+    await act(async () => {
+      jest.advanceTimersByTime(60000);
+    });
+
+    expect(getByText('Reward Cap Reached')).toBeInTheDocument();
+  });
+
+  it('transitions WatchRewardStatus to inactive when SCRUM-118 reports stream is not live', async () => {
+    setupLiveViewer();
+    mockRecordWatchTick.mockRejectedValue(
+      createAxiosError(400, {
+        success: false,
+        coinsAwarded: 0,
+        currentBalance: 100,
+        message: 'Stream is not currently live.',
+      })
+    );
+
+    const { getByTestId, getByText } = renderMatchRoom('101');
+    act(() => {
+      fireEvent.click(getByTestId('stream-play-btn'));
+    });
+
+    await act(async () => {
+      jest.advanceTimersByTime(60000);
+    });
+
+    expect(getByText('Rewards Inactive')).toBeInTheDocument();
+  });
+
+  it('supports backend stream response using streamId property', async () => {
+    mockUseAuth.mockReturnValue({
+      user: {
+        userId: 1,
+        username: 'ViewerUser',
+        email: 'viewer@test.com',
+        role: 'Viewer',
+      },
+      token: 'jwt-token',
+      isLoading: false,
+      login: jest.fn(),
+      logout: jest.fn(),
+      refreshProfile: jest.fn(),
+    });
+
+    mockUseMatchStatus.mockReturnValue({
+      status: 'Live',
+      match: {
+        matchId: 101,
+        teamAId: 1,
+        teamBId: 2,
+        scheduledTime: '2026-09-25T12:00:00Z',
+        status: 'Live',
+      },
+      stream: {
+        streamId: 555,
+        matchId: 101,
+        channelName: 'Arena_streams',
+        status: 'Live',
+        twitchUrl: 'https://twitch.tv/Arena_streams',
+      },
+      error: null,
+    });
+
+    const mockUpdateBalance = jest.fn();
+    mockUseWallet.mockReturnValue({
+      balance: 100,
+      isLoading: false,
+      error: null,
+      setBalance: jest.fn(),
+      updateBalance: mockUpdateBalance,
+    });
+
+    const { getByTestId, getByText } = renderMatchRoom('101');
+
+    // Initially paused
+    expect(getByText('Rewards Paused')).toBeInTheDocument();
+
+    // Play -> transitions to Earning Coins
+    act(() => {
+      fireEvent.click(getByTestId('stream-play-btn'));
+    });
+    expect(getByText('Earning Coins')).toBeInTheDocument();
+
+    // 60s passes -> dispatches tick with streamId: 555
+    await act(async () => {
+      jest.advanceTimersByTime(60000);
+    });
+
+    expect(mockRecordWatchTick).toHaveBeenCalledWith({ streamId: 555 });
+    expect(mockUpdateBalance).toHaveBeenCalledWith(200);
+  });
 });
