@@ -92,8 +92,8 @@ export const TeamSelector: React.FC<TeamSelectorProps> = ({
         </span>
       </div>
 
-      {/* Team cards - Full-width vertical stack so both teams are always clearly visible */}
-      <div className="flex flex-col gap-2 p-3">
+      {/* Team cards - Side by side layout */}
+      <div className="grid grid-cols-2 gap-2.5 p-2.5 sm:p-3">
         {[teamA, teamB].map((team) => {
           const isSelected = activeSelectedId === team.teamId;
           const hasImageError = imageErrors[team.teamId];
@@ -107,7 +107,7 @@ export const TeamSelector: React.FC<TeamSelectorProps> = ({
               type="button"
               onClick={() => handleSelect(team.teamId)}
               className={`
-                w-full flex items-center gap-3 p-3 rounded-xl border-2 transition-all duration-200 cursor-pointer text-left
+                flex items-center gap-2.5 p-2.5 rounded-xl border-2 transition-all duration-200 cursor-pointer text-left min-w-0
                 ${
                   isSelected
                     ? 'shadow-md'
@@ -118,16 +118,17 @@ export const TeamSelector: React.FC<TeamSelectorProps> = ({
                 isSelected
                   ? {
                       borderColor: teamColor,
-                      backgroundColor: `${teamColor}12`,
+                      backgroundColor: `${teamColor}15`,
                       boxShadow: `0 0 16px -4px ${teamColor}40`,
                     }
                   : undefined
               }
               id={`team-select-${team.teamId}`}
+              title={team.name}
             >
               {/* Team emblem / logo */}
               <div
-                className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden shadow-sm font-black text-sm text-white"
+                className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden shadow-sm font-black text-sm text-white"
                 style={{ backgroundColor: teamColor }}
               >
                 {logoSrc ? (
@@ -144,29 +145,30 @@ export const TeamSelector: React.FC<TeamSelectorProps> = ({
 
               {/* Team info */}
               <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between gap-1">
-                  <p
-                    className="text-sm font-bold truncate tracking-wide"
-                    style={{ color: isSelected ? teamColor : undefined }}
-                  >
-                    {team.name}
-                  </p>
-                  {isSelected && (
+                <p
+                  className="text-xs sm:text-sm font-bold truncate tracking-wide"
+                  style={{ color: isSelected ? teamColor : undefined }}
+                >
+                  {team.name}
+                </p>
+                <div className="mt-0.5 flex items-center">
+                  {isSelected ? (
                     <span
-                      className="flex items-center gap-1 text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded shrink-0"
+                      className="inline-flex items-center gap-1 text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded"
                       style={{
                         color: teamColor,
-                        backgroundColor: `${teamColor}20`,
+                        backgroundColor: `${teamColor}25`,
                       }}
                     >
-                      <Check size={10} strokeWidth={3} />
+                      <Check size={9} strokeWidth={3} />
                       Active
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-arena-textMuted truncate">
+                      Select
                     </span>
                   )}
                 </div>
-                <p className="text-[11px] text-arena-textMuted mt-0.5">
-                  {isSelected ? 'You are representing this faction' : 'Click to support in chat'}
-                </p>
               </div>
             </button>
           );
