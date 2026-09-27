@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import { useMatchStatus } from '../hooks/useMatchStatus';
 import { useTwitchPlayback } from '../hooks/useTwitchPlayback';
 import { useWatchHeartbeat } from '../hooks/useWatchHeartbeat';
@@ -8,6 +9,7 @@ import Badge from '../components/common/Badge';
 import Button from '../components/common/Button';
 import { useAuth } from '../context/AuthContext';
 import { useWallet } from '../context/WalletContext';
+import { useNotification } from '../context/NotificationContext';
 import EditMatchModal from '../components/match/EditMatchModal';
 import DeleteMatchModal from '../components/match/DeleteMatchModal';
 import BattleBar from '../components/match/BattleBar';
@@ -22,6 +24,8 @@ export const MatchRoomView: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { updateBalance } = useWallet();
+  const { notify } = useNotification();
+  const hasNotifiedCapRef = useRef(false);
 
   const { status, match, stream, error } = useMatchStatus(matchId);
   const { isPlaying, onPlay, onPause, resetPlayback } = useTwitchPlayback();
@@ -45,6 +49,42 @@ export const MatchRoomView: React.FC = () => {
     onSuccess: (response) => {
       if (response.success && response.currentBalance !== undefined) {
         updateBalance(response.currentBalance);
+        hasNotifiedCapRef.current = false;
+      }
+    },
+    onError: (err: unknown) => {
+      if (axios.isAxiosError(err) && err.response) {
+        const { status, data, headers } = err.response;
+        const retryAfter = headers?.['retry-after'] ?? headers?.['Retry-After'];
+        const remainingSeconds = data?.remainingSeconds;
+        const message = data?.message;
+
+        if (status === 429) {
+          // SCRUM-114: Minimum interval anti-farm rejection -> silent
+          if (retryAfter !== undefined || (typeof remainingSeconds === 'number' && remainingSeconds > 0)) {
+            return;
+          }
+
+          // SCRUM-115: Coin cap reached -> debounced informational notification
+          const isCapMessage = typeof message === 'string' && message.toLowerCase().includes('cap');
+          if (isCapMessage || (remainingSeconds === undefined && retryAfter === undefined)) {
+            if (!hasNotifiedCapRef.current) {
+              hasNotifiedCapRef.current = true;
+              notify(message || 'Coin cap reached for this stream window.', 'info');
+            }
+            return;
+          }
+        } else if (status === 400) {
+          // SCRUM-118: Stream not live rejection -> informational notification
+          if (message === 'Stream is not currently live.') {
+            notify(message, 'info');
+            return;
+          }
+
+          // Other 400 errors (e.g. invalid stream ID)
+          console.warn('Watch tick rejected:', message);
+          return;
+        }
       }
     }
   });
