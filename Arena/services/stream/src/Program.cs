@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.HttpOverrides;
 using System.Security.Claims;   // provide standard claim types as ClaimTypes.Role
 using System.Text;      // provides character encoding tool to convert strings into byte rates
 using Microsoft.AspNetCore.Authentication.JwtBearer;    // provide authentication scheme constants, JWT options
@@ -18,6 +19,14 @@ if (!string.IsNullOrEmpty(appInsightsConnString))
 {
     builder.Services.AddApplicationInsightsTelemetry();
 }
+
+// configure services before builder.Build();
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownIPNetworks.Clear();
+    options.KnownProxies.Clear();
+});
 
 // Add services to the container.
 
@@ -195,7 +204,8 @@ if (!migrationSucceeded)
     throw new InvalidOperationException("Failed to apply StreamService database migrations after maximum retry attempts.");
 }
 
-
+// middlewares
+app.UseForwardedHeaders();
 // Exception Handling at the very top of the HTTP pipeline
 app.UseExceptionHandler();
 // Global Security Headers middleware
