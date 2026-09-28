@@ -142,6 +142,9 @@ builder.Services.AddScoped<ITeamRepository, TeamRepository>();
 // Register file storage services
 builder.Services.AddScoped<IFileStorageService, LocalFileStorageService>();
 
+// Register Kafka producer
+builder.Services.AddSingleton<IKafkaProducerService, KafkaProducerService>();
+
 var app = builder.Build();
 
 // Run DbUp database migrations if database connection string is present

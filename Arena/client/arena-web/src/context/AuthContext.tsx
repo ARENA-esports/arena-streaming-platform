@@ -22,10 +22,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const profile = await authService.getMe();
       setUser(profile);
-    } catch (error) {
-      setUser(null);
-      setToken(null);
-      localStorage.removeItem('arena_access_token');
+    } catch (error: any) {
+      if (error?.response?.status === 401) {
+        setUser(null);
+        setToken(null);
+        localStorage.removeItem('arena_access_token');
+      }
     } finally {
       setIsLoading(false);
     }

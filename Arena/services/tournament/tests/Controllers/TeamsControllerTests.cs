@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Moq;
 using TournamentService.Controllers;
@@ -17,6 +18,7 @@ public class TeamsControllerTests
 {
     private readonly Mock<ITeamRepository> _mockRepository;
     private readonly Mock<IFileStorageService> _mockFileStorageService;
+    private readonly Mock<IKafkaProducerService> _mockKafkaProducer;
     private readonly Mock<ILogger<TeamsController>> _mockLogger;
     private readonly TeamsController _controller;
 
@@ -24,7 +26,10 @@ public class TeamsControllerTests
     {
         _mockRepository = new Mock<ITeamRepository>();
         _mockFileStorageService = new Mock<IFileStorageService>();
+        _mockKafkaProducer = new Mock<IKafkaProducerService>();
         _mockLogger = new Mock<ILogger<TeamsController>>();
+
+        var mockConfiguration = new Mock<IConfiguration>();
         _controller = new TeamsController(
             _mockRepository.Object,
             _mockFileStorageService.Object,

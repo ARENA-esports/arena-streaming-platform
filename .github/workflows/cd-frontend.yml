@@ -6,43 +6,52 @@ on:
     paths:
       - 'Arena/client/arena-web/**'
 
+concurrency:
+  group: deploy-arena-frontend
+  cancel-in-progress: false
+
 jobs:
   deploy-frontend:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: Arena/client/arena-web
-
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
 
-      - uses: actions/setup-node@v4
+      - name: Lowercase owner
+        id: lower
+        run: echo "owner=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
         with:
-          node-version: "20"
-          cache: "npm"
-          cache-dependency-path: Arena/client/arena-web/package-lock.json
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build
-        run: npm run build
-        env:
-          # API URLs — set these as GitHub Actions Variables (vars.*) in the repository settings
-          VITE_USER_API_URL: ${{ vars.VITE_USER_API_URL }}
-          VITE_STREAM_API_URL: ${{ vars.VITE_STREAM_API_URL }}
-          VITE_TOURNAMENT_API_URL: ${{ vars.VITE_TOURNAMENT_API_URL }}
-          # Twitch embed parent domain (e.g. your Azure Static Web App domain)
-          VITE_APP_DOMAIN: ${{ vars.VITE_APP_DOMAIN }}
-          # Optional: override channel for testing in CI
-          VITE_TWITCH_TEST_CHANNEL: ${{ vars.VITE_TWITCH_TEST_CHANNEL }}
-
-      - name: Deploy to Azure Static Web Apps
-        uses: Azure/static-web-apps-deploy@v1
+      - name: Build and push image
+        uses: docker/build-push-action@v6
         with:
-          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          action: "upload"
-          app_location: "Arena/client/arena-web"
-          output_location: "dist"
-          skip_app_build: true
+          context: ./Arena/client/arena-web
+          file: ./Arena/client/arena-web/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ steps.lower.outputs.owner }}/arena-frontend:latest
+            ghcr.io/${{ steps.lower.outputs.owner }}/arena-frontend:${{ github.sha }}
+          build-args: |
+            VITE_USER_API_URL=${{ vars.VITE_USER_API_URL }}
+            VITE_STREAM_API_URL=${{ vars.VITE_STREAM_API_URL }}
+            VITE_TOURNAMENT_API_URL=${{ vars.VITE_TOURNAMENT_API_URL }}
+            VITE_CHAT_API_URL=${{ vars.VITE_CHAT_API_URL }}
+            VITE_APP_DOMAIN=${{ vars.VITE_APP_DOMAIN }}
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,mode=max,scope=frontend
+
+      - name: Deploy to Azure App Service
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: arena-frontend
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE_FRONTEND }}
+          images: ghcr.io/${{ steps.lower.outputs.owner }}/arena-frontend:${{ github.sha }}
