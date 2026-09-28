@@ -4,3 +4,4 @@
 -- The arena_user_db database is provisioned by the mysql-user container via MYSQL_DATABASE env var.
 CREATE DATABASE IF NOT EXISTS arena_stream_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 CREATE DATABASE IF NOT EXISTS arena_tournament_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE IF NOT EXISTS arena_chat_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;

@@ -3,34 +3,48 @@ name: CI Frontend
 on:
   push:
     branches: [dev]
-    paths:
-      - 'Arena/client/arena-web/**'
   pull_request:
     branches: [main, dev]
-    paths:
-      - 'Arena/client/arena-web/**'
+
+concurrency:
+  group: ci-frontend-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      frontend: ${{ steps.filter.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            frontend:
+              - 'Arena/client/arena-web/**'
+
   build-frontend:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: Arena/client/arena-web
-
+      
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: "npm"
           cache-dependency-path: Arena/client/arena-web/package-lock.json
-
+      
       - name: Install dependencies
         run: npm ci
-
+      
       - name: Lint
         run: npm run lint
-
+      
       - name: Build
         run: npm run build

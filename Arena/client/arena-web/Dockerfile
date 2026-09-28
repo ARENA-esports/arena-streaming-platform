@@ -1,23 +1,27 @@
 # ==========================================
 # Stage 1: Build the React Application
 # ==========================================
-FROM node:20-alpine AS build
+FROM node:22-alpine AS build
 
 WORKDIR /app
 
 COPY package*.json ./
 
-RUN npm install
+RUN npm ci
 
 COPY . .
 
 ARG VITE_USER_API_URL
 ARG VITE_TOURNAMENT_API_URL
 ARG VITE_STREAM_API_URL
+ARG VITE_CHAT_API_URL
+ARG VITE_APP_DOMAIN
 
 ENV VITE_USER_API_URL=$VITE_USER_API_URL
 ENV VITE_TOURNAMENT_API_URL=$VITE_TOURNAMENT_API_URL
 ENV VITE_STREAM_API_URL=$VITE_STREAM_API_URL
+ENV VITE_CHAT_API_URL=$VITE_CHAT_API_URL
+ENV VITE_APP_DOMAIN=$VITE_APP_DOMAIN
 
 RUN npm run build
 

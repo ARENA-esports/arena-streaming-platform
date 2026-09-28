@@ -103,6 +103,31 @@ services:
       mysql:
         condition: service_healthy
 
+  # ── chat Service ──────────────────────────────────────────────────────
+  chat:
+    build:
+      context: .
+      dockerfile: services/chat/Dockerfile
+    container_name: arena-chat
+    restart: on-failure
+    ports:
+      - "5170:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__ChatDb=Server=mysql;Port=3306;Database=arena_chat_db;Uid=root;Pwd=${MYSQL_ROOT_PASSWORD:-rootpassword};AllowedUserVariables=True;
+      - JwtSettings__Secret=${JWT_SECRET}
+      - JwtSettings__Issuer=Arena.UserService
+      - JwtSettings__Audience=Arena.Platform
+      - Kafka__BootstrapServers=kafka:9092
+      - Kafka__GroupId=chat-service-team-cache
+      - Kafka__Topic=team.events
+      - Cors__AllowedOrigins__0=http://localhost:5173
+    depends_on:
+      mysql:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+
   # ── Web (Nginx + React SPA) ─────────────────────────────────────────────────
   web:
     build:
@@ -118,8 +143,9 @@ services:
       - user
       - tournament
       - stream
-    # ── Kafka Event Broker ──────────────────────────────────────────────────────
-    # ── Kafka Event Broker ──────────────────────────────────────────────────────
+      - chat
+
+  # ── Kafka Event Broker ──────────────────────────────────────────────────────
   kafka:
     image: apache/kafka:3.7.0
     container_name: arena-kafka
