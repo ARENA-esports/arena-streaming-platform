@@ -22,6 +22,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\src\ChatService.csproj" />
+    <ProjectReference Include="../../../shared/EventContracts/src/EventContracts.csproj" />
   </ItemGroup>
 
 </Project>
