@@ -169,6 +169,6 @@ export const TeamSelector: React.FC<TeamSelectorProps> = ({
         })}
       </div>
     </div>
-);
-
+  );
+}
 export default TeamSelector;
