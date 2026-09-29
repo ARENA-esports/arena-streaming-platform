@@ -157,11 +157,11 @@ export function useFactionChat(
             }
             case 'message': {
               const key = currentStreamKeyRef.current;
-              mergeMessages([frame as ChatMessage], key);
+              mergeMessages([frame as unknown as ChatMessage], key);
               break;
             }
             case 'error': {
-              setError(frame.message);
+              setError(frame.message ?? 'An unknown error occurred.');
               setTimeout(() => {
                 if (mountedRef.current) setError(null);
               }, 5000);
