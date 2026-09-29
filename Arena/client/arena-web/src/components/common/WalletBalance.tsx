@@ -18,7 +18,7 @@ const useAnimatedNumber = (value: number, duration: number = 800) => {
     const animate = (timestamp: number) => {
       if (!startTime.current) startTime.current = timestamp;
       const progress = timestamp - startTime.current;
-      
+
       if (progress < duration) {
         const easeOutQuart = 1 - Math.pow(1 - progress / duration, 4);
         const nextValue = startValue.current + ((value - startValue.current) * easeOutQuart);
@@ -98,11 +98,10 @@ export const WalletBalance: React.FC = () => {
   return (
     <div className="relative inline-flex items-center">
       <div
-        className={`flex items-center gap-1.5 px-3 py-1 bg-[var(--panel)] border rounded-full text-[var(--prime)] text-sm font-bold transition-all duration-300 ${
-          isHighlighted
-            ? 'border-[var(--prime)] ring-2 ring-[var(--prime)]/50 shadow-[0_0_12px_rgba(0,184,252,0.4)] scale-105'
-            : 'border-[var(--prime)]/50'
-        }`}
+        className={`flex items-center gap-1.5 px-3 py-1 bg-[var(--panel)] rounded-full text-[var(--prime)] text-sm font-bold transition-all duration-300 ${isHighlighted
+            ? 'ring-2 ring-[var(--prime)]/50 shadow-[0_0_12px_rgba(0,184,252,0.4)] scale-105'
+            : ''
+          }`}
         title="Current Coin Balance"
       >
         <Coins size={14} />
