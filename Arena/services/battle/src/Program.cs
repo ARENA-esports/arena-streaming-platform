@@ -103,7 +103,7 @@ builder.Services.AddSwaggerGen(c =>
 
 // JWT Authentication per jwt-spec.md
 var jwtSecret = builder.Configuration["JwtSettings:Secret"]
-    ?? "Arena_Secret_Key_For_Jwt_Token_Signing_2026_SE3022_Production_Grade!";
+    ?? throw new InvalidOperationException("JwtSettings:Secret is not configured.");
 var jwtIssuer = builder.Configuration["JwtSettings:Issuer"]
     ?? "Arena.UserService";
 var jwtAudience = builder.Configuration["JwtSettings:Audience"]

@@ -23,7 +23,7 @@
 * **Local Development (`appsettings.Development.json`, not committed):**
   ```json
   "JwtSettings": {
-    "Secret": "Arena_Secret_Key_For_Jwt_Token_Signing_2026_SE3022_Production_Grade!",
+    "Secret": "<YOUR_DEVELOPMENT_JWT_SECRET_MIN_32_BYTES>",
     "Issuer": "Arena.UserService",
     "Audience": "Arena.Platform",
     "ExpiryMinutes": 120
