@@ -12,28 +12,7 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      '/ws/chat': {
-        target: 'http://127.0.0.1:5169', // Chat Service WebSocket
-        ws: true,
-        changeOrigin: true,
-      },
-      '/api/chat': {
-        target: 'http://127.0.0.1:5169', // Chat Service REST (moderation)
-        changeOrigin: true,
-      },
       '/api/Auth': {
-        target: 'http://127.0.0.1:5168', // User Service
-        changeOrigin: true,
-      },
-      '/api/auth': {
-        target: 'http://127.0.0.1:5168', // User Service
-        changeOrigin: true,
-      },
-      '/api/Users': {
-        target: 'http://127.0.0.1:5168', // User Service
-        changeOrigin: true,
-      },
-      '/api/users': {
         target: 'http://127.0.0.1:5168', // User Service
         changeOrigin: true,
       },
@@ -47,6 +26,14 @@ export default defineConfig({
       },
       '/uploads': {
         target: 'http://127.0.0.1:8082', // Tournament Service Static Uploads
+        changeOrigin: true,
+      },
+      '/api/economy': {
+        target: 'http://127.0.0.1:8083', // Battle Economy Service
+        changeOrigin: true,
+      },
+      '/api/wallet': {
+        target: 'http://127.0.0.1:8083', // Battle Economy Service (SCRUM-116)
         changeOrigin: true,
       },
       '/api': {

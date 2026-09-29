@@ -3,8 +3,8 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Threading.RateLimiting;
 using System.Text;
-using Dapper;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.AspNetCore.RateLimiting;
 using UserService.Repositories;
@@ -12,6 +12,14 @@ using UserService.Services;
 using DbUp;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Configure forwarded headers for proxy environments (Azure, reverse proxies)
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownIPNetworks.Clear();
+    options.KnownProxies.Clear();
+});
 
 // Add services to the container
 builder.Services.AddControllers();
@@ -68,8 +76,6 @@ builder.Services.AddRateLimiter(options =>
                 QueueLimit = 2
             }));
 });
-// Dapper configuration
-DefaultTypeMap.MatchNamesWithUnderscores = true;
 
 // Repositories and Services
 builder.Services.AddScoped<IUserRepository, UserRepository>();
@@ -173,6 +179,7 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
+app.UseForwardedHeaders();
 app.UseHttpsRedirection();
 //hard: Rate limiter pipeline placed prior to routing to drop abusive floods at the ingress boundary
 app.UseRateLimiter();

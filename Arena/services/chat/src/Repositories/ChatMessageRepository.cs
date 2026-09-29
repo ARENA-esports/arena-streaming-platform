@@ -1,5 +1,5 @@
 using System.Data;
-using Dapper;
+using Microsoft.Extensions.Configuration;
 using MySqlConnector;
 using ChatService.Entities;
 
@@ -17,33 +17,30 @@ public class ChatMessageRepository : IChatMessageRepository
         _configuration = configuration;
     }
 
-    private IDbConnection CreateConnection() => new MySqlConnection(ConnectionString);
-
-    /// <inheritdoc />
     public async Task<long> InsertAsync(ChatMessage message)
     {
-        using var connection = CreateConnection();
+        using var connection = new MySqlConnection(ConnectionString);
+        await connection.OpenAsync();
 
         const string sql = @"
             INSERT INTO chat_messages (team_id, user_id, username, content)
             VALUES (@TeamId, @UserId, @Username, @Content);
             SELECT LAST_INSERT_ID();";
 
-        var id = await connection.ExecuteScalarAsync<long>(sql, new
-        {
-            message.TeamId,
-            message.UserId,
-            message.Username,
-            message.Content
-        });
+        using var command = new MySqlCommand(sql, connection);
+        command.Parameters.AddWithValue("@TeamId", message.TeamId);
+        command.Parameters.AddWithValue("@UserId", message.UserId);
+        command.Parameters.AddWithValue("@Username", message.Username);
+        command.Parameters.AddWithValue("@Content", message.Content);
 
-        return id;
+        var id = await command.ExecuteScalarAsync();
+        return Convert.ToInt64(id);
     }
 
-    /// <inheritdoc />
     public async Task<IEnumerable<ChatMessage>> GetRecentByTeamAsync(int teamId, int limit = 50)
     {
-        using var connection = CreateConnection();
+        using var connection = new MySqlConnection(ConnectionString);
+        await connection.OpenAsync();
 
         const string sql = @"
             SELECT * FROM (
@@ -55,6 +52,24 @@ public class ChatMessageRepository : IChatMessageRepository
             ) AS recent
             ORDER BY created_at ASC;";
 
-        return await connection.QueryAsync<ChatMessage>(sql, new { TeamId = teamId, Limit = limit });
+        using var command = new MySqlCommand(sql, connection);
+        command.Parameters.AddWithValue("@TeamId", teamId);
+        command.Parameters.AddWithValue("@Limit", limit);
+
+        using var reader = await command.ExecuteReaderAsync();
+        var list = new List<ChatMessage>();
+        while (await reader.ReadAsync())
+        {
+            list.Add(new ChatMessage
+            {
+                MessageId = reader.GetInt64(reader.GetOrdinal("message_id")),
+                TeamId = reader.GetInt32(reader.GetOrdinal("team_id")),
+                UserId = reader.GetInt32(reader.GetOrdinal("user_id")),
+                Username = reader.GetString(reader.GetOrdinal("username")),
+                Content = reader.GetString(reader.GetOrdinal("content")),
+                CreatedAt = reader.GetDateTime(reader.GetOrdinal("created_at"))
+            });
+        }
+        return list;
     }
 }

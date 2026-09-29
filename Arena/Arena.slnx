@@ -1,5 +1,12 @@
 <Solution>
   <Folder Name="/services/" />
+  <Folder Name="/services/battle/" />
+  <Folder Name="/services/battle/src/">
+    <Project Path="services/battle/src/BattleEconomyService.csproj" />
+  </Folder>
+  <Folder Name="/services/battle/tests/">
+    <Project Path="services/battle/tests/BattleEconomyService.Tests.csproj" />
+  </Folder>
   <Folder Name="/services/stream/" />
   <Folder Name="/services/stream/src/">
     <Project Path="services/stream/src/StreamService.csproj" />
@@ -20,13 +27,6 @@
   </Folder>
   <Folder Name="/services/user/tests/">
     <Project Path="services/user/tests/UserService.Tests.csproj" />
-  </Folder>
-  <Folder Name="/services/chat/" />
-  <Folder Name="/services/chat/src/">
-    <Project Path="services/chat/src/ChatService.csproj" />
-  </Folder>
-  <Folder Name="/services/chat/tests/">
-    <Project Path="services/chat/tests/ChatService.Tests.csproj" />
   </Folder>
   <Folder Name="/shared/" />
   <Folder Name="/shared/eventContracts/" />

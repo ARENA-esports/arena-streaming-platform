@@ -85,8 +85,7 @@ if (!string.IsNullOrEmpty(rsaPublicKeyPem))
 
 if (signingKeys.Count == 0)
 {
-    const string fallbackSecret = "Arena_Secret_Key_For_Jwt_Token_Signing_2026_SE3022_Production_Grade!";
-    signingKeys.Add(new SymmetricSecurityKey(Encoding.UTF8.GetBytes(fallbackSecret)));
+    throw new InvalidOperationException("JwtSettings:Secret is not configured.");
 }
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -125,9 +124,6 @@ builder.Services.AddScoped<ITeamRepository, TeamRepository>();
 
 // Register file storage services
 builder.Services.AddScoped<IFileStorageService, LocalFileStorageService>();
-
-// Register Kafka producer
-builder.Services.AddSingleton<IKafkaProducerService, KafkaProducerService>();
 
 var app = builder.Build();
 

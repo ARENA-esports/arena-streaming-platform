@@ -1,13 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { Shield, Check } from 'lucide-react';
-import { teamService, Team, formatLogoUrl } from '../../api/teamService';
-import { matchService } from '../../api/matchService';
+import React from 'react';
 
 interface TeamSelectorProps {
-  matchId: number | string;
-  selectedTeamId?: number | null;
-  onTeamSelect?: (teamId: number | null) => void;
-  onTeamsLoaded?: (teamA: Team, teamB: Team) => void;
+    matchId: number | string;
 }
 
 export const TeamSelector: React.FC<TeamSelectorProps> = ({
@@ -175,7 +169,6 @@ export const TeamSelector: React.FC<TeamSelectorProps> = ({
         })}
       </div>
     </div>
-  );
-};
+);
 
 export default TeamSelector;

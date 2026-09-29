@@ -1,5 +1,5 @@
 using System.Data;
-using Dapper;
+using Microsoft.Extensions.Configuration;
 using MySqlConnector;
 using ChatService.Entities;
 
@@ -17,46 +17,46 @@ public class ChatMuteRepository : IChatMuteRepository
         _configuration = configuration;
     }
 
-    private IDbConnection CreateConnection() => new MySqlConnection(ConnectionString);
-
-    /// <inheritdoc />
     public async Task<long> InsertAsync(ChatMute mute)
     {
-        using var connection = CreateConnection();
+        using var connection = new MySqlConnection(ConnectionString);
+        await connection.OpenAsync();
 
         const string sql = @"
             INSERT INTO chat_mutes (user_id, muted_by, reason, expires_at)
             VALUES (@UserId, @MutedBy, @Reason, @ExpiresAt);
             SELECT LAST_INSERT_ID();";
 
-        var id = await connection.ExecuteScalarAsync<long>(sql, new
-        {
-            mute.UserId,
-            mute.MutedBy,
-            mute.Reason,
-            mute.ExpiresAt
-        });
+        using var command = new MySqlCommand(sql, connection);
+        command.Parameters.AddWithValue("@UserId", mute.UserId);
+        command.Parameters.AddWithValue("@MutedBy", mute.MutedBy);
+        command.Parameters.AddWithValue("@Reason", mute.Reason);
+        command.Parameters.AddWithValue("@ExpiresAt", mute.ExpiresAt);
 
-        return id;
+        var id = await command.ExecuteScalarAsync();
+        return Convert.ToInt64(id);
     }
 
-    /// <inheritdoc />
     public async Task<bool> IsUserMutedAsync(int userId)
     {
-        using var connection = CreateConnection();
+        using var connection = new MySqlConnection(ConnectionString);
+        await connection.OpenAsync();
 
         const string sql = @"
             SELECT COUNT(1) FROM chat_mutes
             WHERE user_id = @UserId AND expires_at > UTC_TIMESTAMP()";
 
-        var count = await connection.ExecuteScalarAsync<int>(sql, new { UserId = userId });
-        return count > 0;
+        using var command = new MySqlCommand(sql, connection);
+        command.Parameters.AddWithValue("@UserId", userId);
+
+        var count = await command.ExecuteScalarAsync();
+        return Convert.ToInt32(count) > 0;
     }
 
-    /// <inheritdoc />
     public async Task<ChatMute?> GetActiveMuteAsync(int userId)
     {
-        using var connection = CreateConnection();
+        using var connection = new MySqlConnection(ConnectionString);
+        await connection.OpenAsync();
 
         const string sql = @"
             SELECT mute_id, user_id, muted_by, reason, muted_at, expires_at
@@ -65,6 +65,22 @@ public class ChatMuteRepository : IChatMuteRepository
             ORDER BY expires_at DESC
             LIMIT 1";
 
-        return await connection.QueryFirstOrDefaultAsync<ChatMute>(sql, new { UserId = userId });
+        using var command = new MySqlCommand(sql, connection);
+        command.Parameters.AddWithValue("@UserId", userId);
+
+        using var reader = await command.ExecuteReaderAsync();
+        if (await reader.ReadAsync())
+        {
+            return new ChatMute
+            {
+                MuteId = reader.GetInt64(reader.GetOrdinal("mute_id")),
+                UserId = reader.GetInt32(reader.GetOrdinal("user_id")),
+                MutedBy = reader.GetInt32(reader.GetOrdinal("muted_by")),
+                Reason = reader.GetString(reader.GetOrdinal("reason")),
+                MutedAt = reader.GetDateTime(reader.GetOrdinal("muted_at")),
+                ExpiresAt = reader.GetDateTime(reader.GetOrdinal("expires_at"))
+            };
+        }
+        return null;
     }
 }

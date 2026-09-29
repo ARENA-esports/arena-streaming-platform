@@ -1,6 +1,6 @@
 using System.Text.Json;
 using Confluent.Kafka;
-using EventContracts;
+using Arena.Shared.EventContracts;
 
 namespace TournamentService.Services;
 
@@ -10,7 +10,7 @@ namespace TournamentService.Services;
 /// </summary>
 public class KafkaProducerService : IKafkaProducerService, IDisposable
 {
-    private const string TopicName = "arena.teams.changed";
+    private const string TopicName = "team.events";
 
     private readonly IProducer<string, string> _producer;
     private readonly ILogger<KafkaProducerService> _logger;
@@ -60,6 +60,28 @@ public class KafkaProducerService : IKafkaProducerService, IDisposable
                 evt.TeamId, TopicName);
             // Fire-and-forget: log but don't rethrow — team creation/update should not fail
             // just because Kafka is temporarily unavailable
+        }
+    }
+
+    public async Task PublishAsync<T>(string topic, string key, T message) where T : class
+    {
+        var value = JsonSerializer.Serialize(message, JsonOptions);
+
+        try
+        {
+            var result = await _producer.ProduceAsync(topic, new Message<string, string>
+            {
+                Key = key,
+                Value = value
+            });
+
+            _logger.LogInformation(
+                "Published message to {Topic} [Partition={Partition}, Offset={Offset}]",
+                topic, result.Partition.Value, result.Offset.Value);
+        }
+        catch (ProduceException<string, string> ex)
+        {
+            _logger.LogError(ex, "Failed to publish message to {Topic}", topic);
         }
     }
 
