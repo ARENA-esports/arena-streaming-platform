@@ -1,4 +1,4 @@
-using EventContracts;
+using Arena.Shared.EventContracts;
 
 namespace TournamentService.Services;
 

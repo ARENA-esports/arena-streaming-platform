@@ -3,16 +3,14 @@ using Confluent.Kafka;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using BattleEconomyService.Configuration;
-
-// Alias to disambiguate from the internal BattleEconomyService.Services.CoinEarnedEvent
-using KafkaContract = Arena.Shared.EventContracts.CoinEarnedEvent;
+using Arena.Shared.EventContracts;
 
 namespace BattleEconomyService.Services;
 
 /// <summary>
 /// Kafka producer implementation of <see cref="ICoinEarnedEventPublisher"/>.
 /// Serialises the internal watch-tick award event to the shared
-/// <see cref="KafkaContract"/> Kafka payload shape and produces it to the
+/// <see cref="CoinEarnedEvent"/> Kafka payload shape and produces it to the
 /// configured <c>arena.coin-earned</c> topic (SCRUM-117).
 /// </summary>
 /// <remarks>
@@ -72,7 +70,7 @@ public sealed class KafkaCoinEarnedEventPublisher : ICoinEarnedEventPublisher, I
         // Map internal service event → shared Kafka contract.
         // StreamId → MatchId: no dedicated MatchId exists in the current model;
         // StreamId represents the stream/match context and is the correct mapping.
-        var contract = new KafkaContract(
+        var contract = new Arena.Shared.EventContracts.CoinEarnedEvent(
             UserId: evt.UserId,
             MatchId: evt.StreamId,
             Amount: evt.Amount,

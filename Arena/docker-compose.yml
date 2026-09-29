@@ -28,7 +28,7 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ConnectionStrings__UserDb=Server=mysql-user;Port=3306;Database=arena_user_db;Uid=arena;Pwd=arena_password;
-      - JwtSettings__Secret=${JWT_SECRET:-Arena_Secret_Key_For_Jwt_Token_Signing_2026_SE3022_Production_Grade!}
+      - JwtSettings__Secret=${JWT_SECRET}
       - JwtSettings__Issuer=Arena.UserService
       - JwtSettings__Audience=Arena.Platform
     depends_on:
@@ -45,7 +45,7 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ConnectionStrings__DefaultConnection=Server=mysql;Port=3306;Database=arena_stream_db;Uid=root;Pwd=rootpassword;AllowUserVariables=True;
-      - JwtSettings__Secret=${JWT_SECRET:-Arena_Secret_Key_For_Jwt_Token_Signing_2026_SE3022_Production_Grade!}
+      - JwtSettings__Secret=${JWT_SECRET}
       - JwtSettings__Issuer=Arena.UserService
       - JwtSettings__Audience=Arena.Platform
     depends_on:
@@ -97,7 +97,7 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ConnectionStrings__DefaultConnection=Server=mysql-tournament;Port=3306;Database=arena_tournament_db;Uid=root;Pwd=rootpassword;AllowUserVariables=True;
-      - JwtSettings__Secret=${JWT_SECRET:-Arena_Secret_Key_For_Jwt_Token_Signing_2026_SE3022_Production_Grade!}
+      - JwtSettings__Secret=${JWT_SECRET}
       - JwtSettings__Issuer=Arena.UserService
       - JwtSettings__Audience=Arena.Platform
     depends_on:
@@ -161,7 +161,7 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ConnectionStrings__DefaultConnection=Server=mysql-battle;Port=3306;Database=arena_battle_db;Uid=root;Pwd=rootpassword;AllowUserVariables=True;
-      - JwtSettings__Secret=${JWT_SECRET:-Arena_Secret_Key_For_Jwt_Token_Signing_2026_SE3022_Production_Grade!}
+      - JwtSettings__Secret=${JWT_SECRET}
       - JwtSettings__Issuer=Arena.UserService
       - JwtSettings__Audience=Arena.Platform
       # SCRUM-118: override StreamService BaseUrl for Docker Compose internal networking
@@ -176,6 +176,44 @@ services:
       kafka:
         condition: service_healthy
 
+  # ── Chat Service ────────────────────────────────────────────────────────────
+  chat:
+    build:
+      context: .
+      dockerfile: services/chat/Dockerfile
+    container_name: arena-chat
+    restart: on-failure
+    ports:
+      - "5170:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__ChatDb=Server=mysql;Port=3306;Database=arena_chat_db;Uid=root;Pwd=${MYSQL_ROOT_PASSWORD:-rootpassword};AllowUserVariables=True;
+      - JwtSettings__Secret=${JWT_SECRET}
+      - JwtSettings__Issuer=Arena.UserService
+      - JwtSettings__Audience=Arena.Platform
+      - Kafka__BootstrapServers=kafka:29092
+      - Kafka__GroupId=chat-service-team-cache
+      - Kafka__Topic=team.events
+      - Cors__AllowedOrigins__0=http://localhost:5173
+    depends_on:
+      mysql:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+
+  # ── One-Shot Topic Initializer ──────────────────────────────────────────────
+  kafka-init:
+    image: apache/kafka:3.9.0
+    container_name: arena-kafka-init
+    depends_on:
+      kafka:
+        condition: service_healthy
+    entrypoint: [ "/bin/sh", "-c" ]
+    command: >
+      "/opt/kafka/bin/kafka-topics.sh --create --if-not-exists --bootstrap-server kafka:29092 --partitions 3 --replication-factor 1 --topic stream.lifecycle &&
+       /opt/kafka/bin/kafka-topics.sh --create --if-not-exists --bootstrap-server kafka:29092 --partitions 3 --replication-factor 1 --topic team.events &&
+       /opt/kafka/bin/kafka-topics.sh --create --if-not-exists --bootstrap-server kafka:29092 --partitions 3 --replication-factor 1 --topic coin.earned"
+
   web:
     build:
       context: ./client/arena-web
@@ -188,6 +226,7 @@ services:
       - tournament
       - stream
       - battle
+      - chat
 
 volumes:
   mysql-user-data:

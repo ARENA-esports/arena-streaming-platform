@@ -2,7 +2,7 @@ using System.Text.Json;
 using Confluent.Kafka;
 using ChatService.Entities;
 using ChatService.Repositories;
-using EventContracts;
+using Arena.Shared.EventContracts;
 
 namespace ChatService.Consumers;
 
@@ -12,7 +12,7 @@ namespace ChatService.Consumers;
 /// </summary>
 public class TeamCacheConsumer : BackgroundService
 {
-    private const string TopicName = "arena.teams.changed";
+    private const string TopicName = "team.events";
 
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<TeamCacheConsumer> _logger;

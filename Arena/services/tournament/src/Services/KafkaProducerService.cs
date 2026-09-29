@@ -1,6 +1,6 @@
 using System.Text.Json;
 using Confluent.Kafka;
-using EventContracts;
+using Arena.Shared.EventContracts;
 
 namespace TournamentService.Services;
 
@@ -10,7 +10,7 @@ namespace TournamentService.Services;
 /// </summary>
 public class KafkaProducerService : IKafkaProducerService, IDisposable
 {
-    private const string TopicName = "arena.teams.changed";
+    private const string TopicName = "team.events";
 
     private readonly IProducer<string, string> _producer;
     private readonly ILogger<KafkaProducerService> _logger;

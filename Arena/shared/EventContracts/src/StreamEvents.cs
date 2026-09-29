@@ -1,4 +1,4 @@
-namespace EventContracts;
+namespace Arena.Shared.EventContracts;
 
 /// <summary>
 /// Event published when a stream transitions to Live status.
