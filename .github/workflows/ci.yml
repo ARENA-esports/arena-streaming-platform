@@ -5,6 +5,7 @@ on:
     branches: [dev]
   pull_request:
     branches: [main, dev]
+  workflow_dispatch:
 
 # FIX: Prefixed with "ci-" so this doesn't collide with cd-staging.yml
 # which also triggers on dev push. Without prefix, they cancel each other.
