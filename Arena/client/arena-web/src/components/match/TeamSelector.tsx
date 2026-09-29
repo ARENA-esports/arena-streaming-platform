@@ -1,7 +1,14 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { Check, Shield } from 'lucide-react';
+
+import { matchService } from '../../api/matchService';
+import { formatLogoUrl, teamService, Team } from '../../api/teamService';
 
 interface TeamSelectorProps {
-    matchId: number | string;
+  matchId: number | string;
+  selectedTeamId?: number | null;
+  onTeamSelect?: (teamId: number | null) => void;
+  onTeamsLoaded?: (teamA: Team, teamB: Team) => void;
 }
 
 export const TeamSelector: React.FC<TeamSelectorProps> = ({
@@ -20,14 +27,17 @@ export const TeamSelector: React.FC<TeamSelectorProps> = ({
 
   useEffect(() => {
     let isMounted = true;
+
     async function fetchTeams() {
       try {
         setLoading(true);
+
         const match = await matchService.getMatch(Number(matchId));
         const [a, b] = await Promise.all([
           teamService.getTeamById(match.teamAId),
           teamService.getTeamById(match.teamBId),
         ]);
+
         if (isMounted) {
           setTeamA(a);
           setTeamB(b);
@@ -39,7 +49,9 @@ export const TeamSelector: React.FC<TeamSelectorProps> = ({
         if (isMounted) setLoading(false);
       }
     }
+
     fetchTeams();
+
     return () => {
       isMounted = false;
     };
@@ -73,7 +85,6 @@ export const TeamSelector: React.FC<TeamSelectorProps> = ({
 
   return (
     <div className="w-full bg-arena-surface border border-arena-border rounded-[14px] overflow-hidden">
-      {/* Header */}
       <div className="flex items-center justify-between px-4 py-2.5 border-b border-arena-border bg-arena-surface/80">
         <div className="flex items-center gap-2">
           <Shield size={14} className="text-arena-cyan" />
@@ -86,7 +97,6 @@ export const TeamSelector: React.FC<TeamSelectorProps> = ({
         </span>
       </div>
 
-      {/* Team cards - Side by side layout */}
       <div className="grid grid-cols-2 gap-2.5 p-2.5 sm:p-3">
         {[teamA, teamB].map((team) => {
           const isSelected = activeSelectedId === team.teamId;
@@ -120,7 +130,6 @@ export const TeamSelector: React.FC<TeamSelectorProps> = ({
               id={`team-select-${team.teamId}`}
               title={team.name}
             >
-              {/* Team emblem / logo */}
               <div
                 className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden shadow-sm font-black text-sm text-white"
                 style={{ backgroundColor: teamColor }}
@@ -137,7 +146,6 @@ export const TeamSelector: React.FC<TeamSelectorProps> = ({
                 )}
               </div>
 
-              {/* Team info */}
               <div className="flex-1 min-w-0">
                 <p
                   className="text-xs sm:text-sm font-bold truncate tracking-wide"
@@ -170,5 +178,6 @@ export const TeamSelector: React.FC<TeamSelectorProps> = ({
       </div>
     </div>
   );
-}
+};
+
 export default TeamSelector;
