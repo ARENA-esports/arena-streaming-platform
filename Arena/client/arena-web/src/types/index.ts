@@ -155,3 +155,31 @@ export interface WatchTickResponse {
 export interface WalletBalanceResponse {
   balance: number;
 }
+
+// Chat Message and Frame types used by useFactionChat hook
+export interface ChatMessage {
+  messageId: number;
+  teamId: number;
+  teamName?: string;
+  teamColor?: string;
+  content?: string;
+  createdAt: string;
+  senderId?: string | number;
+  senderName?: string;
+  [key: string]: any;
+}
+
+export interface ChatFrame {
+  type: 'history' | 'message' | 'error';
+  messages?: ChatMessage[];
+  message?: string;
+  messageId?: number;
+  teamId?: number;
+  teamName?: string;
+  teamColor?: string;
+  content?: string;
+  createdAt?: string;
+  senderId?: string | number;
+  senderName?: string;
+  [key: string]: any;
+}

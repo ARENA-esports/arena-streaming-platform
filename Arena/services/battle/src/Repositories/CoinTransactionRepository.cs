@@ -1,5 +1,4 @@
 using System.Data;
-using Dapper;
 using Microsoft.Extensions.Configuration;
 using MySqlConnector;
 using BattleEconomyService.Models;
@@ -16,61 +15,69 @@ public class CoinTransactionRepository : ICoinTransactionRepository
             ?? throw new InvalidOperationException("DefaultConnection string is not configured.");
     }
 
-    private IDbConnection CreateConnection() => new MySqlConnection(_connectionString);
-
     public async Task<long> RecordTransactionAsync(int userId, int walletId, int amount, string type, int? streamId)
     {
-        using var connection = CreateConnection();
+        using var connection = new MySqlConnection(_connectionString);
+        await connection.OpenAsync();
         const string sql = @"
             INSERT INTO coin_transactions (user_id, wallet_id, amount, transaction_type, stream_id)
             VALUES (@UserId, @WalletId, @Amount, @Type, @StreamId);
             SELECT LAST_INSERT_ID();";
 
-        return await connection.ExecuteScalarAsync<long>(sql, new
-        {
-            UserId = userId,
-            WalletId = walletId,
-            Amount = amount,
-            Type = type,
-            StreamId = streamId
-        });
+        using var command = new MySqlCommand(sql, connection);
+        command.Parameters.AddWithValue("@UserId", userId);
+        command.Parameters.AddWithValue("@WalletId", walletId);
+        command.Parameters.AddWithValue("@Amount", amount);
+        command.Parameters.AddWithValue("@Type", type);
+        command.Parameters.AddWithValue("@StreamId", (object?)streamId ?? DBNull.Value);
+
+        var result = await command.ExecuteScalarAsync();
+        return Convert.ToInt64(result);
     }
 
     public async Task<IEnumerable<CoinTransaction>> GetRecentTransactionsAsync(int userId, int limit = 50)
     {
-        using var connection = CreateConnection();
+        using var connection = new MySqlConnection(_connectionString);
+        await connection.OpenAsync();
         const string sql = @"
-            SELECT * FROM coin_transactions
+            SELECT transaction_id, user_id, wallet_id, amount, transaction_type, stream_id, created_at
+            FROM coin_transactions
             WHERE user_id = @UserId
             ORDER BY created_at DESC
             LIMIT @Limit;";
 
-        return await connection.QueryAsync<CoinTransaction>(sql, new { UserId = userId, Limit = limit });
+        using var command = new MySqlCommand(sql, connection);
+        command.Parameters.AddWithValue("@UserId", userId);
+        command.Parameters.AddWithValue("@Limit", limit);
+
+        using var reader = await command.ExecuteReaderAsync();
+        var list = new List<CoinTransaction>();
+        while (await reader.ReadAsync())
+        {
+            list.Add(new CoinTransaction
+            {
+                TransactionId = reader.GetInt64(reader.GetOrdinal("transaction_id")),
+                UserId = reader.GetInt32(reader.GetOrdinal("user_id")),
+                WalletId = reader.GetInt32(reader.GetOrdinal("wallet_id")),
+                Amount = reader.GetInt32(reader.GetOrdinal("amount")),
+                TransactionType = reader.GetString(reader.GetOrdinal("transaction_type")),
+                StreamId = reader.IsDBNull(reader.GetOrdinal("stream_id")) ? null : reader.GetInt32(reader.GetOrdinal("stream_id")),
+                CreatedAt = reader.GetDateTime(reader.GetOrdinal("created_at"))
+            });
+        }
+        return list;
     }
 
-    /// <summary>
-    /// Returns the sum of WATCH_TICK coins earned by the specified user for the specified stream
-    /// within the rolling window [windowStart, now]. Uses the composite index
-    /// idx_transactions_user_stream_created(user_id, stream_id, created_at) for efficient range access.
-    /// When streamId is null, returns 0 immediately (no global-per-user aggregation is applied).
-    /// </summary>
     public async Task<int> GetWindowCoinSumAsync(int userId, int? streamId, DateTime windowStart)
     {
-        // Per SCRUM-115 design decision: when no stream context is provided,
-        // the cap policy does not aggregate across unrelated null-stream requests.
         if (streamId is null)
         {
             return 0;
         }
 
-        using var connection = CreateConnection();
+        using var connection = new MySqlConnection(_connectionString);
+        await connection.OpenAsync();
 
-        // The WHERE clause is crafted so the query engine uses the leading columns of
-        // idx_transactions_user_stream_created (user_id, stream_id, created_at):
-        //   1. user_id  = @UserId     -> equality on first key column
-        //   2. stream_id = @StreamId  -> equality on second key column
-        //   3. created_at >= @WindowStart -> range on third key column
-        // transaction_type filter is applied as a residual predicate inside the index range.
         const string sql = @"
             SELECT COALESCE(SUM(amount), 0)
             FROM coin_transactions
@@ -79,11 +86,12 @@ public class CoinTransactionRepository : ICoinTransactionRepository
               AND transaction_type = 'WATCH_TICK'
               AND created_at    >= @WindowStart;";
 
-        return await connection.ExecuteScalarAsync<int>(sql, new
-        {
-            UserId = userId,
-            StreamId = streamId.Value,
-            WindowStart = windowStart
-        });
+        using var command = new MySqlCommand(sql, connection);
+        command.Parameters.AddWithValue("@UserId", userId);
+        command.Parameters.AddWithValue("@StreamId", streamId.Value);
+        command.Parameters.AddWithValue("@WindowStart", windowStart);
+
+        var result = await command.ExecuteScalarAsync();
+        return Convert.ToInt32(result);
     }
 }

@@ -1,5 +1,4 @@
 using System.Data;
-using Dapper;
 using Microsoft.Extensions.Configuration;
 using MySqlConnector;
 using BattleEconomyService.Models;
@@ -16,39 +15,51 @@ public class WalletRepository : IWalletRepository
             ?? throw new InvalidOperationException("DefaultConnection string is not configured.");
     }
 
-    private IDbConnection CreateConnection() => new MySqlConnection(_connectionString);
-
     public async Task<Wallet?> GetByUserIdAsync(int userId)
     {
-        using var connection = CreateConnection();
-        const string sql = "SELECT * FROM wallets WHERE user_id = @UserId LIMIT 1;";
-        return await connection.QueryFirstOrDefaultAsync<Wallet>(sql, new { UserId = userId });
+        using var connection = new MySqlConnection(_connectionString);
+        await connection.OpenAsync();
+        const string sql = "SELECT wallet_id, user_id, coins, last_tick_at, created_at, updated_at FROM wallets WHERE user_id = @UserId LIMIT 1;";
+        using var command = new MySqlCommand(sql, connection);
+        command.Parameters.AddWithValue("@UserId", userId);
+
+        using var reader = await command.ExecuteReaderAsync();
+        if (await reader.ReadAsync())
+        {
+            return MapWallet(reader);
+        }
+        return null;
     }
 
     public async Task<Wallet> GetOrCreateWalletAsync(int userId)
     {
-        using var connection = CreateConnection();
+        using var connection = new MySqlConnection(_connectionString);
+        await connection.OpenAsync();
 
-        // Ensure wallet exists with initial coins = 0 and last_tick_at = NULL
         const string insertSql = @"
             INSERT INTO wallets (user_id, coins, last_tick_at)
             VALUES (@UserId, 0, NULL)
             ON DUPLICATE KEY UPDATE user_id = user_id;";
-        await connection.ExecuteAsync(insertSql, new { UserId = userId });
+        using var insertCmd = new MySqlCommand(insertSql, connection);
+        insertCmd.Parameters.AddWithValue("@UserId", userId);
+        await insertCmd.ExecuteNonQueryAsync();
 
-        const string selectSql = "SELECT * FROM wallets WHERE user_id = @UserId LIMIT 1;";
-        var wallet = await connection.QueryFirstOrDefaultAsync<Wallet>(selectSql, new { UserId = userId });
-        return wallet ?? throw new InvalidOperationException($"Failed to retrieve or create wallet for user {userId}.");
+        const string selectSql = "SELECT wallet_id, user_id, coins, last_tick_at, created_at, updated_at FROM wallets WHERE user_id = @UserId LIMIT 1;";
+        using var selectCmd = new MySqlCommand(selectSql, connection);
+        selectCmd.Parameters.AddWithValue("@UserId", userId);
+
+        using var reader = await selectCmd.ExecuteReaderAsync();
+        if (await reader.ReadAsync())
+        {
+            return MapWallet(reader);
+        }
+        throw new InvalidOperationException($"Failed to retrieve or create wallet for user {userId}.");
     }
 
-    /// <summary>
-    /// Executes an atomic conditional update enforcing the minimum-interval anti-farm rule (AC3).
-    /// If last_tick_at is NULL (first award) or last_tick_at &lt;= threshold, the update succeeds.
-    /// If another concurrent request beats this one or the interval is not met, 0 rows are affected.
-    /// </summary>
     public async Task<bool> TryAwardWatchTickAsync(int userId, int coins, DateTime currentTime, DateTime threshold)
     {
-        using var connection = CreateConnection();
+        using var connection = new MySqlConnection(_connectionString);
+        await connection.OpenAsync();
 
         const string sql = @"
             UPDATE wallets
@@ -57,22 +68,16 @@ public class WalletRepository : IWalletRepository
             WHERE user_id = @UserId
               AND (last_tick_at IS NULL OR last_tick_at <= @Threshold);";
 
-        var rowsAffected = await connection.ExecuteAsync(sql, new
-        {
-            Coins = coins,
-            CurrentTime = currentTime,
-            UserId = userId,
-            Threshold = threshold
-        });
+        using var command = new MySqlCommand(sql, connection);
+        command.Parameters.AddWithValue("@Coins", coins);
+        command.Parameters.AddWithValue("@CurrentTime", currentTime);
+        command.Parameters.AddWithValue("@UserId", userId);
+        command.Parameters.AddWithValue("@Threshold", threshold);
 
+        var rowsAffected = await command.ExecuteNonQueryAsync();
         return rowsAffected > 0;
     }
 
-    /// <summary>
-    /// Atomically executes the conditional wallet award AND inserts the coin_transaction ledger record
-    /// within a single ACID database transaction.
-    /// If the conditional update rejects (0 rows affected), transaction is rolled back and no ledger record is created.
-    /// </summary>
     public async Task<AwardResult> ExecuteWatchTickAwardAsync(int userId, int coins, DateTime currentTime, DateTime threshold, int? streamId)
     {
         using var connection = new MySqlConnection(_connectionString);
@@ -81,7 +86,6 @@ public class WalletRepository : IWalletRepository
 
         try
         {
-            // 1. Atomic conditional update (AC3)
             const string updateSql = @"
                 UPDATE wallets
                 SET coins = coins + @Coins,
@@ -89,27 +93,41 @@ public class WalletRepository : IWalletRepository
                 WHERE user_id = @UserId
                   AND (last_tick_at IS NULL OR last_tick_at <= @Threshold);";
 
-            var rowsAffected = await connection.ExecuteAsync(updateSql, new
-            {
-                Coins = coins,
-                CurrentTime = currentTime,
-                UserId = userId,
-                Threshold = threshold
-            }, transaction);
+            using var updateCmd = new MySqlCommand(updateSql, connection, transaction);
+            updateCmd.Parameters.AddWithValue("@Coins", coins);
+            updateCmd.Parameters.AddWithValue("@CurrentTime", currentTime);
+            updateCmd.Parameters.AddWithValue("@UserId", userId);
+            updateCmd.Parameters.AddWithValue("@Threshold", threshold);
+
+            var rowsAffected = await updateCmd.ExecuteNonQueryAsync();
 
             if (rowsAffected == 0)
             {
-                // Rate-limited or concurrent collision: query current state without altering
-                const string querySql = "SELECT * FROM wallets WHERE user_id = @UserId LIMIT 1;";
-                var existing = await connection.QueryFirstOrDefaultAsync<Wallet>(querySql, new { UserId = userId }, transaction);
+                const string querySql = "SELECT wallet_id, user_id, coins, last_tick_at, created_at, updated_at FROM wallets WHERE user_id = @UserId LIMIT 1;";
+                using var queryCmd = new MySqlCommand(querySql, connection, transaction);
+                queryCmd.Parameters.AddWithValue("@UserId", userId);
+                using var reader = await queryCmd.ExecuteReaderAsync();
+                Wallet? existing = null;
+                if (await reader.ReadAsync())
+                {
+                    existing = MapWallet(reader);
+                }
+                await reader.CloseAsync();
                 await transaction.RollbackAsync();
 
                 return AwardResult.RateLimited(existing?.Coins ?? 0, existing?.LastTickAt);
             }
 
-            // 2. Fetch updated balance
-            const string selectSql = "SELECT * FROM wallets WHERE user_id = @UserId LIMIT 1;";
-            var updatedWallet = await connection.QueryFirstOrDefaultAsync<Wallet>(selectSql, new { UserId = userId }, transaction);
+            const string selectSql = "SELECT wallet_id, user_id, coins, last_tick_at, created_at, updated_at FROM wallets WHERE user_id = @UserId LIMIT 1;";
+            using var selectCmd = new MySqlCommand(selectSql, connection, transaction);
+            selectCmd.Parameters.AddWithValue("@UserId", userId);
+            using var updatedReader = await selectCmd.ExecuteReaderAsync();
+            Wallet? updatedWallet = null;
+            if (await updatedReader.ReadAsync())
+            {
+                updatedWallet = MapWallet(updatedReader);
+            }
+            await updatedReader.CloseAsync();
 
             if (updatedWallet == null)
             {
@@ -117,20 +135,18 @@ public class WalletRepository : IWalletRepository
                 throw new InvalidOperationException($"Wallet for user {userId} could not be loaded after update.");
             }
 
-            // 3. Atomically insert coin transaction ledger entry
             const string insertTxSql = @"
                 INSERT INTO coin_transactions (user_id, wallet_id, amount, transaction_type, stream_id)
                 VALUES (@UserId, @WalletId, @Amount, @Type, @StreamId);";
 
-            await connection.ExecuteAsync(insertTxSql, new
-            {
-                UserId = userId,
-                WalletId = updatedWallet.WalletId,
-                Amount = coins,
-                Type = "WATCH_TICK",
-                StreamId = streamId
-            }, transaction);
+            using var insertTxCmd = new MySqlCommand(insertTxSql, connection, transaction);
+            insertTxCmd.Parameters.AddWithValue("@UserId", userId);
+            insertTxCmd.Parameters.AddWithValue("@WalletId", updatedWallet.WalletId);
+            insertTxCmd.Parameters.AddWithValue("@Amount", coins);
+            insertTxCmd.Parameters.AddWithValue("@Type", "WATCH_TICK");
+            insertTxCmd.Parameters.AddWithValue("@StreamId", (object?)streamId ?? DBNull.Value);
 
+            await insertTxCmd.ExecuteNonQueryAsync();
             await transaction.CommitAsync();
 
             return AwardResult.Succeeded(coins, updatedWallet.Coins, currentTime, updatedWallet.WalletId);
@@ -140,5 +156,18 @@ public class WalletRepository : IWalletRepository
             await transaction.RollbackAsync();
             throw;
         }
+    }
+
+    private static Wallet MapWallet(MySqlDataReader reader)
+    {
+        return new Wallet
+        {
+            WalletId = reader.GetInt32(reader.GetOrdinal("wallet_id")),
+            UserId = reader.GetInt32(reader.GetOrdinal("user_id")),
+            Coins = reader.GetInt32(reader.GetOrdinal("coins")),
+            LastTickAt = reader.IsDBNull(reader.GetOrdinal("last_tick_at")) ? null : reader.GetDateTime(reader.GetOrdinal("last_tick_at")),
+            CreatedAt = reader.GetDateTime(reader.GetOrdinal("created_at")),
+            UpdatedAt = reader.GetDateTime(reader.GetOrdinal("updated_at"))
+        };
     }
 }

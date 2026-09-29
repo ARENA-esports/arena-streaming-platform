@@ -1,7 +1,6 @@
 using System;
 using System.Data;
 using System.Threading.Tasks;
-using Dapper;
 using Microsoft.Extensions.Configuration;
 using MySqlConnector;
 
@@ -18,58 +17,67 @@ public class TokenBlacklistRepository : ITokenBlacklistRepository
         _configuration = configuration;
     }
 
-    private IDbConnection CreateConnection() => new MySqlConnection(ConnectionString);
-
     public async Task RevokeTokenAsync(string jti, int? userId, DateTime expiresAt)
     {
-        using var connection = CreateConnection();
+        using var connection = new MySqlConnection(ConnectionString);
+        await connection.OpenAsync();
         const string sql = @"
             INSERT INTO revoked_tokens (jti, user_id, expires_at)
             VALUES (@Jti, @UserId, @ExpiresAt)
             ON DUPLICATE KEY UPDATE expires_at = @ExpiresAt;
         ";
 
-        await connection.ExecuteAsync(sql, new
-        {
-            Jti = jti,
-            UserId = userId,
-            ExpiresAt = expiresAt
-        });
+        using var command = new MySqlCommand(sql, connection);
+        command.Parameters.AddWithValue("@Jti", jti);
+        command.Parameters.AddWithValue("@UserId", (object?)userId ?? DBNull.Value);
+        command.Parameters.AddWithValue("@ExpiresAt", expiresAt);
+        await command.ExecuteNonQueryAsync();
     }
 
     public async Task<bool> IsTokenRevokedAsync(string jti)
     {
-        using var connection = CreateConnection();
+        using var connection = new MySqlConnection(ConnectionString);
+        await connection.OpenAsync();
         const string sql = "SELECT COUNT(1) FROM revoked_tokens WHERE jti = @Jti AND expires_at > NOW() LIMIT 1;";
-        var count = await connection.ExecuteScalarAsync<int>(sql, new { Jti = jti });
-        return count > 0;
+        using var command = new MySqlCommand(sql, connection);
+        command.Parameters.AddWithValue("@Jti", jti);
+        var result = await command.ExecuteScalarAsync();
+        return Convert.ToInt32(result) > 0;
     }
 
     public async Task RevokeUserTokensAsync(int userId, DateTime expiresAt)
     {
-        using var connection = CreateConnection();
+        using var connection = new MySqlConnection(ConnectionString);
+        await connection.OpenAsync();
         const string sql = @"
             INSERT INTO revoked_tokens (jti, user_id, revoked_at, expires_at)
             VALUES (@Jti, @UserId, UTC_TIMESTAMP(), @ExpiresAt)
             ON DUPLICATE KEY UPDATE revoked_at = UTC_TIMESTAMP(), expires_at = @ExpiresAt;
         ";
 
-        await connection.ExecuteAsync(sql, new
-        {
-            Jti = $"USER_REVOKED_{userId}",
-            UserId = userId,
-            ExpiresAt = expiresAt
-        });
+        using var command = new MySqlCommand(sql, connection);
+        command.Parameters.AddWithValue("@Jti", $"USER_REVOKED_{userId}");
+        command.Parameters.AddWithValue("@UserId", userId);
+        command.Parameters.AddWithValue("@ExpiresAt", expiresAt);
+        await command.ExecuteNonQueryAsync();
     }
 
     public async Task<DateTime?> GetUserRevocationTimeAsync(int userId)
     {
-        using var connection = CreateConnection();
+        using var connection = new MySqlConnection(ConnectionString);
+        await connection.OpenAsync();
         const string sql = @"
             SELECT revoked_at FROM revoked_tokens 
             WHERE jti = @Jti AND expires_at > UTC_TIMESTAMP() 
             LIMIT 1;
         ";
-        return await connection.QueryFirstOrDefaultAsync<DateTime?>(sql, new { Jti = $"USER_REVOKED_{userId}" });
+        using var command = new MySqlCommand(sql, connection);
+        command.Parameters.AddWithValue("@Jti", $"USER_REVOKED_{userId}");
+        using var reader = await command.ExecuteReaderAsync();
+        if (await reader.ReadAsync() && !reader.IsDBNull(0))
+        {
+            return reader.GetDateTime(0);
+        }
+        return null;
     }
 }

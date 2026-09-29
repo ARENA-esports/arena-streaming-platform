@@ -1,6 +1,5 @@
 using System.Security.Claims;
 using System.Text;
-using Dapper;
 using DbUp;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Options;
@@ -12,9 +11,6 @@ using BattleEconomyService.Repositories;
 using BattleEconomyService.Services;
 
 var builder = WebApplication.CreateBuilder(args);
-
-// Dapper configuration for underscore column-to-property mapping
-DefaultTypeMap.MatchNamesWithUnderscores = true;
 
 // Add services to the container
 builder.Services.AddControllers();
@@ -107,7 +103,7 @@ builder.Services.AddSwaggerGen(c =>
 
 // JWT Authentication per jwt-spec.md
 var jwtSecret = builder.Configuration["JwtSettings:Secret"]
-    ?? "Arena_Secret_Key_For_Jwt_Token_Signing_2026_SE3022_Production_Grade!";
+    ?? throw new InvalidOperationException("JwtSettings:Secret is not configured.");
 var jwtIssuer = builder.Configuration["JwtSettings:Issuer"]
     ?? "Arena.UserService";
 var jwtAudience = builder.Configuration["JwtSettings:Audience"]

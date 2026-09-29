@@ -1,6 +1,8 @@
 using System.Security.Claims;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using Moq;
 using UserService.Controllers;
 using UserService.Models;
@@ -12,12 +14,16 @@ namespace UserService.Tests;
 public class UsersControllerTests
 {
     private readonly Mock<IUserService> _mockUserService;
+    private readonly Mock<ILogger<UsersController>> _mockLogger;
+    private readonly Mock<IWebHostEnvironment> _mockEnv;
     private readonly UsersController _controller;
 
     public UsersControllerTests()
     {
         _mockUserService = new Mock<IUserService>();
-        _controller = new UsersController(_mockUserService.Object);
+        _mockLogger = new Mock<ILogger<UsersController>>();
+        _mockEnv = new Mock<IWebHostEnvironment>();
+        _controller = new UsersController(_mockUserService.Object, _mockLogger.Object, _mockEnv.Object);
     }
 
     private void SetAuthenticatedUser(string userId)
