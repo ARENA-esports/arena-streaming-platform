@@ -5,6 +5,7 @@ on:
     branches: [dev]
     paths:
       - 'Arena/client/arena-web/**'
+  workflow_dispatch:
 
 concurrency:
   group: deploy-arena-frontend-staging
