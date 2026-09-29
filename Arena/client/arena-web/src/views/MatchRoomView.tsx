@@ -6,6 +6,7 @@ import { useTwitchPlayback } from '../hooks/useTwitchPlayback';
 import { useWatchHeartbeat } from '../hooks/useWatchHeartbeat';
 import { StreamContainer } from '../components/player/StreamContainer';
 import Badge from '../components/common/Badge';
+import WalletBalance from '../components/common/WalletBalance';
 import Button from '../components/common/Button';
 import { useAuth } from '../context/AuthContext';
 import { useWallet } from '../context/WalletContext';
@@ -180,6 +181,10 @@ export const MatchRoomView: React.FC = () => {
 
         {/* Panel Group - Always mounted in right column, visibility toggled on mobile */}
         <div className="lg:col-start-2 flex flex-col gap-4 min-w-0">
+          <div className="flex items-center justify-end">
+            <WalletBalance />
+          </div>
+
           {/* Tab switcher - mobile only */}
           <div className="flex lg:hidden border-b border-arena-border mb-2">
             {['team', 'chat', 'battle'].map(tab => (
