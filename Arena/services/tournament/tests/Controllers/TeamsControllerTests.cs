@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Moq;
 using TournamentService.Controllers;
@@ -27,6 +28,7 @@ public class TeamsControllerTests
         _controller = new TeamsController(
             _mockRepository.Object,
             _mockFileStorageService.Object,
+            new Mock<IConfiguration>().Object,
             _mockLogger.Object
         );
         SetUserContext("Organizer");

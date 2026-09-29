@@ -118,7 +118,8 @@ button {
   height: 56px;
   min-height: 56px;
   max-height: 56px;
-  flex-shrink: 0; /* CRITICAL: Prevents carousel from crushing the header */
+  flex-shrink: 0;
+  /* CRITICAL: Prevents carousel from crushing the header */
   padding: 0 20px;
   border-bottom: 1px solid var(--line);
   background: var(--topbar-bg);
@@ -157,7 +158,8 @@ button {
   position: relative;
   display: flex;
   align-items: center;
-  height: 34px; /* Matches input height */
+  height: 34px;
+  /* Matches input height */
 }
 
 .search-wrap svg {
@@ -179,7 +181,8 @@ button {
   background: var(--panel-2);
   border: 1px solid var(--line);
   border-radius: 14px;
-  padding: 0 12px 0 34px; /* 34px left padding gives clean space for 14px icon */
+  padding: 0 12px 0 34px;
+  /* 34px left padding gives clean space for 14px icon */
   color: var(--text);
   font-size: 0.8rem;
   box-sizing: border-box;
@@ -812,4 +815,30 @@ button {
     margin-left: 0;
     width: 100%;
   }
+}
+
+@keyframes coin-float-up {
+  0% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  20% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  80% {
+    opacity: 1;
+    transform: translateY(-4px);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+}
+
+.animate-coin-float {
+  animation: coin-float-up 1.2s ease-out forwards;
 }

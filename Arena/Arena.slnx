@@ -1,5 +1,12 @@
 <Solution>
   <Folder Name="/services/" />
+  <Folder Name="/services/battle/" />
+  <Folder Name="/services/battle/src/">
+    <Project Path="services/battle/src/BattleEconomyService.csproj" />
+  </Folder>
+  <Folder Name="/services/battle/tests/">
+    <Project Path="services/battle/tests/BattleEconomyService.Tests.csproj" />
+  </Folder>
   <Folder Name="/services/stream/" />
   <Folder Name="/services/stream/src/">
     <Project Path="services/stream/src/StreamService.csproj" />
