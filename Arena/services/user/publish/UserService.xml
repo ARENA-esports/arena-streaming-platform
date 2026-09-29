@@ -1,0 +1,160 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>UserService</name>
+    </assembly>
+    <members>
+        <member name="M:UserService.Controllers.AuthController.Signup(UserService.Models.SignupRequest)">
+            <summary>
+            Registers a new viewer account.
+            </summary>
+            <param name="request">Signup details containing username, email, and password</param>
+            <returns>A confirmation response on successful registration</returns>
+        </member>
+        <member name="M:UserService.Controllers.AuthController.Login(UserService.Models.LoginRequest)">
+            <summary>
+            Authenticates a viewer and issues a signed JWT token.
+            </summary>
+            <param name="request">Login credentials with username/email and password</param>
+            <returns>The authenticated user information and signed JWT Bearer token</returns>
+        </member>
+        <member name="M:UserService.Controllers.AuthController.Logout">
+            <summary>
+            Logs out the viewer and invalidates the JWT Bearer token.
+            </summary>
+            <returns>A confirmation message on successful logout</returns>
+        </member>
+        <member name="M:UserService.Controllers.AuthController.ForgotPassword(UserService.Models.ForgotPasswordRequest)">
+            <summary>
+            Initiates password reset for a registered viewer account.
+            </summary>
+            <param name="request">Request containing the user's email</param>
+            <returns>Confirmation message and token if user is found</returns>
+        </member>
+        <member name="M:UserService.Controllers.AuthController.ResetPassword(UserService.Models.ResetPasswordRequest)">
+            <summary>
+            Sets a new password using a valid reset token.
+            </summary>
+            <param name="request">Request containing reset token and new password</param>
+            <returns>Confirmation of password change</returns>
+        </member>
+        <member name="M:UserService.Controllers.AuthController.VerifyEmail(UserService.Models.VerifyEmailRequest)">
+            <summary>
+            Verifies a user's email address using a verification token.
+            </summary>
+            <param name="request">Request containing the verification token</param>
+            <returns>Confirmation message on successful email verification</returns>
+        </member>
+        <member name="M:UserService.Controllers.AuthController.ResendVerification(UserService.Models.ResendVerificationEmailRequest)">
+            <summary>
+            Resends the email verification token to the specified email address.
+            </summary>
+            <param name="request">Request containing the user's email</param>
+            <returns>Confirmation message</returns>
+        </member>
+        <member name="M:UserService.Controllers.AuthController.GetMe">
+            <summary>
+            Retrieves current authenticated user profile from the database.
+            </summary>
+            <returns>The authenticated user profile information</returns>
+        </member>
+        <member name="M:UserService.Controllers.AuthController.Refresh">
+            <summary>
+            Refreshes the session by issuing a new JWT for an active, unexpired token.
+            </summary>
+            <returns>A new LoginResponse containing the refreshed JWT</returns>
+        </member>
+        <member name="M:UserService.Controllers.UsersController.GetMe">
+            <summary>
+            Retrieves current authenticated user profile.
+            </summary>
+            <returns>The authenticated user's profile information</returns>
+        </member>
+        <member name="M:UserService.Controllers.UsersController.UpdateProfile(UserService.Models.UpdateProfileRequest)">
+            <summary>
+            Updates current authenticated user profile (username, email, avatar URL).
+            </summary>
+            <param name="request">Fields to update</param>
+            <returns>The updated user profile</returns>
+        </member>
+        <member name="M:UserService.Controllers.UsersController.ChangeRole(UserService.Models.ChangeRoleRequest)">
+            <summary>
+            Changes the role for the current authenticated user.
+            </summary>
+            <param name="request">New role</param>
+            <returns>The updated user profile</returns>
+        </member>
+        <member name="M:UserService.Controllers.UsersController.ChangePassword(UserService.Models.ChangePasswordRequest)">
+            <summary>
+            Changes the password for the current authenticated user.
+            </summary>
+            <param name="request">Current and new password</param>
+            <returns>Confirmation message of password change</returns>
+        </member>
+        <member name="M:UserService.Controllers.UsersController.DeleteAccount">
+            <summary>
+            Deletes the current authenticated user account completely.
+            </summary>
+            <returns>Confirmation of deletion</returns>
+        </member>
+        <member name="P:UserService.Models.LoginRequest.Identifier">
+            <summary>
+            The username or email of the user attempting to log in.
+            </summary>
+        </member>
+        <member name="P:UserService.Models.LoginRequest.Password">
+            <summary>
+            The plain-text password to authenticate with.
+            </summary>
+        </member>
+        <member name="T:Program">
+            <summary>
+            Auto-generated public partial Program class for top-level statement apps.
+            </summary>
+        </member>
+        <member name="M:Microsoft.AspNetCore.OpenApi.Generated.DocumentationCommentIdHelper.CreateDocumentationId(System.Type)">
+            <summary>
+            Generates a documentation comment ID for a type.
+            Example: T:Namespace.Outer+Inner`1 becomes T:Namespace.Outer.Inner`1
+            </summary>
+        </member>
+        <member name="M:Microsoft.AspNetCore.OpenApi.Generated.DocumentationCommentIdHelper.CreateDocumentationId(System.Reflection.PropertyInfo)">
+            <summary>
+            Generates a documentation comment ID for a property.
+            Example: P:Namespace.ContainingType.PropertyName or for an indexer P:Namespace.ContainingType.Item(System.Int32)
+            </summary>
+        </member>
+        <member name="M:Microsoft.AspNetCore.OpenApi.Generated.DocumentationCommentIdHelper.CreateDocumentationId(System.Type,System.String)">
+            <summary>
+            Generates a documentation comment ID for a property given its container type and property name.
+            Example: P:Namespace.ContainingType.PropertyName
+            </summary>
+        </member>
+        <member name="M:Microsoft.AspNetCore.OpenApi.Generated.DocumentationCommentIdHelper.CreateDocumentationId(System.Reflection.MethodInfo)">
+            <summary>
+            Generates a documentation comment ID for a method (or constructor).
+            For example:
+              M:Namespace.ContainingType.MethodName(ParamType1,ParamType2)~ReturnType
+              M:Namespace.ContainingType.#ctor(ParamType)
+            </summary>
+        </member>
+        <member name="M:Microsoft.AspNetCore.OpenApi.Generated.DocumentationCommentIdHelper.GetTypeDocId(System.Type,System.Boolean,System.Boolean)">
+            <summary>
+            Generates a documentation ID string for a type.
+            This method handles nested types (replacing '+' with '.'),
+            generic types, arrays, pointers, by-ref types, and generic parameters.
+            The <paramref name="includeGenericArguments"/> flag controls whether
+            constructed generic type arguments are emitted, while <paramref name="omitGenericArity"/>
+            controls whether the generic arity marker (e.g. "`1") is appended.
+            </summary>
+        </member>
+        <member name="M:Microsoft.AspNetCore.OpenApi.Generated.DocumentationCommentIdHelper.NormalizeDocId(System.String)">
+            <summary>
+            Normalizes a documentation comment ID to match the compiler-style format.
+            Strips the return type suffix for ordinary methods but retains it for conversion operators.
+            </summary>
+            <param name="docId">The documentation comment ID to normalize.</param>
+            <returns>The normalized documentation comment ID.</returns>
+        </member>
+    </members>
+</doc>

@@ -34,7 +34,7 @@ builder.Services.AddMemoryCache();
 // Configure restrictive CORS policy for client authentication
 //hard: Allow Vite port (5173) and React port (3000) by default to prevent CORS preflight blocks during dev
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
-    ?? new[] { "http://localhost:3000", "http://localhost:5173", "http://127.0.0.1:5173" };
+    ?? new[] { "http://localhost:3000", "http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:5174", "http://127.0.0.1:5174" };
 
 builder.Services.AddCors(options =>
 {
