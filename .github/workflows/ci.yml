@@ -21,6 +21,7 @@ jobs:
       stream: ${{ steps.filter.outputs.stream }}
       tournament: ${{ steps.filter.outputs.tournament }}
       chat: ${{ steps.filter.outputs.chat }}
+      battle: ${{ steps.filter.outputs.battle }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -38,6 +39,9 @@ jobs:
               - 'Arena/shared/EventContracts/**'
             chat:
               - 'Arena/services/chat/**'
+              - 'Arena/shared/EventContracts/**'
+            battle:
+              - 'Arena/services/battle/**'
               - 'Arena/shared/EventContracts/**'
 
   # Job 2: build + test + analyze User (only if changed)
@@ -230,4 +234,52 @@ jobs:
         uses: github/codeql-action/analyze@v3
         with: 
           category: "/language:csharp"
+
+  # Job 6: build + test + analyze Battle
+  build-battle:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.battle == 'true'
+    runs-on: ubuntu-latest
+    permissions: 
+      actions: read
+      contents: read
+      security-events: write
+    steps: 
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with: 
+          dotnet-version: "10.0.x"
+      - uses: actions/cache@v4
+        with: 
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+      
+      - name: Initialize CodeQL 
+        uses: github/codeql-action/init@v3
+        with: 
+          languages: csharp
+      
+      - name: Restore 
+        run: dotnet restore Arena/services/battle/tests/BattleEconomyService.Tests.csproj
+      
+      - name: Build 
+        run: dotnet build Arena/services/battle/tests/BattleEconomyService.Tests.csproj --no-restore --configuration Release
+
+      - name: Test 
+        run: dotnet test Arena/services/battle/tests/BattleEconomyService.Tests.csproj --no-restore --configuration Release --collect:"XPlat Code Coverage"
+
+      - name: Upload Coverage
+        uses: actions/upload-artifact@v4
+        if: always()
+        with: 
+          name: battle-coverage
+          path: '**/TestResults/**/coverage.cobertura.xml'
+
+      - name: Perform CodeQL Analysis 
+        uses: github/codeql-action/analyze@v3
+        with: 
+          category: "/language:csharp"
+
   

@@ -45,6 +45,7 @@ jobs:
             VITE_STREAM_API_URL=${{ vars.VITE_STREAM_API_URL_STAGING }}
             VITE_TOURNAMENT_API_URL=${{ vars.VITE_TOURNAMENT_API_URL_STAGING }}
             VITE_CHAT_API_URL=${{ vars.VITE_CHAT_API_URL_STAGING }}
+            VITE_BATTLE_API_URL=${{ vars.VITE_BATTLE_API_URL_STAGING }}
             VITE_APP_DOMAIN=${{ vars.VITE_APP_DOMAIN_STAGING }}
           cache-from: type=gha,scope=frontend-staging
           cache-to: type=gha,mode=max,scope=frontend-staging
