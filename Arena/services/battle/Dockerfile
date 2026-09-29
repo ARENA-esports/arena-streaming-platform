@@ -5,14 +5,14 @@ WORKDIR /repo
 COPY services/battle/src/BattleEconomyService.csproj services/battle/src/
 COPY shared/EventContracts/src/EventContracts.csproj shared/EventContracts/src/
 
-RUN --mount=type=cache,id=nuget,target=/root/.nuget/packages \
+RUN --mount=type=cache,id=nuget,target=/root/.nuget/packages,sharing=locked \
     dotnet restore services/battle/src/BattleEconomyService.csproj
 
 COPY services/battle/src/ services/battle/src/
 COPY shared/EventContracts/src/ shared/EventContracts/src/
 
-RUN --mount=type=cache,id=nuget,target=/root/.nuget/packages \
-    dotnet publish services/battle/src/BattleEconomyService.csproj -c Release -o /app/publish --no-restore
+RUN --mount=type=cache,id=nuget,target=/root/.nuget/packages,sharing=locked \
+    dotnet publish services/battle/src/BattleEconomyService.csproj -c Release -o /app/publish
 
 # Stage 2: Runtime
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final

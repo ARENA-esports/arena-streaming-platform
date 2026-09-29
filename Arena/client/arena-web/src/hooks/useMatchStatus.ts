@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { matchService } from '../api/matchService';
 import { MatchResponse, StreamResponse } from '../types';
 
@@ -9,15 +9,23 @@ interface UseMatchStatusResult {
   match: MatchResponse | null;
   stream: StreamResponse | null;
   error: any;
+  refetch?: () => Promise<void>;
 }
 
 export function useMatchStatus(matchId: string | undefined): UseMatchStatusResult {
-  const [state, setState] = useState<UseMatchStatusResult>({
+  const [state, setState] = useState<{
+    status: MatchStatusState;
+    match: MatchResponse | null;
+    stream: StreamResponse | null;
+    error: any;
+  }>({
     status: 'loading',
     match: null,
     stream: null,
     error: null,
   });
+
+  const fetchRef = useRef<() => Promise<void>>();
 
   useEffect(() => {
     if (!matchId) return;
@@ -66,6 +74,8 @@ export function useMatchStatus(matchId: string | undefined): UseMatchStatusResul
       }
     }
 
+    fetchRef.current = fetchData;
+
     // Initial fetch
     fetchData();
 
@@ -75,5 +85,11 @@ export function useMatchStatus(matchId: string | undefined): UseMatchStatusResul
     };
   }, [matchId]);
 
-  return state;
+  const refetch = useCallback(async () => {
+    if (fetchRef.current) {
+      await fetchRef.current();
+    }
+  }, []);
+
+  return { ...state, refetch };
 }

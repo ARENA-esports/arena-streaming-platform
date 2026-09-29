@@ -27,22 +27,33 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       return;
     }
 
-    const fetchBalance = async () => {
+    const fetchBalance = async (isBackground = false) => {
       try {
-        setIsLoading(true);
+        if (!isBackground) setIsLoading(true);
         setError(null);
         const data = await walletService.getBalance();
         setBalance(data.balance);
       } catch (err) {
-        const fetchError = err instanceof Error ? err : new Error('Failed to fetch balance');
-        setError(fetchError);
-        console.error('Wallet hydration failed:', err);
+        if (!isBackground) {
+          const fetchError = err instanceof Error ? err : new Error('Failed to fetch balance');
+          setError(fetchError);
+          console.error('Wallet hydration failed:', err);
+        }
       } finally {
-        setIsLoading(false);
+        if (!isBackground) setIsLoading(false);
       }
     };
 
-    fetchBalance();
+    fetchBalance(false);
+
+    // Background interval to keep wallet balance synchronized with database
+    const intervalId = setInterval(() => {
+      fetchBalance(true);
+    }, 20000);
+
+    return () => {
+      clearInterval(intervalId);
+    };
   }, [token, user]);
 
   const updateBalance = (newBalance: number) => {

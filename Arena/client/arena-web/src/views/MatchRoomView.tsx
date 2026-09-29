@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useMatchStatus } from '../hooks/useMatchStatus';
@@ -19,6 +19,7 @@ import FactionChat from '../components/chat/FactionChat';
 import { ScheduledView } from '../components/match/ScheduledView';
 import { EndedView } from '../components/match/EndedView';
 import { CancelledView } from '../components/match/CancelledView';
+import WatchRewardStatus from '../components/match/WatchRewardStatus';
 
 export const MatchRoomView: React.FC = () => {
   const { matchId } = useParams<{ matchId: string }>();
@@ -28,7 +29,7 @@ export const MatchRoomView: React.FC = () => {
   const { notify } = useNotification();
   const hasNotifiedCapRef = useRef(false);
 
-  const { status, match, stream, error } = useMatchStatus(matchId);
+  const { status, match, stream, error, refetch } = useMatchStatus(matchId);
   const { isPlaying, onPlay, onPause, resetPlayback } = useTwitchPlayback();
 
   // Reset playback state if the match status leaves 'Live' or match changes
@@ -39,8 +40,8 @@ export const MatchRoomView: React.FC = () => {
     }
   }, [status, matchId, resetPlayback]);
 
-  // Heartbeat is active ONLY for authenticated viewers watching an active Live match with a valid stream
-  const isViewer = Boolean(user && user.role === 'Viewer');
+  // Heartbeat is active for authenticated users watching an active Live match with a valid stream
+  const isViewer = Boolean(user);
   const isLiveMatch = status === 'Live' && Boolean(match);
   const streamId = stream?.streamId ?? stream?.id;
   const hasValidStream = typeof streamId === 'number' && streamId > 0;
@@ -50,12 +51,14 @@ export const MatchRoomView: React.FC = () => {
     streamId,
     isPlaying: isHeartbeatEligible,
     onSuccess: (response) => {
+      console.log('[Arena Heartbeat] Watch tick successful! Balance:', response.currentBalance);
       if (response.success && response.currentBalance !== undefined) {
         updateBalance(response.currentBalance);
         hasNotifiedCapRef.current = false;
       }
     },
     onError: (err: unknown) => {
+      console.warn('[Arena Heartbeat] Watch tick error:', err);
       if (axios.isAxiosError(err) && err.response) {
         const { status, data, headers } = err.response;
         const retryAfter = headers?.['retry-after'] ?? headers?.['Retry-After'];
@@ -95,6 +98,26 @@ export const MatchRoomView: React.FC = () => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('team');
+  const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
+  const [teamsData, setTeamsData] = useState<{ teamA: any; teamB: any } | null>(null);
+  const [activeChannel, setActiveChannel] = useState<string>('');
+
+  const handleTeamsLoaded = useCallback((teamA: any, teamB: any) => {
+    setTeamsData({ teamA, teamB });
+  }, []);
+
+  const teamsMap = teamsData
+    ? {
+        [teamsData.teamA.teamId]: {
+          name: teamsData.teamA.name,
+          color: teamsData.teamA.colorHex || '#EF4444',
+        },
+        [teamsData.teamB.teamId]: {
+          name: teamsData.teamB.name,
+          color: teamsData.teamB.colorHex || '#00B8FC',
+        },
+      }
+    : undefined;
 
   if (status === 'loading') {
     return (
@@ -138,9 +161,32 @@ export const MatchRoomView: React.FC = () => {
           </h1>
           <div className="flex items-center space-x-4">
             <Badge status={match.status} />
-            <span className="text-sm text-arena-textMuted font-mono">
-              Scheduled: {new Date(match.scheduledTime).toLocaleString()}
-            </span>
+            {match.status === 'Live' ? (
+              <>
+                <span className="text-sm text-arena-cyan font-mono flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-arena-crimson animate-pulse" />
+                  Live Broadcast
+                </span>
+                <WatchRewardStatus
+                  isViewer={isViewer}
+                  isLiveMatch={isLiveMatch}
+                  hasValidStream={hasValidStream}
+                  isPlaying={isPlaying}
+                />
+              </>
+            ) : match.status === 'Ended' ? (
+              <span className="text-sm text-arena-textMuted font-mono">
+                Match Ended
+              </span>
+            ) : match.status === 'Cancelled' ? (
+              <span className="text-sm text-arena-crimson font-mono">
+                Match Cancelled
+              </span>
+            ) : (
+              <span className="text-sm text-arena-textMuted font-mono">
+                Scheduled: {new Date(match.scheduledTime).toLocaleString()}
+              </span>
+            )}
           </div>
         </div>
 
@@ -171,8 +217,10 @@ export const MatchRoomView: React.FC = () => {
           {status === 'Live' && (
             <StreamContainer
               apiChannelName={stream?.channelName}
+              isPlaying={isPlaying}
               onPlay={onPlay}
               onPause={onPause}
+              onChannelChange={setActiveChannel}
             />
           )}
           {status === 'Ended' && <EndedView match={match} />}
@@ -202,10 +250,23 @@ export const MatchRoomView: React.FC = () => {
           </div>
 
           <div className={activeTab === 'team' ? 'block' : 'hidden lg:block'}>
-            <TeamSelector matchId={match.matchId} />
+            <TeamSelector
+              matchId={match.matchId}
+              selectedTeamId={selectedTeamId}
+              onTeamSelect={setSelectedTeamId}
+              onTeamsLoaded={handleTeamsLoaded}
+            />
           </div>
-          <div className={`h-[600px] lg:h-auto min-w-0 ${activeTab === 'chat' ? 'block' : 'hidden lg:block'}`}>
-            <FactionChat matchId={match.matchId} />
+          <div className={`h-[560px] xl:h-[620px] min-w-0 ${activeTab === 'chat' ? 'block' : 'hidden lg:block'}`}>
+            <FactionChat
+              matchId={match.matchId}
+              teamAId={match.teamAId}
+              teamBId={match.teamBId}
+              selectedTeamId={selectedTeamId}
+              teamsMap={teamsMap}
+              onSelectTeam={setSelectedTeamId}
+              activeChannel={activeChannel}
+            />
           </div>
           <div className={activeTab === 'battle' ? 'block' : 'hidden lg:block'}>
             <BattleBar matchId={match.matchId} />
@@ -218,11 +279,8 @@ export const MatchRoomView: React.FC = () => {
           match={match}
           onClose={() => setIsEditModalOpen(false)}
           onSave={() => {
-            // Note: The parent component won't re-render immediately until the next poll.
-            // If immediate UI update is desired, we could manually update the state here, 
-            // but for simplicity and consistency with polling, we'll let the next poll catch it.
-            // A more robust approach might be to mutate the local state if the hook exposed a mutate function.
             setIsEditModalOpen(false);
+            refetch?.();
           }}
         />
       )}

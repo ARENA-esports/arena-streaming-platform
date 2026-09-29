@@ -185,6 +185,7 @@ public class MatchRepository : IMatchRepository
     {
         using var connection = new MySqlConnection(_connectionString);
         await connection.OpenAsync();
+        using var transaction = await connection.BeginTransactionAsync();
 
         const string sql = @"
             UPDATE matches
@@ -192,14 +193,40 @@ public class MatchRepository : IMatchRepository
             WHERE match_id = @MatchId
                 AND status = @ExpectedCurrentStatus;";
         
-        using var command = new MySqlCommand(sql, connection);
-        command.Parameters.AddWithValue("@NewStatus",newStatus);
-        command.Parameters.AddWithValue("@MatchId",matchId);
-        command.Parameters.AddWithValue("@ExpectedCurrentStatus",expectedCurrentStatus);
+        using var command = new MySqlCommand(sql, connection, transaction);
+        command.Parameters.AddWithValue("@NewStatus", newStatus);
+        command.Parameters.AddWithValue("@MatchId", matchId);
+        command.Parameters.AddWithValue("@ExpectedCurrentStatus", expectedCurrentStatus);
 
         var rowsAffected = await command.ExecuteNonQueryAsync();  // returns number of rows updated
-        return rowsAffected > 0;
+        if (rowsAffected > 0)
+        {
+            const string streamSql = @"
+                UPDATE streams
+                SET status = @NewStatus,
+                    started_at = CASE 
+                        WHEN @NewStatus = 'Live' AND started_at IS NULL THEN UTC_TIMESTAMP()
+                        WHEN @NewStatus = 'Scheduled' THEN NULL
+                        ELSE started_at 
+                    END,
+                    ended_at = CASE 
+                        WHEN @NewStatus IN ('Ended', 'Cancelled') AND ended_at IS NULL THEN UTC_TIMESTAMP()
+                        WHEN @NewStatus IN ('Live', 'Scheduled') THEN NULL
+                        ELSE ended_at 
+                    END
+                WHERE match_id = @MatchId;";
 
+            using var streamCmd = new MySqlCommand(streamSql, connection, transaction);
+            streamCmd.Parameters.AddWithValue("@NewStatus", newStatus);
+            streamCmd.Parameters.AddWithValue("@MatchId", matchId);
+            await streamCmd.ExecuteNonQueryAsync();
+
+            await transaction.CommitAsync();
+            return true;
+        }
+
+        await transaction.RollbackAsync();
+        return false;
     }
 
     public async Task<bool> UpdateMatchAsync(int matchId, int teamAId, int teamBId, DateTimeOffset scheduledTime)
@@ -228,6 +255,7 @@ public class MatchRepository : IMatchRepository
     {
         using var connection = new MySqlConnection(_connectionString);
         await connection.OpenAsync();
+        using var transaction = await connection.BeginTransactionAsync();
 
         // This deliberately lacks the expectedCurrentStatus guard to allow administrative override
         const string sql = @"
@@ -235,12 +263,39 @@ public class MatchRepository : IMatchRepository
             SET status = @NewStatus
             WHERE match_id = @MatchId;";
         
-        using var command = new MySqlCommand(sql, connection);
+        using var command = new MySqlCommand(sql, connection, transaction);
         command.Parameters.AddWithValue("@NewStatus", newStatus);
         command.Parameters.AddWithValue("@MatchId", matchId);
 
         var rowsAffected = await command.ExecuteNonQueryAsync();
-        return rowsAffected > 0;
+        if (rowsAffected > 0)
+        {
+            const string streamSql = @"
+                UPDATE streams
+                SET status = @NewStatus,
+                    started_at = CASE 
+                        WHEN @NewStatus = 'Live' AND started_at IS NULL THEN UTC_TIMESTAMP()
+                        WHEN @NewStatus = 'Scheduled' THEN NULL
+                        ELSE started_at 
+                    END,
+                    ended_at = CASE 
+                        WHEN @NewStatus IN ('Ended', 'Cancelled') AND ended_at IS NULL THEN UTC_TIMESTAMP()
+                        WHEN @NewStatus IN ('Live', 'Scheduled') THEN NULL
+                        ELSE ended_at 
+                    END
+                WHERE match_id = @MatchId;";
+
+            using var streamCmd = new MySqlCommand(streamSql, connection, transaction);
+            streamCmd.Parameters.AddWithValue("@NewStatus", newStatus);
+            streamCmd.Parameters.AddWithValue("@MatchId", matchId);
+            await streamCmd.ExecuteNonQueryAsync();
+
+            await transaction.CommitAsync();
+            return true;
+        }
+
+        await transaction.RollbackAsync();
+        return false;
     }
 
     public async Task<bool> DeleteMatchAsync(int matchId)

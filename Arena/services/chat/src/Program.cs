@@ -97,6 +97,8 @@ var app = builder.Build();
 var connectionString = builder.Configuration.GetConnectionString("ChatDb")
     ?? throw new InvalidOperationException("ChatDb connection string is not configured.");
 
+EnsureDatabase.For.MySqlDatabase(connectionString);
+
 var upgrader = DeployChanges.To
     .MySqlDatabase(connectionString)
     .WithScriptsEmbeddedInAssembly(System.Reflection.Assembly.GetExecutingAssembly())

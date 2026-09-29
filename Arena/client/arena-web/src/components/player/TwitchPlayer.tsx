@@ -93,18 +93,26 @@ export const TwitchPlayer: React.FC<TwitchPlayerProps> = ({
       channel: trimmedChannel,
       parent: resolvedParents,
       autoplay: true,
-      muted: false,
+      muted: true,
       width: '100%',
       height: '100%',
     });
 
+    const handleReady = () => {
+      handlePlay();
+    };
+
+    player.addEventListener(sdk.Player.READY, handleReady);
     player.addEventListener(sdk.Player.PLAY, handlePlay);
     player.addEventListener(sdk.Player.PAUSE, handlePause);
+    player.addEventListener(sdk.Player.ONLINE, handlePlay);
     playerRef.current = player;
 
     return () => {
+      player.removeEventListener(sdk.Player.READY, handleReady);
       player.removeEventListener(sdk.Player.PLAY, handlePlay);
       player.removeEventListener(sdk.Player.PAUSE, handlePause);
+      player.removeEventListener(sdk.Player.ONLINE, handlePlay);
       if (typeof player.destroy === 'function') {
         player.destroy();
       }

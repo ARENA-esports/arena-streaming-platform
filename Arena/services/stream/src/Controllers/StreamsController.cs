@@ -69,6 +69,11 @@ public class StreamsController : ControllerBase
             match.TournamentId,
             request
         );
+
+        if (match.Status != "Scheduled")
+        {
+            await _streamRepository.UpdateStreamStatusAsync(streamId, match.Status, "Scheduled");
+        }
         /* Fetch persisted record and return 201 Created with Location header */
         var createdStream = await _streamRepository.GetStreamByIdAsync(streamId);
         return CreatedAtAction(
