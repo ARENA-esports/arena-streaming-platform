@@ -114,7 +114,7 @@ services:
       - "5170:8080"
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
-      - ConnectionStrings__ChatDb=Server=mysql;Port=3306;Database=arena_chat_db;Uid=root;Pwd=${MYSQL_ROOT_PASSWORD:-rootpassword};AllowedUserVariables=True;
+      - ConnectionStrings__ChatDb=Server=mysql;Port=3306;Database=arena_chat_db;Uid=root;Pwd=${MYSQL_ROOT_PASSWORD:-rootpassword};AllowUserVariables=True;
       - JwtSettings__Secret=${JWT_SECRET}
       - JwtSettings__Issuer=Arena.UserService
       - JwtSettings__Audience=Arena.Platform
@@ -179,7 +179,8 @@ services:
     entrypoint: [ "/bin/sh", "-c" ]
     command: >
       "/opt/kafka/bin/kafka-topics.sh --create --if-not-exists --bootstrap-server kafka:9092 --partitions 3 --replication-factor 1 --topic stream.lifecycle &&
-       /opt/kafka/bin/kafka-topics.sh --create --if-not-exists --bootstrap-server kafka:9092 --partitions 3 --replication-factor 1 --topic team.events"
+       /opt/kafka/bin/kafka-topics.sh --create --if-not-exists --bootstrap-server kafka:9092 --partitions 3 --replication-factor 1 --topic team.events &&
+       /opt/kafka/bin/kafka-topics.sh --create --if-not-exists --bootstrap-server kafka:9092 --partitions 3 --replication-factor 1 --topic arena.teams.changed"
 
 volumes:
   mysql-user-data:

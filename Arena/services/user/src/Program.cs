@@ -10,6 +10,9 @@ using Microsoft.AspNetCore.RateLimiting;
 using UserService.Repositories;
 using UserService.Services;
 using DbUp;
+using Dapper;
+
+DefaultTypeMap.MatchNamesWithUnderscores = true;
 
 var builder = WebApplication.CreateBuilder(args);
 

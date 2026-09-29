@@ -63,6 +63,28 @@ public class KafkaProducerService : IKafkaProducerService, IDisposable
         }
     }
 
+    public async Task PublishAsync<T>(string topic, string key, T message) where T : class
+    {
+        var value = JsonSerializer.Serialize(message, JsonOptions);
+
+        try
+        {
+            var result = await _producer.ProduceAsync(topic, new Message<string, string>
+            {
+                Key = key,
+                Value = value
+            });
+
+            _logger.LogInformation(
+                "Published message to {Topic} [Partition={Partition}, Offset={Offset}]",
+                topic, result.Partition.Value, result.Offset.Value);
+        }
+        catch (ProduceException<string, string> ex)
+        {
+            _logger.LogError(ex, "Failed to publish message to {Topic}", topic);
+        }
+    }
+
     public void Dispose()
     {
         _producer.Flush(TimeSpan.FromSeconds(5));
