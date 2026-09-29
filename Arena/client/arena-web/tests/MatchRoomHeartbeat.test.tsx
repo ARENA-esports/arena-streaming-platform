@@ -793,9 +793,9 @@ describe('MatchRoomView — Watch Heartbeat Integration', () => {
     expect(mockUpdateBalance).not.toHaveBeenCalled();
   });
 
-  // ── WatchRewardStatus UI Integration ──────────────────────────────────────────
+  // ── WatchRewardStatus UI Removal (BUG 01) ───────────────────────────────────
 
-  it('renders WatchRewardStatus and transitions states: paused -> earning -> capped', async () => {
+  it('does not render WatchRewardStatus badge in Match Overview even when playback and cap state change', async () => {
     setupLiveViewer();
     const mockUpdateBalance = jest.fn();
     mockUseWallet.mockReturnValue({
@@ -806,16 +806,18 @@ describe('MatchRoomView — Watch Heartbeat Integration', () => {
       updateBalance: mockUpdateBalance,
     });
 
-    const { getByTestId, getByText } = renderMatchRoom('101');
+    const { getByTestId, queryByTestId, queryByText } = renderMatchRoom('101');
 
-    // Before playback: Rewards Paused
-    expect(getByText('Rewards Paused')).toBeInTheDocument();
+    // Before playback: no reward status button/badge
+    expect(queryByTestId('watch-reward-status')).not.toBeInTheDocument();
+    expect(queryByText('Rewards Paused')).not.toBeInTheDocument();
 
-    // Start playback: Earning Coins
+    // Start playback: still no reward status badge
     act(() => {
       fireEvent.click(getByTestId('stream-play-btn'));
     });
-    expect(getByText('Earning Coins')).toBeInTheDocument();
+    expect(queryByTestId('watch-reward-status')).not.toBeInTheDocument();
+    expect(queryByText('Earning Coins')).not.toBeInTheDocument();
 
     // Next tick fails with SCRUM-115 cap rejection
     mockRecordWatchTick.mockRejectedValue(
@@ -831,10 +833,12 @@ describe('MatchRoomView — Watch Heartbeat Integration', () => {
       jest.advanceTimersByTime(60000);
     });
 
-    expect(getByText('Reward Cap Reached')).toBeInTheDocument();
+    expect(mockNotify).toHaveBeenCalledWith('Coin cap reached for this stream window.', 'info');
+    expect(queryByTestId('watch-reward-status')).not.toBeInTheDocument();
+    expect(queryByText('Reward Cap Reached')).not.toBeInTheDocument();
   });
 
-  it('transitions WatchRewardStatus to inactive when SCRUM-118 reports stream is not live', async () => {
+  it('does not render WatchRewardStatus badge when SCRUM-118 reports stream is not live', async () => {
     setupLiveViewer();
     mockRecordWatchTick.mockRejectedValue(
       createAxiosError(400, {
@@ -845,7 +849,7 @@ describe('MatchRoomView — Watch Heartbeat Integration', () => {
       })
     );
 
-    const { getByTestId, getByText } = renderMatchRoom('101');
+    const { getByTestId, queryByTestId, queryByText } = renderMatchRoom('101');
     act(() => {
       fireEvent.click(getByTestId('stream-play-btn'));
     });
@@ -854,7 +858,9 @@ describe('MatchRoomView — Watch Heartbeat Integration', () => {
       jest.advanceTimersByTime(60000);
     });
 
-    expect(getByText('Rewards Inactive')).toBeInTheDocument();
+    expect(mockNotify).toHaveBeenCalledWith('Stream is not currently live.', 'info');
+    expect(queryByTestId('watch-reward-status')).not.toBeInTheDocument();
+    expect(queryByText('Rewards Inactive')).not.toBeInTheDocument();
   });
 
   it('supports backend stream response using streamId property', async () => {
@@ -900,16 +906,15 @@ describe('MatchRoomView — Watch Heartbeat Integration', () => {
       updateBalance: mockUpdateBalance,
     });
 
-    const { getByTestId, getByText } = renderMatchRoom('101');
+    const { getByTestId, queryByTestId } = renderMatchRoom('101');
 
-    // Initially paused
-    expect(getByText('Rewards Paused')).toBeInTheDocument();
+    // No reward status badge in Match Overview
+    expect(queryByTestId('watch-reward-status')).not.toBeInTheDocument();
 
-    // Play -> transitions to Earning Coins
+    // Play stream
     act(() => {
       fireEvent.click(getByTestId('stream-play-btn'));
     });
-    expect(getByText('Earning Coins')).toBeInTheDocument();
 
     // 60s passes -> dispatches tick with streamId: 555
     await act(async () => {

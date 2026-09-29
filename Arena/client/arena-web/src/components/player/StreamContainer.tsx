@@ -33,7 +33,7 @@ export const StreamContainer: React.FC<StreamContainerProps> = ({ apiChannelName
     return (
         <div className="flex flex-col w-full h-full gap-2">
             {/* Twitch Stream Channel Override Bar */}
-            <div className='flex flex-wrap items-center gap-2 p-2.5 bg-arena-card/90 border border-arena-cyan/30 rounded-md text-xs shadow-md'>
+            <div className='flex flex-wrap items-center gap-2 p-2.5 bg-arena-card/90 rounded-md text-xs shadow-md'>
                 <span className="bg-arena-cyan/20 text-arena-cyan px-2 py-0.5 rounded font-mono font-bold uppercase tracking-wider text-[10px]">
                     CHANNEL
                 </span>

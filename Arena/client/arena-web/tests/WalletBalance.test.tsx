@@ -170,7 +170,7 @@ describe('WalletBalance', () => {
     expect(screen.queryByText('+100 Coins')).not.toBeInTheDocument();
   });
 
-  it('shows +X Coins floating badge on watch reward increase and auto-dismisses', () => {
+  it('smoothly animates balance on watch reward increase without showing floating badge', () => {
     mockUseWallet.mockReturnValue({
       balance: 100,
       isLoading: false,
@@ -196,16 +196,17 @@ describe('WalletBalance', () => {
 
     rerender(<WalletBalance />);
 
-    // Floating badge must be rendered with +10 Coins
-    expect(screen.getByTestId('wallet-reward-badge')).toBeInTheDocument();
-    expect(screen.getByText('+10 Coins')).toBeInTheDocument();
-
-    // Auto-dismiss after 1200ms
-    act(() => {
-      jest.advanceTimersByTime(1200);
-    });
-
+    // Floating badge must NOT be rendered
     expect(screen.queryByTestId('wallet-reward-badge')).not.toBeInTheDocument();
     expect(screen.queryByText('+10 Coins')).not.toBeInTheDocument();
+    expect(screen.queryByText(/\+.*Coins/i)).not.toBeInTheDocument();
+
+    // Advance animation timers to complete balance roll-up
+    act(() => {
+      jest.advanceTimersByTime(800);
+    });
+
+    // Final balance is displayed
+    expect(screen.getByText('110')).toBeInTheDocument();
   });
 });
