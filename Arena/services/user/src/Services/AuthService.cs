@@ -106,7 +106,7 @@ public class AuthService : IAuthService
             ?? await _userRepository.GetByUsernameAsync(request.Identifier);
 
         // Generic error check: do not leak whether identifier or password was incorrect
-        if (user == null || string.IsNullOrWhiteSpace(user.PasswordHash) || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
+        if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
         {
             throw new UnauthorizedAccessException("Invalid username/email or password.");
         }

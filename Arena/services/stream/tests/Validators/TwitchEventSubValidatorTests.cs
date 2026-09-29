@@ -14,7 +14,7 @@ namespace StreamService.Tests.Validators;
 
 public class TwitchEventSubValidatorTests
 {
-    private const string TestSecret = "Test_Twitch_EventSub_HMAC_Secret_256_Bit_Key!";
+    private const string TestSecret = "Arena_Secret_Key_For_Jwt_Token_Signing_2026_SE3022_Production_Grade!";
     private readonly TwitchEventSubValidator _validator;
 
     public TwitchEventSubValidatorTests()

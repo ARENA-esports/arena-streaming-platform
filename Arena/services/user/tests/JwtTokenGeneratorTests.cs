@@ -14,7 +14,7 @@ namespace UserService.Tests;
 public class JwtTokenGeneratorTests
 {
     private readonly IConfiguration _configuration;
-    private readonly string _secret = "Test_Jwt_Secret_Key_For_Unit_Tests_Only_256_Bits_Entropy!";
+    private readonly string _secret = "Arena_Secret_Key_For_Jwt_Token_Signing_2026_SE3022_Production_Grade!";
     private readonly string _issuer = "Arena.UserService";
     private readonly string _audience = "Arena.Platform";
 

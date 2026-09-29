@@ -124,6 +124,3 @@ pnpm-debug.log*
 ehthumbs.db
 Thumbs.db
 [Dd]esktop.ini
-
-## Runtime Uploads & Media
-**/uploads/

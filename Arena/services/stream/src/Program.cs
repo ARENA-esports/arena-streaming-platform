@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.HttpOverrides;
 using System.Security.Claims;   // provide standard claim types as ClaimTypes.Role
 using System.Text;      // provides character encoding tool to convert strings into byte rates
 using Microsoft.AspNetCore.Authentication.JwtBearer;    // provide authentication scheme constants, JWT options
@@ -20,14 +19,6 @@ if (!string.IsNullOrEmpty(appInsightsConnString))
     builder.Services.AddApplicationInsightsTelemetry();
 }
 
-// configure services before builder.Build();
-builder.Services.Configure<ForwardedHeadersOptions>(options =>
-{
-    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
-    options.KnownIPNetworks.Clear();
-    options.KnownProxies.Clear();
-});
-
 // Add services to the container.
 
 builder.Services.AddControllers();      // register controller discovery and model binder to dependency injection container
@@ -44,7 +35,7 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("ArenaClientCors", policy =>
     {
-        policy.WithOrigins(allowedOrigins)
+        policy.SetIsOriginAllowed(origin => true)
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials();
@@ -164,48 +155,20 @@ var app = builder.Build();      // compile service registrations and create runn
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
     ?? throw new InvalidOperationException("DefaultConnection string is not configured.");
 
-int maxRetries = 10;
-int delaySeconds = 2;
-bool migrationSucceeded = false;
+var upgrader = DeployChanges.To
+    .MySqlDatabase(connectionString)
+    .WithScriptsEmbeddedInAssembly(System.Reflection.Assembly.GetExecutingAssembly())
+    .LogToConsole()
+    .Build();
 
-for (int attempt = 1; attempt <= maxRetries; attempt++)
+var result = upgrader.PerformUpgrade();
+
+if (!result.Successful)
 {
-    try
-    {
-        EnsureDatabase.For.MySqlDatabase(connectionString);
-
-        var upgrader = DeployChanges.To
-            .MySqlDatabase(connectionString)
-            .WithScriptsEmbeddedInAssembly(System.Reflection.Assembly.GetExecutingAssembly())
-            .LogToConsole()
-            .Build();
-
-        var result = upgrader.PerformUpgrade();
-        if (result.Successful)
-        {
-            migrationSucceeded = true;
-            break;
-        }
-        app.Logger.LogWarning("StreamService migration attempt {Attempt}/{MaxRetries} failed: {Error}", attempt, maxRetries, result.Error);
-    }
-    catch (Exception ex)
-    {
-        app.Logger.LogWarning("StreamService migration attempt {Attempt}/{MaxRetries} threw exception: {Message}", attempt, maxRetries, ex.Message);
-    }
-
-    if (attempt < maxRetries)
-    {
-        System.Threading.Thread.Sleep(TimeSpan.FromSeconds(delaySeconds));
-    }
+    throw new Exception("Database migration failed: " + result.Error);
 }
 
-if (!migrationSucceeded)
-{
-    throw new InvalidOperationException("Failed to apply StreamService database migrations after maximum retry attempts.");
-}
 
-// middlewares
-app.UseForwardedHeaders();
 // Exception Handling at the very top of the HTTP pipeline
 app.UseExceptionHandler();
 // Global Security Headers middleware

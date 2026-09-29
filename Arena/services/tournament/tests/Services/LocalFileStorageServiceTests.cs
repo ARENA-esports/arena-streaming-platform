@@ -59,20 +59,6 @@ public class LocalFileStorageServiceTests : IDisposable
     private static IFormFile CreateMockFormFile(string fileName, string contentType, long sizeBytes)
     {
         var content = new byte[sizeBytes];
-        if (fileName.EndsWith(".png", StringComparison.OrdinalIgnoreCase) && sizeBytes >= 4)
-        {
-            content[0] = 0x89; content[1] = 0x50; content[2] = 0x4E; content[3] = 0x47;
-        }
-        else if ((fileName.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase) || fileName.EndsWith(".jpeg", StringComparison.OrdinalIgnoreCase)) && sizeBytes >= 3)
-        {
-            content[0] = 0xFF; content[1] = 0xD8; content[2] = 0xFF;
-        }
-        else if (fileName.EndsWith(".svg", StringComparison.OrdinalIgnoreCase) && sizeBytes >= 4)
-        {
-            var svgBytes = Encoding.UTF8.GetBytes("<svg xmlns='http://www.w3.org/2000/svg'></svg>");
-            Array.Copy(svgBytes, content, Math.Min(svgBytes.Length, content.Length));
-        }
-
         var stream = new MemoryStream(content);
         return new FormFile(stream, 0, sizeBytes, "file", fileName)
         {

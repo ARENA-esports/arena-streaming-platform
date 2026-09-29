@@ -21,7 +21,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\src\TournamentService.csproj" />
-    <ProjectReference Include="..\..\..\shared\EventContracts\src\EventContracts.csproj" />
   </ItemGroup>
 
 </Project>

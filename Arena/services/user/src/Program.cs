@@ -1,30 +1,19 @@
-using Microsoft.AspNetCore.HttpOverrides;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Threading.RateLimiting;
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.AspNetCore.RateLimiting;
 using UserService.Repositories;
 using UserService.Services;
 using DbUp;
-using Dapper;
-
-DefaultTypeMap.MatchNamesWithUnderscores = true;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Application Insights — enabled when APPLICATIONINSIGHTS_CONNECTION_STRING is set in the environment
-var appInsightsConnString = builder.Configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"]
-    ?? builder.Configuration["ApplicationInsights:ConnectionString"];
-if (!string.IsNullOrEmpty(appInsightsConnString))
-{
-    builder.Services.AddApplicationInsightsTelemetry();
-}
-
-// configure services before builder.Build();
+// Configure forwarded headers for proxy environments (Azure, reverse proxies)
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
@@ -158,46 +147,18 @@ var app = builder.Build();
 var connectionString = builder.Configuration.GetConnectionString("UserDb")
     ?? throw new InvalidOperationException("UserDb connection string is not configured.");
 
-int maxRetries = 10;
-int delaySeconds = 2;
-bool migrationSucceeded = false;
+var upgrader = DeployChanges.To
+    .MySqlDatabase(connectionString)
+    .WithScriptsEmbeddedInAssembly(System.Reflection.Assembly.GetExecutingAssembly())
+    .LogToConsole()
+    .Build();
 
-for (int attempt = 1; attempt <= maxRetries; attempt++)
+var result = upgrader.PerformUpgrade();
+if (!result.Successful)
 {
-    try
-    {
-        var upgrader = DeployChanges.To
-            .MySqlDatabase(connectionString)
-            .WithScriptsEmbeddedInAssembly(System.Reflection.Assembly.GetExecutingAssembly())
-            .LogToConsole()
-            .Build();
-
-        var result = upgrader.PerformUpgrade();
-        if (result.Successful)
-        {
-            migrationSucceeded = true;
-            break;
-        }
-        app.Logger.LogWarning("UserService migration attempt {Attempt}/{MaxRetries} failed: {Error}", attempt, maxRetries, result.Error);
-    }
-    catch (Exception ex)
-    {
-        app.Logger.LogWarning("UserService migration attempt {Attempt}/{MaxRetries} threw exception: {Message}", attempt, maxRetries, ex.Message);
-    }
-
-    if (attempt < maxRetries)
-    {
-        System.Threading.Thread.Sleep(TimeSpan.FromSeconds(delaySeconds));
-    }
+    throw new Exception("Database migration failed: " + result.Error);
 }
 
-if (!migrationSucceeded)
-{
-    throw new InvalidOperationException("Failed to apply UserService database migrations after maximum retry attempts.");
-}
-
-// middleware
-app.UseForwardedHeaders();
 // Exception Handling at the very top of the HTTP pipeline
 app.UseExceptionHandler();
 
@@ -218,6 +179,7 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
+app.UseForwardedHeaders();
 app.UseHttpsRedirection();
 //hard: Rate limiter pipeline placed prior to routing to drop abusive floods at the ingress boundary
 app.UseRateLimiter();

@@ -1,5 +1,4 @@
 using System.Text;
-using Dapper;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using ChatService.Repositories;
@@ -34,8 +33,6 @@ builder.Services.AddCors(options =>
     });
 });
 
-// Dapper configuration
-DefaultTypeMap.MatchNamesWithUnderscores = true;
 
 // ── DI Registrations ──
 builder.Services.AddSingleton<FactionChannelManager>();

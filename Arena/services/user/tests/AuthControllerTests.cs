@@ -23,7 +23,6 @@ public class AuthControllerTests
         _mockAuthService = new Mock<IAuthService>();
         _mockLogger = new Mock<ILogger<AuthController>>();
         _mockEnv = new Mock<IWebHostEnvironment>();
-        _mockEnv.Setup(e => e.EnvironmentName).Returns("Development");
         _controller = new AuthController(_mockAuthService.Object, _mockLogger.Object, _mockEnv.Object)
         {
             ControllerContext = new ControllerContext

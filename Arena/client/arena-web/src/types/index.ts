@@ -95,7 +95,8 @@ export interface LinkStreamRequest {
 }
 
 export interface StreamResponse {
-  id: number;
+  id?: number;
+  streamId?: number;
   matchId: number;
   channelName: string;
   status: 'Scheduled' | 'Live' | 'Ended';
@@ -138,31 +139,19 @@ export interface UpdateTournamentRequest {
   end_date: string;
 }
 
-// ── Chat Types ──
-
-export interface ChatMessage {
-  messageId: number;
-  teamId: number;
-  teamName: string;
-  teamColor: string;
-  userId: number;
-  username: string;
-  content: string;
-  createdAt: string;
+export interface WatchTickRequest {
+  streamId?: number;
 }
 
-export interface ChatHistoryFrame {
-  type: 'history';
-  messages: ChatMessage[];
-}
-
-export interface ChatMessageFrame extends ChatMessage {
-  type: 'message';
-}
-
-export interface ChatErrorFrame {
-  type: 'error';
+export interface WatchTickResponse {
+  success: boolean;
+  coinsAwarded: number;
+  currentBalance: number;
+  lastTickAt: string | null;
+  remainingSeconds?: number;
   message: string;
 }
 
-export type ChatFrame = ChatHistoryFrame | ChatMessageFrame | ChatErrorFrame;
+export interface WalletBalanceResponse {
+  balance: number;
+}
