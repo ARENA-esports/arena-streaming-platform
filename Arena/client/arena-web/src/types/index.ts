@@ -183,3 +183,13 @@ export interface ChatFrame {
   senderName?: string;
   [key: string]: any;
 }
+
+export interface StreamEngagementResponse {
+  streamId: number;
+  totalWatchSeconds: number;
+  totalCoinsEarned: number;
+  totalWatchTicks: number;
+  uniqueViewers: number;
+  lastEventAt: string | null;
+}
+
