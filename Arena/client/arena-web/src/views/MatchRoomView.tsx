@@ -13,7 +13,7 @@ import { useWallet } from '../context/WalletContext';
 import { useNotification } from '../context/NotificationContext';
 import EditMatchModal from '../components/match/EditMatchModal';
 import DeleteMatchModal from '../components/match/DeleteMatchModal';
-import BattleBar from '../components/match/BattleBar';
+import WeaponShop from '../components/match/WeaponShop';
 import TeamSelector from '../components/match/TeamSelector';
 import FactionChat from '../components/chat/FactionChat';
 import { ScheduledView } from '../components/match/ScheduledView';
@@ -210,7 +210,7 @@ export const MatchRoomView: React.FC = () => {
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[3fr_1fr] gap-4 w-full h-full py-4">
+      <div className="grid grid-cols-1 lg:grid-cols-[3fr_1fr] gap-4 w-full py-4">
         {/* Video Player Section - Dynamic tile swapping */}
         <div className="lg:col-start-1 flex flex-col gap-3 min-w-0">
           {status === 'Scheduled' && <ScheduledView match={match} />}
@@ -227,18 +227,23 @@ export const MatchRoomView: React.FC = () => {
           {status === 'Cancelled' && <CancelledView match={match} />}
         </div>
 
-        {/* Panel Group - Always mounted in right column, visibility toggled on mobile */}
-        <div className="lg:col-start-2 flex flex-col gap-4 min-w-0">
-          <div className="flex items-center justify-end">
+        {/* Panel Group - Always mounted in right column, height matched to stream */}
+        <div className="lg:col-start-2 flex flex-col gap-3 min-w-0 h-full">
+          <div className="flex items-center justify-end shrink-0">
             <WalletBalance />
           </div>
 
           {/* Tab switcher - mobile only */}
-          <div className="flex lg:hidden border-b border-arena-border mb-2">
+          <div className="flex lg:hidden border-b border-arena-border mb-2 shrink-0">
             {['team', 'chat', 'battle'].map(tab => (
               <button
                 key={tab}
-                onClick={() => setActiveTab(tab)}
+                onClick={() => {
+                  setActiveTab(tab);
+                  if (tab === 'battle') {
+                    document.getElementById('weapon-shop-section')?.scrollIntoView({ behavior: 'smooth' });
+                  }
+                }}
                 className={`px-4 py-3 flex-1 text-sm font-bold uppercase tracking-wider transition-colors duration-200 ${activeTab === tab
                     ? 'border-b-2 border-arena-cyan text-arena-text'
                     : 'text-arena-textMuted hover:text-arena-text'
@@ -249,7 +254,7 @@ export const MatchRoomView: React.FC = () => {
             ))}
           </div>
 
-          <div className={activeTab === 'team' ? 'block' : 'hidden lg:block'}>
+          <div className={`shrink-0 ${activeTab === 'team' ? 'block' : 'hidden lg:block'}`}>
             <TeamSelector
               matchId={match.matchId}
               selectedTeamId={selectedTeamId}
@@ -257,7 +262,7 @@ export const MatchRoomView: React.FC = () => {
               onTeamsLoaded={handleTeamsLoaded}
             />
           </div>
-          <div className={`h-[560px] xl:h-[620px] min-w-0 ${activeTab === 'chat' ? 'block' : 'hidden lg:block'}`}>
+          <div className={`flex-1 min-h-[320px] min-w-0 ${activeTab === 'chat' ? 'flex flex-col' : 'hidden lg:flex lg:flex-col'}`}>
             <FactionChat
               matchId={match.matchId}
               teamAId={match.teamAId}
@@ -268,10 +273,12 @@ export const MatchRoomView: React.FC = () => {
               activeChannel={activeChannel}
             />
           </div>
-          <div className={activeTab === 'battle' ? 'block' : 'hidden lg:block'}>
-            <BattleBar matchId={match.matchId} />
-          </div>
         </div>
+      </div>
+
+      {/* Full-Width Weapon Shop across the whole display below stream & chat */}
+      <div id="weapon-shop-section" className="w-full pb-8">
+        <WeaponShop matchId={match.matchId} teamId={selectedTeamId} />
       </div>
 
       {isEditModalOpen && (

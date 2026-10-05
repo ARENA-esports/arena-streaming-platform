@@ -31,6 +31,8 @@ builder.Services.AddSingleton(TimeProvider.System);
 // Register Repositories
 builder.Services.AddScoped<IWalletRepository, WalletRepository>();
 builder.Services.AddScoped<ICoinTransactionRepository, CoinTransactionRepository>();
+builder.Services.AddScoped<IWeaponRepository, WeaponRepository>();
+builder.Services.AddScoped<IAttackRepository, AttackRepository>();
 
 // Register StreamService HTTP Client with Polly resilience (SCRUM-118)
 builder.Services.AddHttpClient<IStreamServiceClient, StreamServiceClient>((sp, client) =>
@@ -49,6 +51,7 @@ builder.Services.AddHttpClient<IStreamServiceClient, StreamServiceClient>((sp, c
 builder.Services.AddScoped<IWatchTickService, WatchTickService>();
 builder.Services.AddScoped<IStreamLivenessValidator, HttpStreamLivenessValidator>();
 builder.Services.AddScoped<ICoinCapPolicy, SlidingWindowCoinCapPolicy>();
+builder.Services.AddScoped<IWeaponShopService, WeaponShopService>();
 // SCRUM-117: real Kafka publisher registered as Singleton — IProducer<> is thread-safe
 // and long-lived; ASP.NET Core disposes Singleton IDisposables on application shutdown,
 // which triggers the 5-second flush before the librdkafka handle is released.
