@@ -35,6 +35,11 @@ export default defineConfig({
                 target: 'http://127.0.0.1:8083', // Battle Economy Service (SCRUM-116)
                 changeOrigin: true,
             },
+            '/ws/battle': {
+                target: 'http://127.0.0.1:8083', // Battle Economy Service WebSocket (SCRUM-121)
+                ws: true,
+                changeOrigin: true,
+            },
             '/api': {
                 target: 'http://127.0.0.1:5167', // Stream Service
                 changeOrigin: true,

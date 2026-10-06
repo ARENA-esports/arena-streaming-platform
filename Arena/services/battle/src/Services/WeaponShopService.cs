@@ -1,6 +1,7 @@
 using BattleEconomyService.DTOs;
 using BattleEconomyService.Models;
 using BattleEconomyService.Repositories;
+using BattleEconomyService.WebSockets;
 
 namespace BattleEconomyService.Services;
 
@@ -11,6 +12,7 @@ public class WeaponShopService : IWeaponShopService
     private readonly IWalletRepository _walletRepository;
     private readonly ICoinTransactionRepository _coinTransactionRepository;
     private readonly IBattleBarRepository _battleBarRepository;
+    private readonly IBattleWebSocketManager _webSocketManager;
     private readonly ILogger<WeaponShopService> _logger;
 
     public WeaponShopService(
@@ -19,6 +21,7 @@ public class WeaponShopService : IWeaponShopService
         IWalletRepository walletRepository,
         ICoinTransactionRepository coinTransactionRepository,
         IBattleBarRepository battleBarRepository,
+        IBattleWebSocketManager webSocketManager,
         ILogger<WeaponShopService> logger)
     {
         _weaponRepository = weaponRepository;
@@ -26,6 +29,7 @@ public class WeaponShopService : IWeaponShopService
         _walletRepository = walletRepository;
         _coinTransactionRepository = coinTransactionRepository;
         _battleBarRepository = battleBarRepository;
+        _webSocketManager = webSocketManager;
         _logger = logger;
     }
 
@@ -101,7 +105,38 @@ public class WeaponShopService : IWeaponShopService
                 request.MatchId, request.TeamId, attackId);
         }
 
-        // 5. Retrieve updated balance
+        // 5. Broadcast real-time battle bar update to all connected viewers (SCRUM-121)
+        try
+        {
+            var matchBars = await _battleBarRepository.GetBarsForMatchAsync(request.MatchId) ?? new List<BattleBar>();
+            var broadcast = new BattleBarBroadcastMessage
+            {
+                Type = "battle_bar_update",
+                MatchId = request.MatchId,
+                Bars = matchBars.Select(b => new BattleBarDto
+                {
+                    TeamId = b.TeamId,
+                    TotalDamage = b.TotalDamage
+                }).ToList(),
+                LatestAttack = new AttackEventDto
+                {
+                    TeamId = request.TeamId,
+                    Damage = weapon.Damage,
+                    WeaponName = weapon.Name,
+                    WeaponId = weapon.WeaponId
+                },
+                Timestamp = DateTime.UtcNow
+            };
+
+            await _webSocketManager.BroadcastToMatchAsync(request.MatchId, broadcast);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to broadcast battle bar update for match {MatchId}, attack {AttackId}.",
+                request.MatchId, attackId);
+        }
+
+        // 6. Retrieve updated balance
         var updatedWallet = await _walletRepository.GetByUserIdAsync(userId);
         var newBalance = updatedWallet?.Coins ?? 0;
 

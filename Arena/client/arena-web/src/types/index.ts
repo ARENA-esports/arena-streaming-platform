@@ -206,6 +206,32 @@ export interface AttackResponse {
   coinsSpent: number;
   currentBalance: number;
   damageDealt: number;
+  teamTotalDamage?: number;
   message: string;
+}
+
+// Battle Bar Types (SCRUM-120, SCRUM-121)
+export interface BattleBarEntry {
+  barId?: number;
+  matchId: number;
+  teamId: number;
+  totalDamage: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface LatestAttackEvent {
+  teamId: number;
+  damage: number;
+  weaponName: string;
+  weaponId: number;
+}
+
+export interface BattleBarBroadcastPayload {
+  type: 'init' | 'battle_bar_update';
+  matchId: number;
+  bars: Array<{ teamId: number; totalDamage: number }>;
+  latestAttack?: LatestAttackEvent | null;
+  timestamp: string;
 }
 

@@ -14,6 +14,7 @@ import { useNotification } from '../context/NotificationContext';
 import EditMatchModal from '../components/match/EditMatchModal';
 import DeleteMatchModal from '../components/match/DeleteMatchModal';
 import WeaponShop from '../components/match/WeaponShop';
+import BattleBar from '../components/match/BattleBar';
 import TeamSelector from '../components/match/TeamSelector';
 import FactionChat from '../components/chat/FactionChat';
 import { ScheduledView } from '../components/match/ScheduledView';
@@ -274,6 +275,16 @@ export const MatchRoomView: React.FC = () => {
             />
           </div>
         </div>
+      </div>
+
+      {/* Real-Time Faction Battle Bar (SCRUM-120, SCRUM-121) */}
+      <div id="battle-bar-section" className="w-full pb-4">
+        <BattleBar
+          matchId={match.matchId}
+          teamAId={match.teamAId}
+          teamBId={match.teamBId}
+          teamsMap={teamsMap}
+        />
       </div>
 
       {/* Full-Width Weapon Shop across the whole display below stream & chat */}

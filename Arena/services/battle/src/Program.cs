@@ -9,6 +9,7 @@ using Polly;
 using BattleEconomyService.Configuration;
 using BattleEconomyService.Repositories;
 using BattleEconomyService.Services;
+using BattleEconomyService.WebSockets;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -53,6 +54,8 @@ builder.Services.AddScoped<IWatchTickService, WatchTickService>();
 builder.Services.AddScoped<IStreamLivenessValidator, HttpStreamLivenessValidator>();
 builder.Services.AddScoped<ICoinCapPolicy, SlidingWindowCoinCapPolicy>();
 builder.Services.AddScoped<IWeaponShopService, WeaponShopService>();
+// SCRUM-121: Real-time WebSocket room manager for battle bar broadcasting
+builder.Services.AddSingleton<IBattleWebSocketManager, BattleWebSocketManager>();
 // SCRUM-117: real Kafka publisher registered as Singleton — IProducer<> is thread-safe
 // and long-lived; ASP.NET Core disposes Singleton IDisposables on application shutdown,
 // which triggers the 5-second flush before the librdkafka handle is released.
@@ -133,10 +136,18 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         {
             OnMessageReceived = context =>
             {
-                if (context.Request.Cookies.TryGetValue("arena_access_token", out var token))
+                // 1. Try cookie first (browser WebSocket handshakes send cookies automatically)
+                if (context.Request.Cookies.TryGetValue("arena_access_token", out var cookieToken))
                 {
-                    context.Token = token;
+                    context.Token = cookieToken;
                 }
+                // 2. Fallback: query parameter for non-browser / direct clients
+                else if (context.Request.Query.TryGetValue("token", out var queryToken)
+                         && !string.IsNullOrWhiteSpace(queryToken))
+                {
+                    context.Token = queryToken!;
+                }
+
                 return Task.CompletedTask;
             }
         };
@@ -184,8 +195,14 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 app.UseCors("ArenaClientCors");
 
+// WebSocket support — must be registered before auth so pipeline can upgrade
+app.UseWebSockets();
+
 app.UseAuthentication();
 app.UseAuthorization();
+
+// Map real-time WebSocket endpoint for battle bar broadcasting (SCRUM-121)
+app.MapBattleWebSocket();
 
 app.MapControllers();
 

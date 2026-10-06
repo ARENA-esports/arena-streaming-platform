@@ -4,6 +4,7 @@ using BattleEconomyService.DTOs;
 using BattleEconomyService.Models;
 using BattleEconomyService.Repositories;
 using BattleEconomyService.Services;
+using BattleEconomyService.WebSockets;
 using Xunit;
 
 namespace BattleEconomyService.Tests;
@@ -15,6 +16,7 @@ public class WeaponShopServiceTests
     private readonly Mock<IWalletRepository> _walletRepoMock;
     private readonly Mock<ICoinTransactionRepository> _coinTransactionRepoMock;
     private readonly Mock<IBattleBarRepository> _battleBarRepoMock;
+    private readonly Mock<IBattleWebSocketManager> _webSocketManagerMock;
     private readonly Mock<ILogger<WeaponShopService>> _loggerMock;
     private readonly WeaponShopService _service;
 
@@ -25,6 +27,7 @@ public class WeaponShopServiceTests
         _walletRepoMock = new Mock<IWalletRepository>();
         _coinTransactionRepoMock = new Mock<ICoinTransactionRepository>();
         _battleBarRepoMock = new Mock<IBattleBarRepository>();
+        _webSocketManagerMock = new Mock<IBattleWebSocketManager>();
         _loggerMock = new Mock<ILogger<WeaponShopService>>();
 
         _service = new WeaponShopService(
@@ -33,6 +36,7 @@ public class WeaponShopServiceTests
             _walletRepoMock.Object,
             _coinTransactionRepoMock.Object,
             _battleBarRepoMock.Object,
+            _webSocketManagerMock.Object,
             _loggerMock.Object);
     }
 
@@ -126,6 +130,8 @@ public class WeaponShopServiceTests
         _walletRepoMock.Setup(w => w.GetByUserIdAsync(10)).ReturnsAsync(new Wallet { WalletId = 77, UserId = 10, Coins = 50 });
         _attackRepoMock.Setup(a => a.RecordAttackAsync(It.IsAny<AttackLog>())).ReturnsAsync(12345L);
         _battleBarRepoMock.Setup(b => b.ApplyDamageAtomicAsync(101, 2, 6)).ReturnsAsync(106L);
+        _battleBarRepoMock.Setup(b => b.GetBarsForMatchAsync(101))
+            .ReturnsAsync(new List<BattleBar> { new() { MatchId = 101, TeamId = 2, TotalDamage = 106 } });
 
         var request = new AttackRequest { WeaponId = 1, MatchId = 101, TeamId = 2 };
 
@@ -151,8 +157,41 @@ public class WeaponShopServiceTests
 
         _battleBarRepoMock.Verify(b => b.ApplyDamageAtomicAsync(101, 2, 6), Times.Once);
 
+        _webSocketManagerMock.Verify(ws => ws.BroadcastToMatchAsync(
+            101,
+            It.Is<BattleBarBroadcastMessage>(m =>
+                m.MatchId == 101 &&
+                m.Type == "battle_bar_update" &&
+                m.LatestAttack != null &&
+                m.LatestAttack.Damage == 6),
+            It.IsAny<CancellationToken>()), Times.Once);
+
         _coinTransactionRepoMock.Verify(c => c.RecordTransactionAsync(
             10, 77, -50, "WEAPON_PURCHASE", null), Times.Once);
+    }
+
+    [Fact]
+    public async Task PurchaseAttackAsync_WebSocketBroadcastFails_StillReturnsSuccess()
+    {
+        // Arrange — WebSocket broadcast fails, but attack must still succeed (fault isolation)
+        var weapon = new Weapon { WeaponId = 1, Name = "Hammer", Cost = 50, Damage = 6, IsActive = true };
+        _weaponRepoMock.Setup(r => r.GetByIdAsync(1)).ReturnsAsync(weapon);
+        _walletRepoMock.Setup(w => w.TryDeductCoinsAsync(10, 50)).ReturnsAsync(true);
+        _walletRepoMock.Setup(w => w.GetByUserIdAsync(10)).ReturnsAsync(new Wallet { WalletId = 77, UserId = 10, Coins = 50 });
+        _attackRepoMock.Setup(a => a.RecordAttackAsync(It.IsAny<AttackLog>())).ReturnsAsync(12345L);
+        _battleBarRepoMock.Setup(b => b.ApplyDamageAtomicAsync(101, 2, 6)).ReturnsAsync(106L);
+        _webSocketManagerMock.Setup(ws => ws.BroadcastToMatchAsync(It.IsAny<int>(), It.IsAny<BattleBarBroadcastMessage>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new Exception("Socket buffer overflow"));
+
+        var request = new AttackRequest { WeaponId = 1, MatchId = 101, TeamId = 2 };
+
+        // Act
+        var result = await _service.PurchaseAttackAsync(10, request);
+
+        // Assert — attack succeeds despite WebSocket broadcast failure
+        Assert.True(result.Success);
+        Assert.Equal(12345L, result.AttackId);
+        Assert.Equal(106L, result.TeamTotalDamage);
     }
 
     [Fact]
