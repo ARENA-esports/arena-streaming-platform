@@ -10,6 +10,7 @@ public class WeaponShopService : IWeaponShopService
     private readonly IAttackRepository _attackRepository;
     private readonly IWalletRepository _walletRepository;
     private readonly ICoinTransactionRepository _coinTransactionRepository;
+    private readonly IBattleBarRepository _battleBarRepository;
     private readonly ILogger<WeaponShopService> _logger;
 
     public WeaponShopService(
@@ -17,12 +18,14 @@ public class WeaponShopService : IWeaponShopService
         IAttackRepository attackRepository,
         IWalletRepository walletRepository,
         ICoinTransactionRepository coinTransactionRepository,
+        IBattleBarRepository battleBarRepository,
         ILogger<WeaponShopService> logger)
     {
         _weaponRepository = weaponRepository;
         _attackRepository = attackRepository;
         _walletRepository = walletRepository;
         _coinTransactionRepository = coinTransactionRepository;
+        _battleBarRepository = battleBarRepository;
         _logger = logger;
     }
 
@@ -83,11 +86,26 @@ public class WeaponShopService : IWeaponShopService
 
         var attackId = await _attackRepository.RecordAttackAsync(attackLog);
 
-        // 4. Retrieve updated balance
+        // 4. Atomically update the battle bar (SCRUM-120)
+        //    Uses INSERT ... ON DUPLICATE KEY UPDATE total_damage = total_damage + @Damage.
+        //    InnoDB row-level locking ensures no lost updates under concurrent load.
+        long teamTotalDamage = 0;
+        try
+        {
+            teamTotalDamage = await _battleBarRepository.ApplyDamageAtomicAsync(
+                request.MatchId, request.TeamId, weapon.Damage);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to update battle bar for match {MatchId}, team {TeamId}. Attack {AttackId} was still recorded.",
+                request.MatchId, request.TeamId, attackId);
+        }
+
+        // 5. Retrieve updated balance
         var updatedWallet = await _walletRepository.GetByUserIdAsync(userId);
         var newBalance = updatedWallet?.Coins ?? 0;
 
-        // 5. Record coin transaction audit entry
+        // 6. Record coin transaction audit entry
         if (updatedWallet != null)
         {
             try
@@ -102,8 +120,8 @@ public class WeaponShopService : IWeaponShopService
         }
 
         _logger.LogInformation(
-            "Attack submitted: user {UserId} used weapon {WeaponName} (cost {Cost}) for team {TeamId} in match {MatchId}. New balance: {Balance}.",
-            userId, weapon.Name, weapon.Cost, request.TeamId, request.MatchId, newBalance);
+            "Attack submitted: user {UserId} used weapon {WeaponName} (cost {Cost}) for team {TeamId} in match {MatchId}. Damage: {Damage}. Bar total: {BarTotal}. New balance: {Balance}.",
+            userId, weapon.Name, weapon.Cost, request.TeamId, request.MatchId, weapon.Damage, teamTotalDamage, newBalance);
 
         return new AttackResponse
         {
@@ -112,7 +130,13 @@ public class WeaponShopService : IWeaponShopService
             CoinsSpent = weapon.Cost,
             CurrentBalance = newBalance,
             DamageDealt = weapon.Damage,
+            TeamTotalDamage = teamTotalDamage,
             Message = $"{weapon.Name} attack launched! Dealt {weapon.Damage} damage."
         };
+    }
+
+    public async Task<List<BattleBar>> GetBarsForMatchAsync(int matchId)
+    {
+        return await _battleBarRepository.GetBarsForMatchAsync(matchId);
     }
 }

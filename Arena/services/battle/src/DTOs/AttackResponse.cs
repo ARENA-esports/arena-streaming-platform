@@ -10,5 +10,6 @@ public class AttackResponse
     public int CoinsSpent { get; set; }
     public int CurrentBalance { get; set; }
     public int DamageDealt { get; set; }
+    public long TeamTotalDamage { get; set; }
     public string Message { get; set; } = string.Empty;
 }

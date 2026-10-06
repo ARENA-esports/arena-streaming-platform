@@ -33,6 +33,7 @@ builder.Services.AddScoped<IWalletRepository, WalletRepository>();
 builder.Services.AddScoped<ICoinTransactionRepository, CoinTransactionRepository>();
 builder.Services.AddScoped<IWeaponRepository, WeaponRepository>();
 builder.Services.AddScoped<IAttackRepository, AttackRepository>();
+builder.Services.AddScoped<IBattleBarRepository, BattleBarRepository>();
 
 // Register StreamService HTTP Client with Polly resilience (SCRUM-118)
 builder.Services.AddHttpClient<IStreamServiceClient, StreamServiceClient>((sp, client) =>
