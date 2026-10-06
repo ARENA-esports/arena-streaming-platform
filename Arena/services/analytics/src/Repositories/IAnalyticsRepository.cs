@@ -35,4 +35,38 @@ public interface IAnalyticsRepository
     /// Retrieves engagement metrics across all streams.
     /// </summary>
     Task<IReadOnlyList<StreamEngagementSummary>> GetAllEngagementSummariesAsync();
+
+    /// <summary>
+    /// Retrieves aggregated battle and attack metrics for a specific stream across all participating teams.
+    /// </summary>
+    /// <param name="streamId">The stream/match identifier.</param>
+    Task<IReadOnlyList<StreamTeamBattleSummary>> GetBattleSummariesByStreamIdAsync(int streamId);
+
+    /// <summary>
+    /// Retrieves aggregated battle and attack metrics across all streams and teams.
+    /// </summary>
+    Task<IReadOnlyList<StreamTeamBattleSummary>> GetAllBattleSummariesAsync();
+
+    /// <summary>
+    /// Retrieves round outcome history for a specific stream ordered by round number ascending.
+    /// </summary>
+    /// <param name="streamId">The stream/match identifier.</param>
+    Task<IReadOnlyList<StreamRoundOutcome>> GetRoundOutcomesByStreamIdAsync(int streamId);
+
+    /// <summary>
+    /// Retrieves round outcome history across all streams.
+    /// </summary>
+    Task<IReadOnlyList<StreamRoundOutcome>> GetAllRoundOutcomesAsync();
+
+    /// <summary>
+    /// Upserts aggregated battle metrics for a stream and team into the read model.
+    /// </summary>
+    /// <param name="summary">The battle summary record to upsert.</param>
+    Task UpsertBattleSummaryAsync(StreamTeamBattleSummary summary);
+
+    /// <summary>
+    /// Records a completed round outcome into the read model.
+    /// </summary>
+    /// <param name="outcome">The round outcome record to insert.</param>
+    Task RecordRoundOutcomeAsync(StreamRoundOutcome outcome);
 }
