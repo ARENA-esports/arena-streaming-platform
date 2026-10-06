@@ -193,3 +193,35 @@ export interface StreamEngagementResponse {
   lastEventAt: string | null;
 }
 
+export interface StreamTeamBattleResponse {
+  streamId: number;
+  teamId: number;
+  teamName: string;
+  totalAttacks: number;
+  totalDamageDealt: number;
+  totalCoinsSpent: number;
+  roundsWon: number;
+  roundsLost: number;
+  lastAttackAt: string | null;
+}
+
+export interface StreamRoundOutcomeResponse {
+  streamId: number;
+  roundNumber: number;
+  winningTeamId: number;
+  winningTeamName: string;
+  teamAId: number;
+  teamBId: number;
+  teamAAttacks: number;
+  teamBAttacks: number;
+  teamADamage: number;
+  teamBDamage: number;
+  completedAt: string;
+}
+
+export interface StreamBattleDashboardResponse {
+  streamId: number;
+  teams: StreamTeamBattleResponse[];
+  rounds: StreamRoundOutcomeResponse[];
+}
+
