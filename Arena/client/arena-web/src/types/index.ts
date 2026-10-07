@@ -208,9 +208,12 @@ export interface AttackResponse {
   damageDealt: number;
   teamTotalDamage?: number;
   message: string;
+  roundEnded?: boolean;
+  winningTeamId?: number | null;
+  roundNumber?: number;
 }
 
-// Battle Bar Types (SCRUM-120, SCRUM-121)
+// Battle Bar Types (SCRUM-120, SCRUM-121, SCRUM-122)
 export interface BattleBarEntry {
   barId?: number;
   matchId: number;
@@ -228,10 +231,13 @@ export interface LatestAttackEvent {
 }
 
 export interface BattleBarBroadcastPayload {
-  type: 'init' | 'battle_bar_update';
+  type: 'init' | 'battle_bar_update' | 'round_reset';
   matchId: number;
   bars: Array<{ teamId: number; totalDamage: number }>;
   latestAttack?: LatestAttackEvent | null;
+  roundNumber?: number;
+  roundEnded?: boolean;
+  winningTeamId?: number | null;
   timestamp: string;
 }
 
