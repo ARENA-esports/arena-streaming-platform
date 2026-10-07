@@ -183,3 +183,55 @@ export interface ChatFrame {
   senderName?: string;
   [key: string]: any;
 }
+
+// Weapon Shop & Attack Types (SCRUM-119)
+export interface Weapon {
+  weaponId: number;
+  name: string;
+  description: string;
+  cost: number;
+  damage: number;
+  iconKey: string;
+}
+
+export interface AttackRequest {
+  weaponId: number;
+  matchId: number;
+  teamId: number;
+}
+
+export interface AttackResponse {
+  success: boolean;
+  attackId?: number;
+  coinsSpent: number;
+  currentBalance: number;
+  damageDealt: number;
+  teamTotalDamage?: number;
+  message: string;
+}
+
+// Battle Bar Types (SCRUM-120, SCRUM-121)
+export interface BattleBarEntry {
+  barId?: number;
+  matchId: number;
+  teamId: number;
+  totalDamage: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface LatestAttackEvent {
+  teamId: number;
+  damage: number;
+  weaponName: string;
+  weaponId: number;
+}
+
+export interface BattleBarBroadcastPayload {
+  type: 'init' | 'battle_bar_update';
+  matchId: number;
+  bars: Array<{ teamId: number; totalDamage: number }>;
+  latestAttack?: LatestAttackEvent | null;
+  timestamp: string;
+}
+
