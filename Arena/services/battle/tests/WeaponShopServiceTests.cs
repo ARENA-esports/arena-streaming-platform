@@ -414,4 +414,88 @@ public class WeaponShopServiceTests
         Assert.Equal(503L, result.AttackId);
         Assert.False(result.RoundEnded);
     }
+
+    [Fact]
+    public async Task GetRoundHistoryAsync_ReturnsMappedHistoryDtosWithParsedBars()
+    {
+        // Arrange
+        var now = DateTime.UtcNow;
+        var rounds = new List<BattleRound>
+        {
+            new()
+            {
+                RoundId = 1,
+                MatchId = 101,
+                RoundNumber = 1,
+                TargetDamage = 100,
+                WinningTeamId = 1,
+                RoundActive = false,
+                FinalBarState = "[{\"TeamId\":1,\"TotalDamage\":100},{\"TeamId\":2,\"TotalDamage\":45}]",
+                CreatedAt = now.AddMinutes(-5),
+                EndedAt = now
+            }
+        };
+
+        _battleRoundRepoMock.Setup(r => r.GetRoundHistoryAsync(101)).ReturnsAsync(rounds);
+
+        // Act
+        var result = await _service.GetRoundHistoryAsync(101);
+
+        // Assert
+        Assert.Single(result);
+        Assert.Equal(1, result[0].RoundId);
+        Assert.Equal(101, result[0].MatchId);
+        Assert.Equal(1, result[0].RoundNumber);
+        Assert.Equal(1, result[0].WinningTeamId);
+        Assert.Equal(100, result[0].TargetDamage);
+        Assert.Equal(2, result[0].FinalBarState.Count);
+        Assert.Equal(1, result[0].FinalBarState[0].TeamId);
+        Assert.Equal(100, result[0].FinalBarState[0].TotalDamage);
+        Assert.Equal(2, result[0].FinalBarState[1].TeamId);
+        Assert.Equal(45, result[0].FinalBarState[1].TotalDamage);
+    }
+
+    [Fact]
+    public async Task GetRoundHistoryAsync_WhenNoRounds_ReturnsEmptyList()
+    {
+        // Arrange
+        _battleRoundRepoMock.Setup(r => r.GetRoundHistoryAsync(999)).ReturnsAsync(new List<BattleRound>());
+
+        // Act
+        var result = await _service.GetRoundHistoryAsync(999);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public async Task GetRoundHistoryAsync_WhenFinalBarStateMalformed_GracefullyFallsBackToEmptyBars()
+    {
+        // Arrange
+        var rounds = new List<BattleRound>
+        {
+            new()
+            {
+                RoundId = 2,
+                MatchId = 101,
+                RoundNumber = 1,
+                TargetDamage = 100,
+                WinningTeamId = 2,
+                RoundActive = false,
+                FinalBarState = "MALFORMED_NOT_A_JSON",
+                CreatedAt = DateTime.UtcNow,
+                EndedAt = DateTime.UtcNow
+            }
+        };
+
+        _battleRoundRepoMock.Setup(r => r.GetRoundHistoryAsync(101)).ReturnsAsync(rounds);
+
+        // Act
+        var result = await _service.GetRoundHistoryAsync(101);
+
+        // Assert
+        Assert.Single(result);
+        Assert.Empty(result[0].FinalBarState);
+    }
 }

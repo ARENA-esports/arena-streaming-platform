@@ -276,4 +276,92 @@ public class WeaponShopControllerTests
         // Assert
         Assert.IsType<BadRequestObjectResult>(result);
     }
+
+    [Fact]
+    public async Task GetRoundHistory_ValidMatchId_Returns200OkWithHistoryList()
+    {
+        // Arrange
+        var now = DateTime.UtcNow;
+        var mockHistory = new List<BattleRoundHistoryDto>
+        {
+            new()
+            {
+                RoundId = 2,
+                MatchId = 101,
+                RoundNumber = 2,
+                WinningTeamId = 2,
+                TargetDamage = 100,
+                FinalBarState = new List<BattleBarDto>
+                {
+                    new() { TeamId = 1, TotalDamage = 60 },
+                    new() { TeamId = 2, TotalDamage = 100 }
+                },
+                CreatedAt = now.AddMinutes(-5),
+                EndedAt = now
+            },
+            new()
+            {
+                RoundId = 1,
+                MatchId = 101,
+                RoundNumber = 1,
+                WinningTeamId = 1,
+                TargetDamage = 100,
+                FinalBarState = new List<BattleBarDto>
+                {
+                    new() { TeamId = 1, TotalDamage = 100 },
+                    new() { TeamId = 2, TotalDamage = 45 }
+                },
+                CreatedAt = now.AddMinutes(-10),
+                EndedAt = now.AddMinutes(-5)
+            }
+        };
+
+        _weaponShopServiceMock.Setup(s => s.GetRoundHistoryAsync(101))
+            .ReturnsAsync(mockHistory);
+
+        var controller = CreateController();
+
+        // Act
+        var result = await controller.GetRoundHistory(101);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var returnedHistory = Assert.IsAssignableFrom<List<BattleRoundHistoryDto>>(okResult.Value);
+        Assert.Equal(2, returnedHistory.Count);
+        Assert.Equal(2, returnedHistory[0].RoundNumber);
+        Assert.Equal(1, returnedHistory[1].RoundNumber);
+    }
+
+    [Fact]
+    public async Task GetRoundHistory_EmptyHistory_Returns200OkWithEmptyList()
+    {
+        // Arrange
+        _weaponShopServiceMock.Setup(s => s.GetRoundHistoryAsync(999))
+            .ReturnsAsync(new List<BattleRoundHistoryDto>());
+
+        var controller = CreateController();
+
+        // Act
+        var result = await controller.GetRoundHistory(999);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var returnedHistory = Assert.IsAssignableFrom<List<BattleRoundHistoryDto>>(okResult.Value);
+        Assert.Empty(returnedHistory);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public async Task GetRoundHistory_InvalidMatchId_Returns400(int matchId)
+    {
+        // Arrange
+        var controller = CreateController();
+
+        // Act
+        var result = await controller.GetRoundHistory(matchId);
+
+        // Assert
+        Assert.IsType<BadRequestObjectResult>(result);
+    }
 }
