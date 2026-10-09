@@ -65,7 +65,7 @@ export const StreamContainer: React.FC<StreamContainerProps> = ({
     return (
         <div className="flex flex-col w-full h-full gap-2">
             {/* Twitch Stream Channel & Playback Control Bar */}
-            <div className='flex flex-wrap items-center justify-between gap-2 p-2.5 bg-arena-card/90 rounded-md text-xs shadow-md border border-arena-border/50'>
+            <div className='flex flex-wrap items-center justify-between gap-2 p-2.5 bg-arena-card/90 rounded-md text-xs shadow-md'>
                 <div className="flex items-center gap-2 flex-wrap">
                     <span className="bg-arena-cyan/20 text-arena-cyan px-2 py-0.5 rounded font-mono font-bold uppercase tracking-wider text-[10px]">
                         CHANNEL
