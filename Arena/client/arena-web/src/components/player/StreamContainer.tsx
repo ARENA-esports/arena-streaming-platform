@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { TwitchPlayer } from '../player/TwitchPlayer';
-import { Play, Pause } from 'lucide-react';
-import WatchRewardStatus from '../match/WatchRewardStatus';
 
 interface StreamContainerProps {
     apiChannelName?: string;
@@ -13,7 +11,6 @@ interface StreamContainerProps {
 
 export const StreamContainer: React.FC<StreamContainerProps> = ({
     apiChannelName,
-    isPlaying = true,
     onPlay,
     onPause,
     onChannelChange,
@@ -50,13 +47,6 @@ export const StreamContainer: React.FC<StreamContainerProps> = ({
         onPlay?.();
     };
 
-    const handleManualPlay = () => {
-        onPlay?.();
-    };
-
-    const handleManualPause = () => {
-        onPause?.();
-    };
 
     const handleTwitchPlay = () => {
         onPlay?.();
@@ -116,47 +106,6 @@ export const StreamContainer: React.FC<StreamContainerProps> = ({
                                 {preset}
                             </button>
                         ))}
-                    </div>
-                </div>
-
-                {/* Playback Controls & Reward Status */}
-                <div className="flex items-center gap-2">
-                    <WatchRewardStatus
-                        isViewer={true}
-                        isLiveMatch={true}
-                        hasValidStream={true}
-                        isPlaying={isPlaying}
-                    />
-
-                    <div className="flex items-center gap-1 bg-arena-bg p-0.5 rounded border border-arena-border">
-                        <button
-                            type="button"
-                            data-testid="stream-play-btn"
-                            onClick={handleManualPlay}
-                            title="Play Stream & Earn Coins"
-                            className={`px-2.5 py-1 rounded text-xs font-bold transition-all flex items-center gap-1 ${
-                                isPlaying
-                                    ? 'bg-arena-cyan text-black shadow-[0_0_8px_rgba(0,184,252,0.4)]'
-                                    : 'text-gray-400 hover:text-white'
-                            }`}
-                        >
-                            <Play size={11} className={isPlaying ? 'fill-black' : 'fill-gray-400'} />
-                            <span>Play</span>
-                        </button>
-                        <button
-                            type="button"
-                            data-testid="stream-pause-btn"
-                            onClick={handleManualPause}
-                            title="Pause Stream"
-                            className={`px-2.5 py-1 rounded text-xs font-bold transition-all flex items-center gap-1 ${
-                                !isPlaying
-                                    ? 'bg-amber-500/20 text-amber-400 border border-amber-500/50'
-                                    : 'text-gray-400 hover:text-white'
-                            }`}
-                        >
-                            <Pause size={11} className={!isPlaying ? 'fill-amber-400' : ''} />
-                            <span>Pause</span>
-                        </button>
                     </div>
                 </div>
             </div>

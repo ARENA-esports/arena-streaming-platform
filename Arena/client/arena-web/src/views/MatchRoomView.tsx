@@ -19,7 +19,6 @@ import FactionChat from '../components/chat/FactionChat';
 import { ScheduledView } from '../components/match/ScheduledView';
 import { EndedView } from '../components/match/EndedView';
 import { CancelledView } from '../components/match/CancelledView';
-import WatchRewardStatus from '../components/match/WatchRewardStatus';
 
 export const MatchRoomView: React.FC = () => {
   const { matchId } = useParams<{ matchId: string }>();
@@ -162,18 +161,10 @@ export const MatchRoomView: React.FC = () => {
           <div className="flex items-center space-x-4">
             <Badge status={match.status} />
             {match.status === 'Live' ? (
-              <>
-                <span className="text-sm text-arena-cyan font-mono flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-arena-crimson animate-pulse" />
-                  Live Broadcast
-                </span>
-                <WatchRewardStatus
-                  isViewer={isViewer}
-                  isLiveMatch={isLiveMatch}
-                  hasValidStream={hasValidStream}
-                  isPlaying={isPlaying}
-                />
-              </>
+              <span className="text-sm text-arena-cyan font-mono flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-arena-crimson animate-pulse" />
+                Live Broadcast
+              </span>
             ) : match.status === 'Ended' ? (
               <span className="text-sm text-arena-textMuted font-mono">
                 Match Ended
