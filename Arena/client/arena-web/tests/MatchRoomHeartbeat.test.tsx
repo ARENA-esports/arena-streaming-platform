@@ -1140,4 +1140,169 @@ describe('MatchRoomView — Watch Heartbeat Integration', () => {
     expect(mockRecordWatchTick).toHaveBeenCalledWith({ streamId: 555 });
     expect(mockUpdateBalance).toHaveBeenCalledWith(200);
   });
+
+  it('does not activate heartbeat while match or stream data is still loading', async () => {
+    mockUseAuth.mockReturnValue({
+      user: {
+        userId: 1,
+        username: 'ViewerUser',
+        email: 'viewer@test.com',
+        role: 'Viewer',
+      },
+      token: 'jwt-token',
+      isLoading: false,
+      login: jest.fn(),
+      logout: jest.fn(),
+      refreshProfile: jest.fn(),
+    });
+
+    mockUseMatchStatus.mockReturnValue({
+      status: 'loading',
+      match: null,
+      stream: null,
+      error: null,
+    });
+
+    renderMatchRoom('101');
+
+    await act(async () => {
+      jest.advanceTimersByTime(60000 * 2);
+    });
+
+    expect(mockRecordWatchTick).not.toHaveBeenCalled();
+  });
+
+  it('does not activate heartbeat when stream response fails with an error', async () => {
+    mockUseAuth.mockReturnValue({
+      user: {
+        userId: 1,
+        username: 'ViewerUser',
+        email: 'viewer@test.com',
+        role: 'Viewer',
+      },
+      token: 'jwt-token',
+      isLoading: false,
+      login: jest.fn(),
+      logout: jest.fn(),
+      refreshProfile: jest.fn(),
+    });
+
+    mockUseMatchStatus.mockReturnValue({
+      status: 'Live',
+      match: {
+        matchId: 101,
+        teamAId: 1,
+        teamBId: 2,
+        scheduledTime: '2026-09-25T12:00:00Z',
+        status: 'Live',
+      },
+      stream: null,
+      error: new Error('StreamService network error'),
+    });
+
+    const { getByTestId } = renderMatchRoom('101');
+
+    act(() => {
+      fireEvent.click(getByTestId('stream-play-btn'));
+    });
+
+    await act(async () => {
+      jest.advanceTimersByTime(60000 * 2);
+    });
+
+    expect(mockRecordWatchTick).not.toHaveBeenCalled();
+  });
+
+  it('does not activate heartbeat for a Live match that genuinely has no linked stream', async () => {
+    mockUseAuth.mockReturnValue({
+      user: {
+        userId: 1,
+        username: 'ViewerUser',
+        email: 'viewer@test.com',
+        role: 'Viewer',
+      },
+      token: 'jwt-token',
+      isLoading: false,
+      login: jest.fn(),
+      logout: jest.fn(),
+      refreshProfile: jest.fn(),
+    });
+
+    mockUseMatchStatus.mockReturnValue({
+      status: 'Live',
+      match: {
+        matchId: 202,
+        teamAId: 3,
+        teamBId: 4,
+        scheduledTime: '2026-09-25T14:00:00Z',
+        status: 'Live',
+      },
+      stream: null,
+      error: null,
+    });
+
+    const { getByTestId } = renderMatchRoom('202');
+
+    act(() => {
+      fireEvent.click(getByTestId('stream-play-btn'));
+    });
+
+    await act(async () => {
+      jest.advanceTimersByTime(60000 * 3);
+    });
+
+    expect(mockRecordWatchTick).not.toHaveBeenCalled();
+  });
+
+  it('uses the stream-service ID and never substitutes the match ID in watch-tick requests', async () => {
+    mockUseAuth.mockReturnValue({
+      user: {
+        userId: 1,
+        username: 'ViewerUser',
+        email: 'viewer@test.com',
+        role: 'Viewer',
+      },
+      token: 'jwt-token',
+      isLoading: false,
+      login: jest.fn(),
+      logout: jest.fn(),
+      refreshProfile: jest.fn(),
+    });
+
+    const matchId = 101;
+    const streamServiceId = 789;
+
+    mockUseMatchStatus.mockReturnValue({
+      status: 'Live',
+      match: {
+        matchId,
+        teamAId: 1,
+        teamBId: 2,
+        scheduledTime: '2026-09-25T12:00:00Z',
+        status: 'Live',
+      },
+      stream: {
+        streamId: streamServiceId,
+        matchId,
+        channelName: 'Arena_streams',
+        status: 'Live',
+        twitchUrl: 'https://twitch.tv/Arena_streams',
+      },
+      error: null,
+    });
+
+    const { getByTestId } = renderMatchRoom(String(matchId));
+
+    act(() => {
+      fireEvent.click(getByTestId('stream-play-btn'));
+    });
+
+    await act(async () => {
+      jest.advanceTimersByTime(60000);
+    });
+
+    expect(mockRecordWatchTick).toHaveBeenCalledTimes(1);
+    expect(mockRecordWatchTick).toHaveBeenCalledWith({ streamId: streamServiceId });
+    expect(mockRecordWatchTick).not.toHaveBeenCalledWith({ streamId: matchId });
+  });
 });
