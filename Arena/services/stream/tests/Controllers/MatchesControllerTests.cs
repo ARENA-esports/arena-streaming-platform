@@ -245,4 +245,193 @@ public class MatchesControllerTests
         var notFoundResult = Assert.IsType<NotFoundObjectResult>(result);
         Assert.Equal(StatusCodes.Status404NotFound, notFoundResult.StatusCode);
     }
+
+    /* ---------------- UpdateMatchStatus Tests ---------------- */
+
+    [Fact]
+    public async Task UpdateMatchStatus_ValidScheduledToLive_Returns200OK()
+    {
+        // Arrange
+        const int matchId = 1;
+        var initialMatch = new MatchResponse(matchId, 1, 10, 20, DateTimeOffset.UtcNow, "Scheduled", null, DateTime.UtcNow);
+        var updatedMatch = new MatchResponse(matchId, 1, 10, 20, DateTimeOffset.UtcNow, "Live", null, DateTime.UtcNow);
+
+        _matchRepoMock.SetupSequence(m => m.GetMatchByIdAsync(matchId))
+            .ReturnsAsync(initialMatch)
+            .ReturnsAsync(updatedMatch);
+
+        _matchRepoMock.Setup(m => m.UpdateMatchStatusAsync(matchId, "Live", "Scheduled"))
+            .ReturnsAsync(true);
+
+        var request = new UpdateMatchStatusRequest { Status = "Live", ForceOverride = false };
+
+        // Act
+        var result = await _controller.UpdateMatchStatus(matchId, request);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(StatusCodes.Status200OK, okResult.StatusCode);
+        Assert.Equal(updatedMatch, okResult.Value);
+        _matchRepoMock.Verify(m => m.UpdateMatchStatusAsync(matchId, "Live", "Scheduled"), Times.Once);
+        _matchRepoMock.Verify(m => m.UpdateMatchStatusOverrideAsync(It.IsAny<int>(), It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task UpdateMatchStatus_ValidLiveToEnded_Returns200OK()
+    {
+        // Arrange
+        const int matchId = 2;
+        var initialMatch = new MatchResponse(matchId, 1, 10, 20, DateTimeOffset.UtcNow, "Live", null, DateTime.UtcNow);
+        var updatedMatch = new MatchResponse(matchId, 1, 10, 20, DateTimeOffset.UtcNow, "Ended", null, DateTime.UtcNow);
+
+        _matchRepoMock.SetupSequence(m => m.GetMatchByIdAsync(matchId))
+            .ReturnsAsync(initialMatch)
+            .ReturnsAsync(updatedMatch);
+
+        _matchRepoMock.Setup(m => m.UpdateMatchStatusAsync(matchId, "Ended", "Live"))
+            .ReturnsAsync(true);
+
+        var request = new UpdateMatchStatusRequest { Status = "Ended", ForceOverride = false };
+
+        // Act
+        var result = await _controller.UpdateMatchStatus(matchId, request);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(StatusCodes.Status200OK, okResult.StatusCode);
+        Assert.Equal(updatedMatch, okResult.Value);
+        _matchRepoMock.Verify(m => m.UpdateMatchStatusAsync(matchId, "Ended", "Live"), Times.Once);
+    }
+
+    [Fact]
+    public async Task UpdateMatchStatus_ValidLiveToCancelled_Returns200OK()
+    {
+        // Arrange
+        const int matchId = 3;
+        var initialMatch = new MatchResponse(matchId, 1, 10, 20, DateTimeOffset.UtcNow, "Live", null, DateTime.UtcNow);
+        var updatedMatch = new MatchResponse(matchId, 1, 10, 20, DateTimeOffset.UtcNow, "Cancelled", null, DateTime.UtcNow);
+
+        _matchRepoMock.SetupSequence(m => m.GetMatchByIdAsync(matchId))
+            .ReturnsAsync(initialMatch)
+            .ReturnsAsync(updatedMatch);
+
+        _matchRepoMock.Setup(m => m.UpdateMatchStatusAsync(matchId, "Cancelled", "Live"))
+            .ReturnsAsync(true);
+
+        var request = new UpdateMatchStatusRequest { Status = "Cancelled", ForceOverride = false };
+
+        // Act
+        var result = await _controller.UpdateMatchStatus(matchId, request);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(StatusCodes.Status200OK, okResult.StatusCode);
+        _matchRepoMock.Verify(m => m.UpdateMatchStatusAsync(matchId, "Cancelled", "Live"), Times.Once);
+    }
+
+    [Fact]
+    public async Task UpdateMatchStatus_InvalidTransition_EndedToLive_WithoutForceOverride_Returns400BadRequest()
+    {
+        // Arrange
+        const int matchId = 4;
+        var initialMatch = new MatchResponse(matchId, 1, 10, 20, DateTimeOffset.UtcNow, "Ended", null, DateTime.UtcNow);
+
+        _matchRepoMock.Setup(m => m.GetMatchByIdAsync(matchId)).ReturnsAsync(initialMatch);
+
+        var request = new UpdateMatchStatusRequest { Status = "Live", ForceOverride = false };
+
+        // Act
+        var result = await _controller.UpdateMatchStatus(matchId, request);
+
+        // Assert
+        var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
+        Assert.Equal(StatusCodes.Status400BadRequest, badRequestResult.StatusCode);
+        _matchRepoMock.Verify(m => m.UpdateMatchStatusAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+        _matchRepoMock.Verify(m => m.UpdateMatchStatusOverrideAsync(It.IsAny<int>(), It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task UpdateMatchStatus_ForceOverride_AllowsEndedToLive_CallsOverrideAsync_Returns200OK()
+    {
+        // Arrange
+        const int matchId = 5;
+        var initialMatch = new MatchResponse(matchId, 1, 10, 20, DateTimeOffset.UtcNow, "Ended", null, DateTime.UtcNow);
+        var updatedMatch = new MatchResponse(matchId, 1, 10, 20, DateTimeOffset.UtcNow, "Live", null, DateTime.UtcNow);
+
+        _matchRepoMock.SetupSequence(m => m.GetMatchByIdAsync(matchId))
+            .ReturnsAsync(initialMatch)
+            .ReturnsAsync(updatedMatch);
+
+        _matchRepoMock.Setup(m => m.UpdateMatchStatusOverrideAsync(matchId, "Live"))
+            .ReturnsAsync(true);
+
+        var request = new UpdateMatchStatusRequest { Status = "Live", ForceOverride = true };
+
+        // Act
+        var result = await _controller.UpdateMatchStatus(matchId, request);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(StatusCodes.Status200OK, okResult.StatusCode);
+        Assert.Equal(updatedMatch, okResult.Value);
+        _matchRepoMock.Verify(m => m.UpdateMatchStatusOverrideAsync(matchId, "Live"), Times.Once);
+        _matchRepoMock.Verify(m => m.UpdateMatchStatusAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task UpdateMatchStatus_WhenMatchNotFound_Returns404NotFound()
+    {
+        // Arrange
+        const int matchId = 999;
+        _matchRepoMock.Setup(m => m.GetMatchByIdAsync(matchId)).ReturnsAsync((MatchResponse?)null);
+
+        var request = new UpdateMatchStatusRequest { Status = "Live", ForceOverride = false };
+
+        // Act
+        var result = await _controller.UpdateMatchStatus(matchId, request);
+
+        // Assert
+        var notFoundResult = Assert.IsType<NotFoundObjectResult>(result);
+        Assert.Equal(StatusCodes.Status404NotFound, notFoundResult.StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateMatchStatus_WhenRepoUpdateFails_WithoutForceOverride_Returns400BadRequest()
+    {
+        // Arrange
+        const int matchId = 6;
+        var initialMatch = new MatchResponse(matchId, 1, 10, 20, DateTimeOffset.UtcNow, "Scheduled", null, DateTime.UtcNow);
+
+        _matchRepoMock.Setup(m => m.GetMatchByIdAsync(matchId)).ReturnsAsync(initialMatch);
+        _matchRepoMock.Setup(m => m.UpdateMatchStatusAsync(matchId, "Live", "Scheduled")).ReturnsAsync(false);
+
+        var request = new UpdateMatchStatusRequest { Status = "Live", ForceOverride = false };
+
+        // Act
+        var result = await _controller.UpdateMatchStatus(matchId, request);
+
+        // Assert
+        var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
+        Assert.Equal(StatusCodes.Status400BadRequest, badRequestResult.StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateMatchStatus_WhenRepoUpdateFails_WithForceOverride_Returns500InternalServerError()
+    {
+        // Arrange
+        const int matchId = 7;
+        var initialMatch = new MatchResponse(matchId, 1, 10, 20, DateTimeOffset.UtcNow, "Live", null, DateTime.UtcNow);
+
+        _matchRepoMock.Setup(m => m.GetMatchByIdAsync(matchId)).ReturnsAsync(initialMatch);
+        _matchRepoMock.Setup(m => m.UpdateMatchStatusOverrideAsync(matchId, "Ended")).ReturnsAsync(false);
+
+        var request = new UpdateMatchStatusRequest { Status = "Ended", ForceOverride = true };
+
+        // Act
+        var result = await _controller.UpdateMatchStatus(matchId, request);
+
+        // Assert
+        var objectResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(StatusCodes.Status500InternalServerError, objectResult.StatusCode);
+    }
 }
