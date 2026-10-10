@@ -11,7 +11,7 @@ namespace BattleEconomyService.Services;
 /// Kafka producer implementation of <see cref="ICoinEarnedEventPublisher"/>.
 /// Serialises the internal watch-tick award event to the shared
 /// <see cref="CoinEarnedEvent"/> Kafka payload shape and produces it to the
-/// configured <c>arena.coin-earned</c> topic (SCRUM-117).
+/// configured <c>coin.earned</c> topic (SCRUM-117).
 /// </summary>
 /// <remarks>
 /// <para>

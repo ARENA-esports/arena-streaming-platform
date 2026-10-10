@@ -79,12 +79,22 @@ export function useWatchHeartbeat(
 
   const shouldRunHeartbeat = isPlaying && isDocumentVisible;
 
+  const shouldRunHeartbeatRef = useRef(shouldRunHeartbeat);
+  useEffect(() => {
+    shouldRunHeartbeatRef.current = shouldRunHeartbeat;
+  }, [shouldRunHeartbeat]);
+
   useEffect(() => {
     if (!shouldRunHeartbeat) {
       return;
     }
 
     const intervalId = setInterval(async () => {
+      // Guard against stale callback executing after eligibility became false
+      if (!shouldRunHeartbeatRef.current) {
+        return;
+      }
+
       try {
         const numericStreamId =
           typeof streamId === 'number'
@@ -99,6 +109,9 @@ export function useWatchHeartbeat(
           numericStreamId !== undefined ? { streamId: numericStreamId } : undefined;
 
         const response = await economyService.recordWatchTick(payload);
+        if (!shouldRunHeartbeatRef.current) {
+          return;
+        }
         onSuccessRef.current?.(response);
       } catch (err) {
         // Prevent unhandled promise rejections
