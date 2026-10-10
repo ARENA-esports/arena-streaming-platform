@@ -35,29 +35,24 @@ export const StreamContainer: React.FC<StreamContainerProps> = ({
         setDevChannel(nextChannel);
         setInputVal(nextChannel);
         onChannelChange?.(nextChannel);
-        onPlay?.();
-    }, [apiChannelName, isMockOrEmpty, envOverrideChannel, onPlay]);
+        onPause?.();
+    }, [apiChannelName, isMockOrEmpty, envOverrideChannel, onChannelChange, onPause]);
 
     const handleSelectChannel = (channel: string) => {
         const trimmed = channel.trim();
         if (!trimmed) return;
+        onPause?.();
         setDevChannel(trimmed);
         setInputVal(trimmed);
         onChannelChange?.(trimmed);
-        onPlay?.();
     };
-
 
     const handleTwitchPlay = () => {
         onPlay?.();
     };
 
     const handleTwitchPause = () => {
-        // If the channel is a mock or empty dev fallback channel, the Twitch embed is offline.
-        // We do not let a mock channel's offline embed pause kill watch reward heartbeats for viewers in a live match.
-        if (!isMockOrEmpty) {
-            onPause?.();
-        }
+        onPause?.();
     };
 
     const activeChannel = devChannel;
