@@ -309,4 +309,70 @@ describe('Twitch Playback → Heartbeat Integration', () => {
     // Player should NOT have been re-instantiated
     expect(MockPlayer).toHaveBeenCalledTimes(1);
   });
+
+  it('halts heartbeat when OFFLINE or ENDED event is fired', async () => {
+    const mockInstance = createMockPlayerInstance();
+    installMockSdk(() => mockInstance);
+
+    render(<StreamWatcherIntegration streamId={321} channel="shroud" />);
+
+    // Start playing -> advance 60s -> tick 1
+    act(() => { mockInstance._fire('play'); });
+    await act(async () => {
+      jest.advanceTimersByTime(WATCH_HEARTBEAT_INTERVAL_MS);
+    });
+    expect(mockRecordWatchTick).toHaveBeenCalledTimes(1);
+
+    // Stream goes OFFLINE
+    act(() => { mockInstance._fire('offline'); });
+
+    // Advance 120s while offline -> zero new ticks
+    await act(async () => {
+      jest.advanceTimersByTime(WATCH_HEARTBEAT_INTERVAL_MS * 2);
+    });
+    expect(mockRecordWatchTick).toHaveBeenCalledTimes(1);
+
+    // Stream plays again -> tick 2 after 60s
+    act(() => { mockInstance._fire('play'); });
+    await act(async () => {
+      jest.advanceTimersByTime(WATCH_HEARTBEAT_INTERVAL_MS);
+    });
+    expect(mockRecordWatchTick).toHaveBeenCalledTimes(2);
+
+    // Stream ENDS
+    act(() => { mockInstance._fire('ended'); });
+
+    // Advance 120s after stream ended -> zero new ticks
+    await act(async () => {
+      jest.advanceTimersByTime(WATCH_HEARTBEAT_INTERVAL_MS * 2);
+    });
+    expect(mockRecordWatchTick).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not resume heartbeat when tab becomes visible if playback was paused', async () => {
+    const mockInstance = createMockPlayerInstance();
+    installMockSdk(() => mockInstance);
+
+    render(<StreamWatcherIntegration streamId={654} channel="shroud" />);
+
+    // Initially paused, tab visible -> advance 60s -> no ticks
+    await act(async () => {
+      jest.advanceTimersByTime(WATCH_HEARTBEAT_INTERVAL_MS);
+    });
+    expect(mockRecordWatchTick).not.toHaveBeenCalled();
+
+    // Tab hidden
+    setDocumentVisibility('hidden');
+    await act(async () => {
+      jest.advanceTimersByTime(WATCH_HEARTBEAT_INTERVAL_MS);
+    });
+    expect(mockRecordWatchTick).not.toHaveBeenCalled();
+
+    // Tab visible again while still paused
+    setDocumentVisibility('visible');
+    await act(async () => {
+      jest.advanceTimersByTime(WATCH_HEARTBEAT_INTERVAL_MS * 2);
+    });
+    expect(mockRecordWatchTick).not.toHaveBeenCalled();
+  });
 });

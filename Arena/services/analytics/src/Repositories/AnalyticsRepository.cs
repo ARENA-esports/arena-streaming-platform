@@ -158,6 +158,221 @@ public class AnalyticsRepository : IAnalyticsRepository
         return list;
     }
 
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<StreamTeamBattleSummary>> GetBattleSummariesByStreamIdAsync(int streamId)
+    {
+        using var connection = new MySqlConnection(_connectionString);
+        await connection.OpenAsync();
+
+        const string sql = @"
+            SELECT stream_id, team_id, team_name, total_attacks, total_damage_dealt, 
+                   total_coins_spent, rounds_won, rounds_lost, last_attack_at, created_at, updated_at
+            FROM stream_team_battle_summary
+            WHERE stream_id = @StreamId
+            ORDER BY total_attacks DESC, total_damage_dealt DESC;";
+
+        using var command = new MySqlCommand(sql, connection);
+        command.Parameters.AddWithValue("@StreamId", streamId);
+
+        using var reader = await command.ExecuteReaderAsync();
+        var list = new List<StreamTeamBattleSummary>();
+        while (await reader.ReadAsync())
+        {
+            list.Add(MapStreamTeamBattleSummary(reader));
+        }
+
+        return list;
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<StreamTeamBattleSummary>> GetAllBattleSummariesAsync()
+    {
+        using var connection = new MySqlConnection(_connectionString);
+        await connection.OpenAsync();
+
+        const string sql = @"
+            SELECT stream_id, team_id, team_name, total_attacks, total_damage_dealt, 
+                   total_coins_spent, rounds_won, rounds_lost, last_attack_at, created_at, updated_at
+            FROM stream_team_battle_summary
+            ORDER BY stream_id ASC, total_attacks DESC;";
+
+        using var command = new MySqlCommand(sql, connection);
+        using var reader = await command.ExecuteReaderAsync();
+
+        var list = new List<StreamTeamBattleSummary>();
+        while (await reader.ReadAsync())
+        {
+            list.Add(MapStreamTeamBattleSummary(reader));
+        }
+
+        return list;
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<StreamRoundOutcome>> GetRoundOutcomesByStreamIdAsync(int streamId)
+    {
+        using var connection = new MySqlConnection(_connectionString);
+        await connection.OpenAsync();
+
+        const string sql = @"
+            SELECT stream_id, round_number, winning_team_id, winning_team_name, team_a_id, team_b_id,
+                   team_a_attacks, team_b_attacks, team_a_damage, team_b_damage, completed_at, created_at
+            FROM stream_round_outcomes
+            WHERE stream_id = @StreamId
+            ORDER BY round_number ASC;";
+
+        using var command = new MySqlCommand(sql, connection);
+        command.Parameters.AddWithValue("@StreamId", streamId);
+
+        using var reader = await command.ExecuteReaderAsync();
+        var list = new List<StreamRoundOutcome>();
+        while (await reader.ReadAsync())
+        {
+            list.Add(MapStreamRoundOutcome(reader));
+        }
+
+        return list;
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<StreamRoundOutcome>> GetAllRoundOutcomesAsync()
+    {
+        using var connection = new MySqlConnection(_connectionString);
+        await connection.OpenAsync();
+
+        const string sql = @"
+            SELECT stream_id, round_number, winning_team_id, winning_team_name, team_a_id, team_b_id,
+                   team_a_attacks, team_b_attacks, team_a_damage, team_b_damage, completed_at, created_at
+            FROM stream_round_outcomes
+            ORDER BY stream_id ASC, round_number ASC;";
+
+        using var command = new MySqlCommand(sql, connection);
+        using var reader = await command.ExecuteReaderAsync();
+
+        var list = new List<StreamRoundOutcome>();
+        while (await reader.ReadAsync())
+        {
+            list.Add(MapStreamRoundOutcome(reader));
+        }
+
+        return list;
+    }
+
+    /// <inheritdoc />
+    public async Task UpsertBattleSummaryAsync(StreamTeamBattleSummary summary)
+    {
+        using var connection = new MySqlConnection(_connectionString);
+        await connection.OpenAsync();
+
+        const string sql = @"
+            INSERT INTO stream_team_battle_summary
+                (stream_id, team_id, team_name, total_attacks, total_damage_dealt, 
+                 total_coins_spent, rounds_won, rounds_lost, last_attack_at)
+            VALUES
+                (@StreamId, @TeamId, @TeamName, @TotalAttacks, @TotalDamageDealt,
+                 @TotalCoinsSpent, @RoundsWon, @RoundsLost, @LastAttackAt)
+            ON DUPLICATE KEY UPDATE
+                team_name = VALUES(team_name),
+                total_attacks = VALUES(total_attacks),
+                total_damage_dealt = VALUES(total_damage_dealt),
+                total_coins_spent = VALUES(total_coins_spent),
+                rounds_won = VALUES(rounds_won),
+                rounds_lost = VALUES(rounds_lost),
+                last_attack_at = VALUES(last_attack_at);";
+
+        using var command = new MySqlCommand(sql, connection);
+        command.Parameters.AddWithValue("@StreamId", summary.StreamId);
+        command.Parameters.AddWithValue("@TeamId", summary.TeamId);
+        command.Parameters.AddWithValue("@TeamName", summary.TeamName);
+        command.Parameters.AddWithValue("@TotalAttacks", summary.TotalAttacks);
+        command.Parameters.AddWithValue("@TotalDamageDealt", summary.TotalDamageDealt);
+        command.Parameters.AddWithValue("@TotalCoinsSpent", summary.TotalCoinsSpent);
+        command.Parameters.AddWithValue("@RoundsWon", summary.RoundsWon);
+        command.Parameters.AddWithValue("@RoundsLost", summary.RoundsLost);
+        command.Parameters.AddWithValue("@LastAttackAt", (object?)summary.LastAttackAt ?? DBNull.Value);
+
+        await command.ExecuteNonQueryAsync();
+    }
+
+    /// <inheritdoc />
+    public async Task RecordRoundOutcomeAsync(StreamRoundOutcome outcome)
+    {
+        using var connection = new MySqlConnection(_connectionString);
+        await connection.OpenAsync();
+
+        const string sql = @"
+            INSERT INTO stream_round_outcomes
+                (stream_id, round_number, winning_team_id, winning_team_name, team_a_id, team_b_id,
+                 team_a_attacks, team_b_attacks, team_a_damage, team_b_damage, completed_at)
+            VALUES
+                (@StreamId, @RoundNumber, @WinningTeamId, @WinningTeamName, @TeamAId, @TeamBId,
+                 @TeamAAttacks, @TeamBAttacks, @TeamADamage, @TeamBDamage, @CompletedAt)
+            ON DUPLICATE KEY UPDATE
+                winning_team_id = VALUES(winning_team_id),
+                winning_team_name = VALUES(winning_team_name),
+                team_a_id = VALUES(team_a_id),
+                team_b_id = VALUES(team_b_id),
+                team_a_attacks = VALUES(team_a_attacks),
+                team_b_attacks = VALUES(team_b_attacks),
+                team_a_damage = VALUES(team_a_damage),
+                team_b_damage = VALUES(team_b_damage),
+                completed_at = VALUES(completed_at);";
+
+        using var command = new MySqlCommand(sql, connection);
+        command.Parameters.AddWithValue("@StreamId", outcome.StreamId);
+        command.Parameters.AddWithValue("@RoundNumber", outcome.RoundNumber);
+        command.Parameters.AddWithValue("@WinningTeamId", outcome.WinningTeamId);
+        command.Parameters.AddWithValue("@WinningTeamName", outcome.WinningTeamName);
+        command.Parameters.AddWithValue("@TeamAId", outcome.TeamAId);
+        command.Parameters.AddWithValue("@TeamBId", outcome.TeamBId);
+        command.Parameters.AddWithValue("@TeamAAttacks", outcome.TeamAAttacks);
+        command.Parameters.AddWithValue("@TeamBAttacks", outcome.TeamBAttacks);
+        command.Parameters.AddWithValue("@TeamADamage", outcome.TeamADamage);
+        command.Parameters.AddWithValue("@TeamBDamage", outcome.TeamBDamage);
+        command.Parameters.AddWithValue("@CompletedAt", outcome.CompletedAt);
+
+        await command.ExecuteNonQueryAsync();
+    }
+
+    private static StreamTeamBattleSummary MapStreamTeamBattleSummary(IDataRecord record)
+    {
+        return new StreamTeamBattleSummary
+        {
+            StreamId = record.GetInt32(record.GetOrdinal("stream_id")),
+            TeamId = record.GetInt32(record.GetOrdinal("team_id")),
+            TeamName = record.GetString(record.GetOrdinal("team_name")),
+            TotalAttacks = record.GetInt32(record.GetOrdinal("total_attacks")),
+            TotalDamageDealt = record.GetInt64(record.GetOrdinal("total_damage_dealt")),
+            TotalCoinsSpent = record.GetInt64(record.GetOrdinal("total_coins_spent")),
+            RoundsWon = record.GetInt32(record.GetOrdinal("rounds_won")),
+            RoundsLost = record.GetInt32(record.GetOrdinal("rounds_lost")),
+            LastAttackAt = record.IsDBNull(record.GetOrdinal("last_attack_at"))
+                ? null
+                : record.GetDateTime(record.GetOrdinal("last_attack_at")),
+            CreatedAt = record.GetDateTime(record.GetOrdinal("created_at")),
+            UpdatedAt = record.GetDateTime(record.GetOrdinal("updated_at"))
+        };
+    }
+
+    private static StreamRoundOutcome MapStreamRoundOutcome(IDataRecord record)
+    {
+        return new StreamRoundOutcome
+        {
+            StreamId = record.GetInt32(record.GetOrdinal("stream_id")),
+            RoundNumber = record.GetInt32(record.GetOrdinal("round_number")),
+            WinningTeamId = record.GetInt32(record.GetOrdinal("winning_team_id")),
+            WinningTeamName = record.GetString(record.GetOrdinal("winning_team_name")),
+            TeamAId = record.GetInt32(record.GetOrdinal("team_a_id")),
+            TeamBId = record.GetInt32(record.GetOrdinal("team_b_id")),
+            TeamAAttacks = record.GetInt32(record.GetOrdinal("team_a_attacks")),
+            TeamBAttacks = record.GetInt32(record.GetOrdinal("team_b_attacks")),
+            TeamADamage = record.GetInt32(record.GetOrdinal("team_a_damage")),
+            TeamBDamage = record.GetInt32(record.GetOrdinal("team_b_damage")),
+            CompletedAt = record.GetDateTime(record.GetOrdinal("completed_at")),
+            CreatedAt = record.GetDateTime(record.GetOrdinal("created_at"))
+        };
+    }
+
     private static StreamEngagementSummary MapStreamEngagementSummary(IDataRecord record)
     {
         return new StreamEngagementSummary

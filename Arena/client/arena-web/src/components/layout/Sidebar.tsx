@@ -1,5 +1,5 @@
 import { FC, useState } from 'react';
-import { Radio, Grid, X, Menu, Trophy, Users, BarChart2 } from 'lucide-react';
+import { Radio, Grid, X, Menu, Trophy, Users, BarChart2, Swords } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
@@ -50,6 +50,10 @@ export const Sidebar: FC<SidebarProps> = ({ isExpanded = false, toggleSidebar })
             <Link to="/organizer/analytics" className={buttonClass} style={isExpanded ? { width: '100%', justifyContent: 'flex-start' } : undefined} aria-label="Analytics">
               <BarChart2 size={20} className="flex-shrink-0" />
               {isExpanded && <span className="font-bold text-sm tracking-wider uppercase">Analytics</span>}
+            </Link>
+            <Link to="/organizer/analytics/battles" className={buttonClass} style={isExpanded ? { width: '100%', justifyContent: 'flex-start' } : undefined} aria-label="Battle Stats">
+              <Swords size={20} className="flex-shrink-0" />
+              {isExpanded && <span className="font-bold text-sm tracking-wider uppercase">Battle Stats</span>}
             </Link>
             <Link to="/teams" className={buttonClass} style={isExpanded ? { width: '100%', justifyContent: 'flex-start' } : undefined} aria-label="Teams">
               <Users size={20} className="flex-shrink-0" />

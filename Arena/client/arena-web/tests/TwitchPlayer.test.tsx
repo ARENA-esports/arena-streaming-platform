@@ -188,7 +188,8 @@ describe('TwitchPlayer — bridge foundation', () => {
     const mockInstance = createMockPlayerInstance();
     installMockSdk(() => mockInstance);
 
-    const { unmount } = render(<TwitchPlayer channel="shroud" />);
+    const onPause = jest.fn();
+    const { unmount } = render(<TwitchPlayer channel="shroud" onPause={onPause} />);
 
     await waitFor(() => {
       expect(mockInstance.addEventListener).toHaveBeenCalled();
@@ -198,7 +199,55 @@ describe('TwitchPlayer — bridge foundation', () => {
 
     expect(mockInstance.removeEventListener).toHaveBeenCalledWith('play', expect.any(Function));
     expect(mockInstance.removeEventListener).toHaveBeenCalledWith('pause', expect.any(Function));
+    expect(mockInstance.removeEventListener).toHaveBeenCalledWith('offline', expect.any(Function));
+    expect(mockInstance.removeEventListener).toHaveBeenCalledWith('ended', expect.any(Function));
+    expect(onPause).toHaveBeenCalled();
     expect(mockInstance.destroy).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not trigger onPlay when READY event is fired', async () => {
+    const mockInstance = createMockPlayerInstance();
+    installMockSdk(() => mockInstance);
+
+    const onPlay = jest.fn();
+    render(<TwitchPlayer channel="shroud" onPlay={onPlay} />);
+
+    await waitFor(() => {
+      expect(mockInstance.addEventListener).toHaveBeenCalledWith('play', expect.any(Function));
+    });
+
+    act(() => { mockInstance._fire('ready'); });
+    expect(onPlay).not.toHaveBeenCalled();
+  });
+
+  it('forwards OFFLINE events to the onPause callback', async () => {
+    const mockInstance = createMockPlayerInstance();
+    installMockSdk(() => mockInstance);
+
+    const onPause = jest.fn();
+    render(<TwitchPlayer channel="shroud" onPause={onPause} />);
+
+    await waitFor(() => {
+      expect(mockInstance.addEventListener).toHaveBeenCalledWith('offline', expect.any(Function));
+    });
+
+    act(() => { mockInstance._fire('offline'); });
+    expect(onPause).toHaveBeenCalledTimes(1);
+  });
+
+  it('forwards ENDED events to the onPause callback', async () => {
+    const mockInstance = createMockPlayerInstance();
+    installMockSdk(() => mockInstance);
+
+    const onPause = jest.fn();
+    render(<TwitchPlayer channel="shroud" onPause={onPause} />);
+
+    await waitFor(() => {
+      expect(mockInstance.addEventListener).toHaveBeenCalledWith('ended', expect.any(Function));
+    });
+
+    act(() => { mockInstance._fire('ended'); });
+    expect(onPause).toHaveBeenCalledTimes(1);
   });
 
   it('creates a new player instance when the channel prop changes', async () => {
@@ -210,19 +259,21 @@ describe('TwitchPlayer — bridge foundation', () => {
       return callCount === 1 ? mockInstance1 : mockInstance2;
     });
 
-    const { rerender } = render(<TwitchPlayer channel="shroud" />);
+    const onPause = jest.fn();
+    const { rerender } = render(<TwitchPlayer channel="shroud" onPause={onPause} />);
 
     await waitFor(() => {
       expect(MockPlayer).toHaveBeenCalledTimes(1);
     });
 
-    // Switching channel should destroy old instance and create a new one
-    rerender(<TwitchPlayer channel="riotgames" />);
+    // Switching channel should invalidate old playback and create a new instance
+    rerender(<TwitchPlayer channel="riotgames" onPause={onPause} />);
 
     await waitFor(() => {
       expect(MockPlayer).toHaveBeenCalledTimes(2);
     });
 
+    expect(onPause).toHaveBeenCalled();
     expect(mockInstance1.destroy).toHaveBeenCalledTimes(1);
     const [, options2] = MockPlayer.mock.calls[1] as [unknown, Record<string, unknown>];
     expect(options2.channel).toBe('riotgames');

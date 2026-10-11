@@ -19,5 +19,5 @@ public class KafkaOptions
     /// <summary>
     /// Kafka topic name to which <c>CoinEarned</c> events are produced.
     /// </summary>
-    public string Topic { get; set; } = "arena.coin-earned";
+    public string Topic { get; set; } = "coin.earned";
 }

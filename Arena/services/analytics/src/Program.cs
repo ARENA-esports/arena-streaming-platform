@@ -7,6 +7,7 @@ using Microsoft.OpenApi;
 using AnalyticsService.Configuration;
 using AnalyticsService.Consumers;
 using AnalyticsService.Repositories;
+using AnalyticsService.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -23,6 +24,9 @@ builder.Services.Configure<AnalyticsOptions>(
 
 // Register ADO.NET Repositories
 builder.Services.AddScoped<IAnalyticsRepository, AnalyticsRepository>();
+
+// Register Application Services
+builder.Services.AddScoped<IBattleStatsService, BattleStatsService>();
 
 // Register Kafka Consumer BackgroundService
 builder.Services.AddHostedService<EngagementEventConsumer>();

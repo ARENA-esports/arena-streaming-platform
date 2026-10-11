@@ -173,6 +173,7 @@ services:
       - StreamService__BaseUrl=http://stream:8080
       # SCRUM-117: Kafka internal Docker bootstrap address (overrides localhost:9092 default)
       - Kafka__BootstrapServers=kafka:29092
+      - Kafka__Topic=coin.earned
     depends_on:
       mysql-battle:
         condition: service_healthy

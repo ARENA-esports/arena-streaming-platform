@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { TwitchPlayerInstance } from '../../types/twitch';
 import { useTwitchSdk } from '../../hooks/useTwitchSdk';
 
@@ -58,14 +58,12 @@ export const TwitchPlayer: React.FC<TwitchPlayerProps> = ({
 
   const trimmedChannel = channel?.trim();
 
-  // ── Internal callbacks (stable identity via ref forwarding) ────────────────
-  const handlePlay = useCallback(() => {
-    onPlayRef.current?.();
-  }, []);
-
-  const handlePause = useCallback(() => {
-    onPauseRef.current?.();
-  }, []);
+  // Invalidate playback if SDK enters an error state or channel is cleared
+  useEffect(() => {
+    if (sdkState === 'error' || !trimmedChannel) {
+      onPauseRef.current?.();
+    }
+  }, [sdkState, trimmedChannel]);
 
   // ── Create / recreate player whenever SDK or channel changes ───────────────
   useEffect(() => {
@@ -73,18 +71,36 @@ export const TwitchPlayer: React.FC<TwitchPlayerProps> = ({
       return;
     }
 
+    let isCurrent = true;
+
+    // Instance-bound callbacks to prevent stale callbacks from a destroyed instance
+    const handlePlay = () => {
+      if (isCurrent) {
+        onPlayRef.current?.();
+      }
+    };
+
+    const handlePause = () => {
+      if (isCurrent) {
+        onPauseRef.current?.();
+      }
+    };
+
     // Clean up any existing player instance before creating a new one
     if (playerRef.current) {
       const prev = playerRef.current;
       const PConst = sdk.Player;
       prev.removeEventListener(PConst.PLAY, handlePlay);
       prev.removeEventListener(PConst.PAUSE, handlePause);
+      if (PConst.OFFLINE) prev.removeEventListener(PConst.OFFLINE, handlePause);
+      if (PConst.ENDED) prev.removeEventListener(PConst.ENDED, handlePause);
       if (typeof prev.destroy === 'function') {
         prev.destroy();
       }
       playerRef.current = null;
-      // Clear the container so the SDK gets a clean element
-      containerRef.current.innerHTML = '';
+      if (containerRef.current) {
+        containerRef.current.innerHTML = '';
+      }
     }
 
     const resolvedParents = resolveParentDomains(parentDomains);
@@ -98,21 +114,29 @@ export const TwitchPlayer: React.FC<TwitchPlayerProps> = ({
       height: '100%',
     });
 
-    const handleReady = () => {
-      handlePlay();
-    };
-
-    player.addEventListener(sdk.Player.READY, handleReady);
+    // PLAY is the authoritative signal of active video playback
     player.addEventListener(sdk.Player.PLAY, handlePlay);
+    // Pause and terminal stream states immediately invalidate eligibility
     player.addEventListener(sdk.Player.PAUSE, handlePause);
-    player.addEventListener(sdk.Player.ONLINE, handlePlay);
+    if (sdk.Player.OFFLINE) {
+      player.addEventListener(sdk.Player.OFFLINE, handlePause);
+    }
+    if (sdk.Player.ENDED) {
+      player.addEventListener(sdk.Player.ENDED, handlePause);
+    }
     playerRef.current = player;
 
     return () => {
-      player.removeEventListener(sdk.Player.READY, handleReady);
+      isCurrent = false;
+      onPauseRef.current?.();
       player.removeEventListener(sdk.Player.PLAY, handlePlay);
       player.removeEventListener(sdk.Player.PAUSE, handlePause);
-      player.removeEventListener(sdk.Player.ONLINE, handlePlay);
+      if (sdk.Player.OFFLINE) {
+        player.removeEventListener(sdk.Player.OFFLINE, handlePause);
+      }
+      if (sdk.Player.ENDED) {
+        player.removeEventListener(sdk.Player.ENDED, handlePause);
+      }
       if (typeof player.destroy === 'function') {
         player.destroy();
       }
@@ -121,7 +145,7 @@ export const TwitchPlayer: React.FC<TwitchPlayerProps> = ({
         containerRef.current.innerHTML = '';
       }
     };
-  }, [sdk, sdkState, trimmedChannel, parentDomains, handlePlay, handlePause]);
+  }, [sdk, sdkState, trimmedChannel, parentDomains]);
 
   // ── Fallback: no channel provided ─────────────────────────────────────────
   if (!trimmedChannel) {

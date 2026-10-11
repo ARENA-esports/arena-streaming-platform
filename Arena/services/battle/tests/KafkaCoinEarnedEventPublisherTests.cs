@@ -3,6 +3,7 @@ using System.Text.Json;
 using Confluent.Kafka;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Configuration;
 using Moq;
 using BattleEconomyService.Configuration;
 using BattleEconomyService.Services;
@@ -16,7 +17,7 @@ public class KafkaCoinEarnedEventPublisherTests
 {
     private readonly Mock<IProducer<string, string>> _producerMock;
     private readonly Mock<ILogger<KafkaCoinEarnedEventPublisher>> _loggerMock;
-    private const string DefaultTopic = "arena.coin-earned";
+    private const string DefaultTopic = "coin.earned";
 
     public KafkaCoinEarnedEventPublisherTests()
     {
@@ -335,5 +336,35 @@ public class KafkaCoinEarnedEventPublisherTests
         // Assert
         _producerMock.Verify(p => p.Flush(It.IsAny<TimeSpan>()), Times.Once);
         _producerMock.Verify(p => p.Dispose(), Times.Once);
+    }
+
+    // =========================================================================
+    // 5. Configuration & Options Tests
+    // =========================================================================
+
+    [Fact]
+    public void KafkaOptions_DefaultTopic_IsCoinEarned()
+    {
+        var options = new KafkaOptions();
+        Assert.Equal("coin.earned", options.Topic);
+        Assert.Equal("localhost:9092", options.BootstrapServers);
+    }
+
+    [Fact]
+    public void KafkaOptions_ConfigBinding_BindsTopicCorrectly()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Kafka:BootstrapServers"] = "kafka:29092",
+                ["Kafka:Topic"] = "coin.earned"
+            })
+            .Build();
+
+        var options = new KafkaOptions();
+        configuration.GetSection(KafkaOptions.SectionName).Bind(options);
+
+        Assert.Equal("kafka:29092", options.BootstrapServers);
+        Assert.Equal("coin.earned", options.Topic);
     }
 }

@@ -20,6 +20,7 @@ import ProfileSettingsView from '../views/ProfileSettingsView';
 import TournamentsView from '../views/TournamentsView';
 import TeamsView from '../views/TeamsView';
 import ViewerEngagementDashboardView from '../views/ViewerEngagementDashboardView';
+import BattleStatsDashboardView from '../views/BattleStatsDashboardView';
 
 export const AppRoutes: FC = () => {
   return (
@@ -37,6 +38,14 @@ export const AppRoutes: FC = () => {
           element={
             <ProtectedRoute allowedRoles={['Organizer']}>
               <ViewerEngagementDashboardView />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/organizer/analytics/battles"
+          element={
+            <ProtectedRoute allowedRoles={['Organizer']}>
+              <BattleStatsDashboardView />
             </ProtectedRoute>
           }
         />

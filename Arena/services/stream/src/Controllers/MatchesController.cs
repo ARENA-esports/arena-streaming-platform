@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;      // imports ASP.NET controller base
 using Microsoft.AspNetCore.Authorization;   //import [Authorize] and role-based access control filters
 using StreamService.DTOs;
+using StreamService.Models;
 using StreamService.Repositories;
 
 using Microsoft.AspNetCore.RateLimiting;
@@ -152,6 +153,12 @@ public class MatchesController : ControllerBase
             return NotFound(new {message = $"Match with ID {id} not found."});
         }
 
+        // State machine validation if force override is not requested
+        if (!request.ForceOverride && !IsValidMatchStatusTransition(match.Status, request.Status))
+        {
+            return BadRequest(new { message = $"Cannot transition match {id} from {match.Status} to {request.Status}." });
+        }
+
         bool updated;
         if (request.ForceOverride)
         {
@@ -178,6 +185,21 @@ public class MatchesController : ControllerBase
         // return refreshed record
         var updatedMatch = await _matchRepository.GetMatchByIdAsync(id);
         return Ok(updatedMatch);
+    }
+
+    private static bool IsValidMatchStatusTransition(string currentStatus, string newStatus)
+    {
+        if (string.Equals(currentStatus, newStatus, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return currentStatus switch
+        {
+            StreamStatus.Scheduled => newStatus is StreamStatus.Live or StreamStatus.Cancelled,
+            StreamStatus.Live => newStatus is StreamStatus.Ended or StreamStatus.Cancelled,
+            _ => false
+        };
     }
 
     /* delete endpoint for match cancellation */
