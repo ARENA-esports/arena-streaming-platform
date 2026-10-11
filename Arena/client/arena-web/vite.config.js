@@ -1,7 +1,6 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
-
 export default defineConfig({
     plugins: [react()],
     resolve: {
@@ -38,6 +37,15 @@ export default defineConfig({
             },
             '/api/analytics': {
                 target: 'http://127.0.0.1:8084', // Analytics Service (SCRUM-125)
+                changeOrigin: true,
+            },
+            '/api/chat': {
+                target: 'http://127.0.0.1:5170', // Chat Service (SCRUM-95)
+                changeOrigin: true,
+            },
+            '/ws/chat': {
+                target: 'http://127.0.0.1:5170', // Chat Service WebSocket
+                ws: true,
                 changeOrigin: true,
             },
             '/ws/battle': {

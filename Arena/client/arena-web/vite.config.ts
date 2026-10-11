@@ -40,6 +40,15 @@ export default defineConfig({
         target: 'http://127.0.0.1:8084', // Analytics Service (SCRUM-125)
         changeOrigin: true,
       },
+      '/api/chat': {
+        target: 'http://127.0.0.1:5170', // Chat Service (SCRUM-95)
+        changeOrigin: true,
+      },
+      '/ws/chat': {
+        target: 'http://127.0.0.1:5170', // Chat Service WebSocket
+        ws: true,
+        changeOrigin: true,
+      },
       '/ws/battle': {
         target: 'http://127.0.0.1:8083', // Battle Economy Service WebSocket (SCRUM-121)
         ws: true,

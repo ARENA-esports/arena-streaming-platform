@@ -220,7 +220,7 @@ services:
       - MYSQL_PASSWORD=arena_password
     volumes:
       - mysql-analytics-data:/var/lib/mysql
-      - ./services/analytics/src/Migrations/001_create_analytics_tables.sql:/docker-entrypoint-initdb.d/001_create_analytics_tables.sql
+      - ./services/analytics/src/Migrations:/docker-entrypoint-initdb.d
     healthcheck:
       test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-prootpassword" ]
       interval: 5s

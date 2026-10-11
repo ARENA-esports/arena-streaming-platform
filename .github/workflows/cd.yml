@@ -14,6 +14,7 @@ jobs:
       tournament: ${{ steps.filter.outputs.tournament }}
       chat: ${{ steps.filter.outputs.chat }}
       battle: ${{ steps.filter.outputs.battle }}
+      analytics: ${{ steps.filter.outputs.analytics }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -34,6 +35,9 @@ jobs:
               - 'Arena/shared/EventContracts/**'
             battle:
               - 'Arena/services/battle/**'
+              - 'Arena/shared/EventContracts/**'
+            analytics:
+              - 'Arena/services/analytics/**'
               - 'Arena/shared/EventContracts/**'
 
   deploy-user:
@@ -255,4 +259,48 @@ jobs:
           app-name: arena-battle
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE_BATTLE }}
           images: ghcr.io/${{ steps.lower.outputs.owner }}/arena-battle:${{ github.sha }}
+
+  deploy-analytics:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.analytics == 'true'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-arena-analytics
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Lowercase owner
+        id: lower
+        run: echo "owner=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./Arena
+          file: ./Arena/services/analytics/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ steps.lower.outputs.owner }}/arena-analytics:latest
+            ghcr.io/${{ steps.lower.outputs.owner }}/arena-analytics:${{ github.sha }}
+          cache-from: type=gha,scope=analytics
+          cache-to: type=gha,mode=max,scope=analytics
+
+      - name: Deploy to Azure App Service
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: arena-analytics
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE_ANALYTICS }}
+          images: ghcr.io/${{ steps.lower.outputs.owner }}/arena-analytics:${{ github.sha }}
 
