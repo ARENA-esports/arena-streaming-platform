@@ -1,5 +1,5 @@
 import { apiClient } from './client';
-import { Weapon, AttackRequest, AttackResponse } from '../types';
+import { Weapon, AttackRequest, AttackResponse, BattleRoundHistoryDto } from '../types';
 
 export const weaponShopService = {
   /**
@@ -17,6 +17,15 @@ export const weaponShopService = {
    */
   purchaseAttack: async (data: AttackRequest): Promise<AttackResponse> => {
     const response = await apiClient.post<AttackResponse>('/economy/attack', data);
+    return response.data;
+  },
+
+  /**
+   * Retrieves past completed round outcome history for a match (SCRUM-123).
+   * Calls GET /api/economy/rounds/{matchId}/history.
+   */
+  getRoundHistory: async (matchId: number): Promise<BattleRoundHistoryDto[]> => {
+    const response = await apiClient.get<BattleRoundHistoryDto[]>(`/economy/rounds/${matchId}/history`);
     return response.data;
   },
 };

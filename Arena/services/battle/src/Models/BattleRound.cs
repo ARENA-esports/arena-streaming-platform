@@ -10,6 +10,7 @@ public class BattleRound
     public int RoundNumber { get; set; } = 1;
     public long TargetDamage { get; set; } = 100;
     public int? WinningTeamId { get; set; }
+    public string? FinalBarState { get; set; }
     public bool RoundActive { get; set; } = true;
     public DateTime CreatedAt { get; set; }
     public DateTime? EndedAt { get; set; }

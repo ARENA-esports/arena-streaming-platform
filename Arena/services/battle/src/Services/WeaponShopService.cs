@@ -1,3 +1,4 @@
+using System.Text.Json;
 using BattleEconomyService.Configuration;
 using BattleEconomyService.DTOs;
 using BattleEconomyService.Models;
@@ -242,5 +243,49 @@ public class WeaponShopService : IWeaponShopService
     public async Task<List<BattleBar>> GetBarsForMatchAsync(int matchId)
     {
         return await _battleBarRepository.GetBarsForMatchAsync(matchId);
+    }
+
+    public async Task<List<BattleRoundHistoryDto>> GetRoundHistoryAsync(int matchId)
+    {
+        if (_battleRoundRepository == null)
+        {
+            return new List<BattleRoundHistoryDto>();
+        }
+
+        var rounds = await _battleRoundRepository.GetRoundHistoryAsync(matchId);
+        var result = new List<BattleRoundHistoryDto>();
+
+        foreach (var r in rounds)
+        {
+            var bars = new List<BattleBarDto>();
+            if (!string.IsNullOrWhiteSpace(r.FinalBarState))
+            {
+                try
+                {
+                    bars = JsonSerializer.Deserialize<List<BattleBarDto>>(r.FinalBarState, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    }) ?? new List<BattleBarDto>();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to deserialize final_bar_state for round {RoundId}.", r.RoundId);
+                }
+            }
+
+            result.Add(new BattleRoundHistoryDto
+            {
+                RoundId = r.RoundId,
+                MatchId = r.MatchId,
+                RoundNumber = r.RoundNumber,
+                WinningTeamId = r.WinningTeamId,
+                TargetDamage = r.TargetDamage,
+                FinalBarState = bars,
+                CreatedAt = r.CreatedAt,
+                EndedAt = r.EndedAt
+            });
+        }
+
+        return result;
     }
 }

@@ -54,6 +54,7 @@ public class BattleRoundRepositoryTests
             RoundActive = true,
             TargetDamage = 100,
             WinningTeamId = 1,
+            FinalBarState = "[{\"teamId\":1,\"totalDamage\":100},{\"teamId\":2,\"totalDamage\":45}]",
             CreatedAt = now.AddMinutes(-10),
             EndedAt = now
         };
@@ -65,6 +66,7 @@ public class BattleRoundRepositoryTests
         Assert.True(round.RoundActive);
         Assert.Equal(100, round.TargetDamage);
         Assert.Equal(1, round.WinningTeamId);
+        Assert.Equal("[{\"teamId\":1,\"totalDamage\":100},{\"teamId\":2,\"totalDamage\":45}]", round.FinalBarState);
         Assert.Equal(now.AddMinutes(-10), round.CreatedAt);
         Assert.Equal(now, round.EndedAt);
     }
@@ -230,6 +232,130 @@ public class BattleRoundRepositoryTests
         }
     }
 
+    [Fact]
+    public async Task GetRoundHistoryAsync_WhenNoCompletedRounds_ReturnsEmptyList()
+    {
+        if (!await CanConnectToTestDatabaseAsync())
+        {
+            return;
+        }
+
+        await EnsureSchemaAsync();
+
+        var configuration = CreateTestConfiguration();
+        var repo = new BattleRoundRepository(configuration);
+        var testMatchId = 74000 + Random.Shared.Next(1, 9999);
+
+        try
+        {
+            // Only create an active round, no completed round yet
+            await repo.GetOrCreateActiveRoundAsync(testMatchId, targetDamage: 100);
+
+            var history = await repo.GetRoundHistoryAsync(testMatchId);
+
+            Assert.NotNull(history);
+            Assert.Empty(history);
+        }
+        finally
+        {
+            await CleanupTestDataAsync(testMatchId);
+        }
+    }
+
+    [Fact]
+    public async Task GetRoundHistoryAsync_WhenMatchDoesNotExist_ReturnsEmptyList()
+    {
+        if (!await CanConnectToTestDatabaseAsync())
+        {
+            return;
+        }
+
+        await EnsureSchemaAsync();
+
+        var configuration = CreateTestConfiguration();
+        var repo = new BattleRoundRepository(configuration);
+
+        var history = await repo.GetRoundHistoryAsync(999999);
+
+        Assert.NotNull(history);
+        Assert.Empty(history);
+    }
+
+    [Fact]
+    public async Task GetRoundHistoryAsync_WhenCompletedRoundsExist_ReturnsInReverseChronologicalOrderWithFinalBars()
+    {
+        if (!await CanConnectToTestDatabaseAsync())
+        {
+            return;
+        }
+
+        await EnsureSchemaAsync();
+
+        var configuration = CreateTestConfiguration();
+        var repo = new BattleRoundRepository(configuration);
+        var barRepo = new BattleBarRepository(configuration);
+        var testMatchId = 75000 + Random.Shared.Next(1, 9999);
+
+        try
+        {
+            // --- Round 1 ---
+            var round1 = await repo.GetOrCreateActiveRoundAsync(testMatchId, targetDamage: 100);
+            await barRepo.ApplyDamageAtomicAsync(testMatchId, teamId: 1, damage: 100);
+            await barRepo.ApplyDamageAtomicAsync(testMatchId, teamId: 2, damage: 45);
+
+            var flipped1 = await repo.TryFlipRoundActiveAsync(round1.RoundId, winningTeamId: 1);
+            Assert.True(flipped1);
+
+            // Reset bars and start Round 2 (snapshots Round 1 bars)
+            var round2 = await repo.ResetBarsAndStartNextRoundAsync(testMatchId, nextRoundNumber: 2, targetDamage: 100);
+            Assert.NotNull(round2);
+
+            // --- Round 2 ---
+            await barRepo.ApplyDamageAtomicAsync(testMatchId, teamId: 1, damage: 60);
+            await barRepo.ApplyDamageAtomicAsync(testMatchId, teamId: 2, damage: 100);
+
+            var flipped2 = await repo.TryFlipRoundActiveAsync(round2.RoundId, winningTeamId: 2);
+            Assert.True(flipped2);
+
+            // Reset bars and start Round 3 (snapshots Round 2 bars)
+            var round3 = await repo.ResetBarsAndStartNextRoundAsync(testMatchId, nextRoundNumber: 3, targetDamage: 100);
+            Assert.NotNull(round3);
+
+            // Act - Fetch round history
+            var history = await repo.GetRoundHistoryAsync(testMatchId);
+
+            // Assert
+            Assert.NotNull(history);
+            Assert.Equal(2, history.Count);
+
+            // 1. Reverse-chronological order: Round 2 first, then Round 1
+            Assert.Equal(2, history[0].RoundNumber);
+            Assert.Equal(2, history[0].WinningTeamId);
+            Assert.False(history[0].RoundActive);
+
+            Assert.Equal(1, history[1].RoundNumber);
+            Assert.Equal(1, history[1].WinningTeamId);
+            Assert.False(history[1].RoundActive);
+
+            // 2. Final bar state snapshot preserved
+            Assert.NotNull(history[0].FinalBarState);
+            Assert.Contains("\"TeamId\":2", history[0].FinalBarState);
+            Assert.Contains("100", history[0].FinalBarState);
+
+            Assert.NotNull(history[1].FinalBarState);
+            Assert.Contains("\"TeamId\":1", history[1].FinalBarState);
+            Assert.Contains("100", history[1].FinalBarState);
+
+            // 3. Timestamps populated
+            Assert.NotNull(history[0].EndedAt);
+            Assert.NotNull(history[1].EndedAt);
+        }
+        finally
+        {
+            await CleanupTestDataAsync(testMatchId);
+        }
+    }
+
     private static IConfiguration CreateTestConfiguration()
     {
         return new ConfigurationBuilder()
@@ -268,6 +394,7 @@ CREATE TABLE IF NOT EXISTS battle_rounds (
     round_active BOOLEAN NOT NULL DEFAULT TRUE,
     target_damage INT NOT NULL DEFAULT 100,
     winning_team_id INT NULL,
+    final_bar_state JSON NULL,
     started_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     ended_at TIMESTAMP NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -288,6 +415,16 @@ CREATE TABLE IF NOT EXISTS battle_bars (
 ";
             using var cmd = new MySqlCommand(sql, connection);
             await cmd.ExecuteNonQueryAsync();
+
+            try
+            {
+                using var alterCmd = new MySqlCommand("ALTER TABLE battle_rounds ADD COLUMN final_bar_state JSON NULL AFTER winning_team_id;", connection);
+                await alterCmd.ExecuteNonQueryAsync();
+            }
+            catch
+            {
+                // Column may already exist
+            }
         }
         catch
         {

@@ -1,6 +1,7 @@
-import React, { useMemo } from 'react';
-import { Swords, Flame } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { Swords, Flame, History } from 'lucide-react';
 import { useBattleBar, BattleBarConnectionStatus } from '../../hooks/useBattleBar';
+import { RoundHistoryModal } from './RoundHistoryModal';
 
 interface BattleBarProps {
   matchId: number | string;
@@ -46,6 +47,8 @@ export const BattleBar: React.FC<BattleBarProps> = ({
     latestAttack,
     connectionStatus,
   } = useBattleBar({ matchId, teamAId, teamBId });
+
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 
   // Resolve team metadata with safe defaults
   const teamA = useMemo(() => {
@@ -101,7 +104,19 @@ export const BattleBar: React.FC<BattleBarProps> = ({
           </div>
         )}
 
-        <ConnectionBadge status={connectionStatus} />
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setIsHistoryOpen(true)}
+            className="flex items-center gap-1.5 text-[11px] font-mono text-arena-cyan bg-arena-cyan/10 hover:bg-arena-cyan/20 border border-arena-cyan/30 px-2.5 py-0.5 rounded-full transition-colors cursor-pointer"
+            title="View Battle Round History"
+            data-testid="round-history-toggle-button"
+          >
+            <History size={12} />
+            <span>Round History</span>
+          </button>
+          <ConnectionBadge status={connectionStatus} />
+        </div>
       </div>
 
       {/* Team Details & Damage Counters */}
@@ -187,6 +202,14 @@ export const BattleBar: React.FC<BattleBarProps> = ({
         </span>
         <span>Opposing Power</span>
       </div>
+
+      {/* Round History Modal (SCRUM-123) */}
+      <RoundHistoryModal
+        matchId={matchId}
+        isOpen={isHistoryOpen}
+        onClose={() => setIsHistoryOpen(false)}
+        teamsMap={teamsMap}
+      />
     </div>
   );
 };

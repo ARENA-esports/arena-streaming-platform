@@ -31,4 +31,10 @@ public interface IBattleRoundRepository
     /// Should only be invoked by the single process that successfully flipped the round-active flag.
     /// </summary>
     Task<BattleRound> ResetBarsAndStartNextRoundAsync(int matchId, int nextRoundNumber, long targetDamage);
+
+    /// <summary>
+    /// Retrieves past completed rounds (round_active = FALSE) for a match in reverse-chronological order (SCRUM-123).
+    /// If no rounds have completed yet, returns an empty list.
+    /// </summary>
+    Task<List<BattleRound>> GetRoundHistoryAsync(int matchId);
 }

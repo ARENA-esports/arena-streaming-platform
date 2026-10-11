@@ -241,3 +241,15 @@ export interface BattleBarBroadcastPayload {
   timestamp: string;
 }
 
+// Battle Round History Types (SCRUM-123)
+export interface BattleRoundHistoryDto {
+  roundId: number;
+  matchId: number;
+  roundNumber: number;
+  winningTeamId?: number | null;
+  targetDamage: number;
+  finalBarState: Array<{ teamId: number; totalDamage: number }>;
+  createdAt: string;
+  endedAt?: string | null;
+}
+

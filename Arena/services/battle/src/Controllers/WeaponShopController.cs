@@ -131,4 +131,27 @@ public class WeaponShopController : ControllerBase
         var bars = await _weaponShopService.GetBarsForMatchAsync(matchId);
         return Ok(bars);
     }
+
+    /// <summary>
+    /// Returns the outcome history of past completed battle rounds for a match in reverse-chronological order (SCRUM-123).
+    /// </summary>
+    /// <param name="matchId">The match to query round history for.</param>
+    /// <returns>List of completed round outcomes including winning team, final bar state, and timestamp.</returns>
+    /// <response code="200">Round history list returned successfully (empty if no rounds have completed).</response>
+    /// <response code="400">Invalid match ID.</response>
+    /// <response code="401">Missing, expired, or invalid JWT authentication token.</response>
+    [HttpGet("rounds/{matchId:int}/history")]
+    [ProducesResponseType(typeof(List<BattleRoundHistoryDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetRoundHistory(int matchId)
+    {
+        if (matchId <= 0)
+        {
+            return BadRequest(new { message = "Invalid match ID. Must be a positive integer." });
+        }
+
+        var history = await _weaponShopService.GetRoundHistoryAsync(matchId);
+        return Ok(history);
+    }
 }
