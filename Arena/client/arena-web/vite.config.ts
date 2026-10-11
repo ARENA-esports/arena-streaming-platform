@@ -38,6 +38,9 @@ export default defineConfig({
       },
       '/api/analytics': {
         target: 'http://127.0.0.1:8084', // Analytics Service (SCRUM-125)
+      '/ws/battle': {
+        target: 'http://127.0.0.1:8083', // Battle Economy Service WebSocket (SCRUM-121)
+        ws: true,
         changeOrigin: true,
       },
       '/api': {

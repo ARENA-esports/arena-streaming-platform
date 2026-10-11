@@ -376,7 +376,7 @@ export const FactionChat: React.FC<FactionChatProps> = ({
 
   return (
     <div
-      className="w-full h-full min-h-[460px] bg-arena-surface border border-arena-border rounded-[14px] flex flex-col overflow-hidden relative"
+      className="w-full h-full min-h-0 bg-arena-surface border border-arena-border rounded-[14px] flex flex-col overflow-hidden relative"
       id="faction-chat-panel"
     >
       <ChatHeader

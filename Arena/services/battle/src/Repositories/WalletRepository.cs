@@ -158,6 +158,25 @@ public class WalletRepository : IWalletRepository
         }
     }
 
+    public async Task<bool> TryDeductCoinsAsync(int userId, int amount)
+    {
+        using var connection = new MySqlConnection(_connectionString);
+        await connection.OpenAsync();
+
+        const string sql = @"
+            UPDATE wallets
+            SET coins = coins - @Amount
+            WHERE user_id = @UserId
+              AND coins >= @Amount;";
+
+        using var command = new MySqlCommand(sql, connection);
+        command.Parameters.AddWithValue("@Amount", amount);
+        command.Parameters.AddWithValue("@UserId", userId);
+
+        var rowsAffected = await command.ExecuteNonQueryAsync();
+        return rowsAffected > 0;
+    }
+
     private static Wallet MapWallet(MySqlDataReader reader)
     {
         return new Wallet
