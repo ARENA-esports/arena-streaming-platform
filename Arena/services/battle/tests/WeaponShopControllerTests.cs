@@ -219,4 +219,61 @@ public class WeaponShopControllerTests
         var response = Assert.IsType<AttackResponse>(okResult.Value);
         Assert.True(response.Success);
     }
+
+    [Fact]
+    public async Task GetBattleBar_ValidMatchId_Returns200_WithBars()
+    {
+        // Arrange
+        var bars = new List<BattleEconomyService.Models.BattleBar>
+        {
+            new() { BarId = 1, MatchId = 10, TeamId = 1, TotalDamage = 150 },
+            new() { BarId = 2, MatchId = 10, TeamId = 2, TotalDamage = 200 }
+        };
+        _weaponShopServiceMock.Setup(s => s.GetBarsForMatchAsync(10)).ReturnsAsync(bars);
+
+        var controller = CreateController();
+
+        // Act
+        var result = await controller.GetBattleBar(10);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var returnedBars = Assert.IsAssignableFrom<List<BattleEconomyService.Models.BattleBar>>(okResult.Value);
+        Assert.Equal(2, returnedBars.Count);
+        Assert.Equal(150, returnedBars[0].TotalDamage);
+        Assert.Equal(200, returnedBars[1].TotalDamage);
+    }
+
+    [Fact]
+    public async Task GetBattleBar_NoDataForMatch_Returns200_WithEmptyList()
+    {
+        // Arrange
+        _weaponShopServiceMock.Setup(s => s.GetBarsForMatchAsync(999))
+            .ReturnsAsync(new List<BattleEconomyService.Models.BattleBar>());
+
+        var controller = CreateController();
+
+        // Act
+        var result = await controller.GetBattleBar(999);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var returnedBars = Assert.IsAssignableFrom<List<BattleEconomyService.Models.BattleBar>>(okResult.Value);
+        Assert.Empty(returnedBars);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public async Task GetBattleBar_InvalidMatchId_Returns400(int matchId)
+    {
+        // Arrange
+        var controller = CreateController();
+
+        // Act
+        var result = await controller.GetBattleBar(matchId);
+
+        // Assert
+        Assert.IsType<BadRequestObjectResult>(result);
+    }
 }

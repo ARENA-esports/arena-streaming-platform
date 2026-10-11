@@ -110,4 +110,25 @@ public class WeaponShopController : ControllerBase
 
         return BadRequest(result);
     }
+
+    /// <summary>
+    /// Returns the current battle bar state for all teams in a match.
+    /// </summary>
+    /// <param name="matchId">The match to query battle bars for.</param>
+    /// <returns>List of battle bar entries with team damage totals.</returns>
+    /// <response code="200">Battle bar data returned successfully.</response>
+    /// <response code="401">Missing, expired, or invalid JWT authentication token.</response>
+    [HttpGet("battle-bar/{matchId:int}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetBattleBar(int matchId)
+    {
+        if (matchId <= 0)
+        {
+            return BadRequest(new { message = "Invalid match ID. Must be a positive integer." });
+        }
+
+        var bars = await _weaponShopService.GetBarsForMatchAsync(matchId);
+        return Ok(bars);
+    }
 }
