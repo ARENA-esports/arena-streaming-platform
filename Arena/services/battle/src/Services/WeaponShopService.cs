@@ -1,7 +1,9 @@
+using BattleEconomyService.Configuration;
 using BattleEconomyService.DTOs;
 using BattleEconomyService.Models;
 using BattleEconomyService.Repositories;
 using BattleEconomyService.WebSockets;
+using Microsoft.Extensions.Options;
 
 namespace BattleEconomyService.Services;
 
@@ -12,7 +14,9 @@ public class WeaponShopService : IWeaponShopService
     private readonly IWalletRepository _walletRepository;
     private readonly ICoinTransactionRepository _coinTransactionRepository;
     private readonly IBattleBarRepository _battleBarRepository;
+    private readonly IBattleRoundRepository? _battleRoundRepository;
     private readonly IBattleWebSocketManager _webSocketManager;
+    private readonly EconomyOptions _economyOptions;
     private readonly ILogger<WeaponShopService> _logger;
 
     public WeaponShopService(
@@ -22,7 +26,9 @@ public class WeaponShopService : IWeaponShopService
         ICoinTransactionRepository coinTransactionRepository,
         IBattleBarRepository battleBarRepository,
         IBattleWebSocketManager webSocketManager,
-        ILogger<WeaponShopService> logger)
+        ILogger<WeaponShopService> logger,
+        IBattleRoundRepository? battleRoundRepository = null,
+        IOptions<EconomyOptions>? economyOptions = null)
     {
         _weaponRepository = weaponRepository;
         _attackRepository = attackRepository;
@@ -31,6 +37,8 @@ public class WeaponShopService : IWeaponShopService
         _battleBarRepository = battleBarRepository;
         _webSocketManager = webSocketManager;
         _logger = logger;
+        _battleRoundRepository = battleRoundRepository;
+        _economyOptions = economyOptions?.Value ?? new EconomyOptions();
     }
 
     public async Task<List<WeaponDto>> GetWeaponsAsync()
@@ -105,13 +113,64 @@ public class WeaponShopService : IWeaponShopService
                 request.MatchId, request.TeamId, attackId);
         }
 
-        // 5. Broadcast real-time battle bar update to all connected viewers (SCRUM-121)
+        // 5. Round-End Atomic Check-and-Flip & Reset (SCRUM-122)
+        //    When a team's cumulative damage reaches or exceeds the round target damage (100%):
+        //    Execute an atomic UPDATE check-and-flip (WHERE round_id = @RoundId AND round_active = TRUE).
+        //    InnoDB row locking ensures exactly one process gets RowsAffected = 1 and resets bars + starts next round.
+        //    All concurrent requests get RowsAffected = 0 and skip reset, ensuring round-end never fires twice.
+        bool roundEnded = false;
+        int? winningTeamId = null;
+        int activeRoundNumber = 1;
+
+        if (_battleRoundRepository != null)
+        {
+            try
+            {
+                var activeRound = await _battleRoundRepository.GetOrCreateActiveRoundAsync(
+                    request.MatchId, _economyOptions.RoundTargetDamage);
+                activeRoundNumber = activeRound.RoundNumber;
+
+                if (teamTotalDamage >= activeRound.TargetDamage)
+                {
+                    var successfullyFlipped = await _battleRoundRepository.TryFlipRoundActiveAsync(
+                        activeRound.RoundId, request.TeamId);
+
+                    if (successfullyFlipped)
+                    {
+                        roundEnded = true;
+                        winningTeamId = request.TeamId;
+
+                        _logger.LogInformation(
+                            "Round {RoundNumber} won by Team {TeamId} in match {MatchId} (Damage: {Damage}/{Target}). Triggering atomic reset.",
+                            activeRound.RoundNumber, request.TeamId, request.MatchId, teamTotalDamage, activeRound.TargetDamage);
+
+                        var nextRound = await _battleRoundRepository.ResetBarsAndStartNextRoundAsync(
+                            request.MatchId, activeRound.RoundNumber + 1, activeRound.TargetDamage);
+
+                        activeRoundNumber = nextRound.RoundNumber;
+                    }
+                    else
+                    {
+                        _logger.LogInformation(
+                            "Round {RoundId} in match {MatchId} was already flipped and reset by a concurrent process. Skipping duplicate reset.",
+                            activeRound.RoundId, request.MatchId);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to perform round-end check or reset for match {MatchId}, attack {AttackId}.",
+                    request.MatchId, attackId);
+            }
+        }
+
+        // 6. Broadcast real-time battle bar update to all connected viewers (SCRUM-121 / SCRUM-122)
         try
         {
             var matchBars = await _battleBarRepository.GetBarsForMatchAsync(request.MatchId) ?? new List<BattleBar>();
             var broadcast = new BattleBarBroadcastMessage
             {
-                Type = "battle_bar_update",
+                Type = roundEnded ? "round_reset" : "battle_bar_update",
                 MatchId = request.MatchId,
                 Bars = matchBars.Select(b => new BattleBarDto
                 {
@@ -125,6 +184,9 @@ public class WeaponShopService : IWeaponShopService
                     WeaponName = weapon.Name,
                     WeaponId = weapon.WeaponId
                 },
+                RoundNumber = activeRoundNumber,
+                RoundEnded = roundEnded,
+                WinningTeamId = winningTeamId,
                 Timestamp = DateTime.UtcNow
             };
 
@@ -136,11 +198,11 @@ public class WeaponShopService : IWeaponShopService
                 request.MatchId, attackId);
         }
 
-        // 6. Retrieve updated balance
+        // 7. Retrieve updated balance
         var updatedWallet = await _walletRepository.GetByUserIdAsync(userId);
         var newBalance = updatedWallet?.Coins ?? 0;
 
-        // 6. Record coin transaction audit entry
+        // 8. Record coin transaction audit entry
         if (updatedWallet != null)
         {
             try
@@ -154,9 +216,13 @@ public class WeaponShopService : IWeaponShopService
             }
         }
 
+        var attackMessage = roundEnded
+            ? $"{weapon.Name} attack delivered the final blow! Team {winningTeamId} won Round {activeRoundNumber - 1}! Round reset to Round {activeRoundNumber}."
+            : $"{weapon.Name} attack launched! Dealt {weapon.Damage} damage.";
+
         _logger.LogInformation(
-            "Attack submitted: user {UserId} used weapon {WeaponName} (cost {Cost}) for team {TeamId} in match {MatchId}. Damage: {Damage}. Bar total: {BarTotal}. New balance: {Balance}.",
-            userId, weapon.Name, weapon.Cost, request.TeamId, request.MatchId, weapon.Damage, teamTotalDamage, newBalance);
+            "Attack submitted: user {UserId} used weapon {WeaponName} (cost {Cost}) for team {TeamId} in match {MatchId}. Damage: {Damage}. Bar total: {BarTotal}. RoundEnded: {RoundEnded}. New balance: {Balance}.",
+            userId, weapon.Name, weapon.Cost, request.TeamId, request.MatchId, weapon.Damage, teamTotalDamage, roundEnded, newBalance);
 
         return new AttackResponse
         {
@@ -165,8 +231,11 @@ public class WeaponShopService : IWeaponShopService
             CoinsSpent = weapon.Cost,
             CurrentBalance = newBalance,
             DamageDealt = weapon.Damage,
-            TeamTotalDamage = teamTotalDamage,
-            Message = $"{weapon.Name} attack launched! Dealt {weapon.Damage} damage."
+            TeamTotalDamage = roundEnded ? 0 : teamTotalDamage,
+            RoundEnded = roundEnded,
+            WinningTeamId = winningTeamId,
+            RoundNumber = activeRoundNumber,
+            Message = attackMessage
         };
     }
 

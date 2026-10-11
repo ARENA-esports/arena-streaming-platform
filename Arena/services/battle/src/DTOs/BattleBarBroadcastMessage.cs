@@ -26,6 +26,21 @@ public class BattleBarBroadcastMessage
     public AttackEventDto? LatestAttack { get; set; }
 
     /// <summary>
+    /// Current active round number for the match.
+    /// </summary>
+    public int RoundNumber { get; set; } = 1;
+
+    /// <summary>
+    /// Indicates whether this broadcast represents a round conclusion and reset (SCRUM-122).
+    /// </summary>
+    public bool RoundEnded { get; set; }
+
+    /// <summary>
+    /// The winning team id if the round has concluded.
+    /// </summary>
+    public int? WinningTeamId { get; set; }
+
+    /// <summary>
     /// UTC timestamp of when this broadcast was produced.
     /// </summary>
     public DateTime Timestamp { get; set; } = DateTime.UtcNow;

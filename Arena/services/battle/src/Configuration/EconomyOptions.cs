@@ -26,4 +26,10 @@ public class EconomyOptions
     /// reach this ceiling within the window, further ticks return HTTP 429.
     /// </summary>
     public int CoinCapPerWindow { get; set; } = 50;
+
+    /// <summary>
+    /// The target damage required for a team's battle bar to reach 100% and trigger round-end (SCRUM-122).
+    /// Default is 100 damage.
+    /// </summary>
+    public long RoundTargetDamage { get; set; } = 100;
 }

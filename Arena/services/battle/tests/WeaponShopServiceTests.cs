@@ -1,5 +1,7 @@
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
+using BattleEconomyService.Configuration;
 using BattleEconomyService.DTOs;
 using BattleEconomyService.Models;
 using BattleEconomyService.Repositories;
@@ -16,6 +18,7 @@ public class WeaponShopServiceTests
     private readonly Mock<IWalletRepository> _walletRepoMock;
     private readonly Mock<ICoinTransactionRepository> _coinTransactionRepoMock;
     private readonly Mock<IBattleBarRepository> _battleBarRepoMock;
+    private readonly Mock<IBattleRoundRepository> _battleRoundRepoMock;
     private readonly Mock<IBattleWebSocketManager> _webSocketManagerMock;
     private readonly Mock<ILogger<WeaponShopService>> _loggerMock;
     private readonly WeaponShopService _service;
@@ -27,8 +30,19 @@ public class WeaponShopServiceTests
         _walletRepoMock = new Mock<IWalletRepository>();
         _coinTransactionRepoMock = new Mock<ICoinTransactionRepository>();
         _battleBarRepoMock = new Mock<IBattleBarRepository>();
+        _battleRoundRepoMock = new Mock<IBattleRoundRepository>();
         _webSocketManagerMock = new Mock<IBattleWebSocketManager>();
         _loggerMock = new Mock<ILogger<WeaponShopService>>();
+
+        _battleRoundRepoMock.Setup(r => r.GetOrCreateActiveRoundAsync(It.IsAny<int>(), It.IsAny<long>()))
+            .ReturnsAsync((int matchId, long targetDamage) => new BattleRound
+            {
+                RoundId = 1,
+                MatchId = matchId,
+                RoundNumber = 1,
+                TargetDamage = targetDamage,
+                RoundActive = true
+            });
 
         _service = new WeaponShopService(
             _weaponRepoMock.Object,
@@ -37,7 +51,9 @@ public class WeaponShopServiceTests
             _coinTransactionRepoMock.Object,
             _battleBarRepoMock.Object,
             _webSocketManagerMock.Object,
-            _loggerMock.Object);
+            _loggerMock.Object,
+            _battleRoundRepoMock.Object,
+            Options.Create(new EconomyOptions { RoundTargetDamage = 100 }));
     }
 
     [Fact]
@@ -261,5 +277,141 @@ public class WeaponShopServiceTests
         Assert.Equal(100, result[0].TotalDamage);
         Assert.Equal(250, result[1].TotalDamage);
         _battleBarRepoMock.Verify(b => b.GetBarsForMatchAsync(5), Times.Once);
+    }
+
+    [Fact]
+    public async Task PurchaseAttackAsync_DamageReachesTargetDamage_FlipsRoundActiveAndTriggersReset()
+    {
+        // Arrange
+        var weapon = new Weapon { WeaponId = 2, Name = "Bow", Cost = 30, Damage = 15, IsActive = true };
+        _weaponRepoMock.Setup(r => r.GetByIdAsync(2)).ReturnsAsync(weapon);
+        _walletRepoMock.Setup(w => w.TryDeductCoinsAsync(10, 30)).ReturnsAsync(true);
+        _walletRepoMock.Setup(w => w.GetByUserIdAsync(10)).ReturnsAsync(new Wallet { WalletId = 77, UserId = 10, Coins = 70 });
+        _attackRepoMock.Setup(a => a.RecordAttackAsync(It.IsAny<AttackLog>())).ReturnsAsync(500L);
+        _battleBarRepoMock.Setup(b => b.ApplyDamageAtomicAsync(101, 1, 15)).ReturnsAsync(100L);
+        _battleBarRepoMock.Setup(b => b.GetBarsForMatchAsync(101)).ReturnsAsync(new List<BattleBar>
+        {
+            new() { BarId = 1, MatchId = 101, TeamId = 1, TotalDamage = 0 },
+            new() { BarId = 2, MatchId = 101, TeamId = 2, TotalDamage = 0 }
+        });
+
+        // Winning flip
+        _battleRoundRepoMock.Setup(r => r.TryFlipRoundActiveAsync(1, 1)).ReturnsAsync(true);
+        _battleRoundRepoMock.Setup(r => r.ResetBarsAndStartNextRoundAsync(101, 2, 100))
+            .ReturnsAsync(new BattleRound { RoundId = 2, MatchId = 101, RoundNumber = 2, TargetDamage = 100, RoundActive = true });
+
+        var request = new AttackRequest { WeaponId = 2, MatchId = 101, TeamId = 1 };
+
+        // Act
+        var result = await _service.PurchaseAttackAsync(10, request);
+
+        // Assert
+        Assert.True(result.Success);
+        Assert.True(result.RoundEnded);
+        Assert.Equal(1, result.WinningTeamId);
+        Assert.Equal(2, result.RoundNumber);
+        Assert.Equal(0L, result.TeamTotalDamage);
+        Assert.Contains("delivered the final blow", result.Message);
+
+        _battleRoundRepoMock.Verify(r => r.TryFlipRoundActiveAsync(1, 1), Times.Once);
+        _battleRoundRepoMock.Verify(r => r.ResetBarsAndStartNextRoundAsync(101, 2, 100), Times.Once);
+        _webSocketManagerMock.Verify(w => w.BroadcastToMatchAsync(101, It.Is<BattleBarBroadcastMessage>(m =>
+            m.Type == "round_reset" &&
+            m.RoundEnded == true &&
+            m.WinningTeamId == 1 &&
+            m.RoundNumber == 2
+        ), default), Times.Once);
+    }
+
+    [Fact]
+    public async Task PurchaseAttackAsync_ConcurrentAttackReachesTarget_FlipReturnsFalse_SkipsReset()
+    {
+        // Arrange
+        var weapon = new Weapon { WeaponId = 2, Name = "Bow", Cost = 30, Damage = 15, IsActive = true };
+        _weaponRepoMock.Setup(r => r.GetByIdAsync(2)).ReturnsAsync(weapon);
+        _walletRepoMock.Setup(w => w.TryDeductCoinsAsync(10, 30)).ReturnsAsync(true);
+        _walletRepoMock.Setup(w => w.GetByUserIdAsync(10)).ReturnsAsync(new Wallet { WalletId = 77, UserId = 10, Coins = 70 });
+        _attackRepoMock.Setup(a => a.RecordAttackAsync(It.IsAny<AttackLog>())).ReturnsAsync(501L);
+        _battleBarRepoMock.Setup(b => b.ApplyDamageAtomicAsync(101, 1, 15)).ReturnsAsync(100L);
+        _battleBarRepoMock.Setup(b => b.GetBarsForMatchAsync(101)).ReturnsAsync(new List<BattleBar>
+        {
+            new() { BarId = 1, MatchId = 101, TeamId = 1, TotalDamage = 100 }
+        });
+
+        // Another concurrent thread already flipped the flag, so TryFlipRoundActiveAsync returns false
+        _battleRoundRepoMock.Setup(r => r.TryFlipRoundActiveAsync(1, 1)).ReturnsAsync(false);
+
+        var request = new AttackRequest { WeaponId = 2, MatchId = 101, TeamId = 1 };
+
+        // Act
+        var result = await _service.PurchaseAttackAsync(10, request);
+
+        // Assert - round-end does NOT fire twice
+        Assert.True(result.Success);
+        Assert.False(result.RoundEnded);
+        Assert.Null(result.WinningTeamId);
+        Assert.Equal(100L, result.TeamTotalDamage);
+
+        _battleRoundRepoMock.Verify(r => r.TryFlipRoundActiveAsync(1, 1), Times.Once);
+        // CRITICAL: ResetBarsAndStartNextRoundAsync must NEVER be called if flip returns false
+        _battleRoundRepoMock.Verify(r => r.ResetBarsAndStartNextRoundAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<long>()), Times.Never);
+        _webSocketManagerMock.Verify(w => w.BroadcastToMatchAsync(101, It.Is<BattleBarBroadcastMessage>(m =>
+            m.Type == "battle_bar_update" &&
+            m.RoundEnded == false
+        ), default), Times.Once);
+    }
+
+    [Fact]
+    public async Task PurchaseAttackAsync_DamageBelowTargetDamage_DoesNotAttemptFlip()
+    {
+        // Arrange
+        var weapon = new Weapon { WeaponId = 1, Name = "Sword", Cost = 15, Damage = 5, IsActive = true };
+        _weaponRepoMock.Setup(r => r.GetByIdAsync(1)).ReturnsAsync(weapon);
+        _walletRepoMock.Setup(w => w.TryDeductCoinsAsync(10, 15)).ReturnsAsync(true);
+        _walletRepoMock.Setup(w => w.GetByUserIdAsync(10)).ReturnsAsync(new Wallet { WalletId = 77, UserId = 10, Coins = 85 });
+        _attackRepoMock.Setup(a => a.RecordAttackAsync(It.IsAny<AttackLog>())).ReturnsAsync(502L);
+        _battleBarRepoMock.Setup(b => b.ApplyDamageAtomicAsync(101, 1, 5)).ReturnsAsync(35L);
+        _battleBarRepoMock.Setup(b => b.GetBarsForMatchAsync(101)).ReturnsAsync(new List<BattleBar>
+        {
+            new() { BarId = 1, MatchId = 101, TeamId = 1, TotalDamage = 35 }
+        });
+
+        var request = new AttackRequest { WeaponId = 1, MatchId = 101, TeamId = 1 };
+
+        // Act
+        var result = await _service.PurchaseAttackAsync(10, request);
+
+        // Assert
+        Assert.True(result.Success);
+        Assert.False(result.RoundEnded);
+        Assert.Equal(35L, result.TeamTotalDamage);
+        _battleRoundRepoMock.Verify(r => r.TryFlipRoundActiveAsync(It.IsAny<int>(), It.IsAny<int>()), Times.Never);
+        _battleRoundRepoMock.Verify(r => r.ResetBarsAndStartNextRoundAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<long>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task PurchaseAttackAsync_RoundRepositoryThrows_ContinuesGracefullyWithoutFailingAttack()
+    {
+        // Arrange
+        var weapon = new Weapon { WeaponId = 1, Name = "Sword", Cost = 15, Damage = 5, IsActive = true };
+        _weaponRepoMock.Setup(r => r.GetByIdAsync(1)).ReturnsAsync(weapon);
+        _walletRepoMock.Setup(w => w.TryDeductCoinsAsync(10, 15)).ReturnsAsync(true);
+        _walletRepoMock.Setup(w => w.GetByUserIdAsync(10)).ReturnsAsync(new Wallet { WalletId = 77, UserId = 10, Coins = 85 });
+        _attackRepoMock.Setup(a => a.RecordAttackAsync(It.IsAny<AttackLog>())).ReturnsAsync(503L);
+        _battleBarRepoMock.Setup(b => b.ApplyDamageAtomicAsync(101, 1, 5)).ReturnsAsync(50L);
+
+        // Round repository throws an unexpected database exception
+        _battleRoundRepoMock.Setup(r => r.GetOrCreateActiveRoundAsync(It.IsAny<int>(), It.IsAny<long>()))
+            .ThrowsAsync(new Exception("Round database table unavailable"));
+
+        var request = new AttackRequest { WeaponId = 1, MatchId = 101, TeamId = 1 };
+
+        // Act
+        var result = await _service.PurchaseAttackAsync(10, request);
+
+        // Assert - Attack still succeeds even if round check errors
+        Assert.True(result.Success);
+        Assert.Equal(503L, result.AttackId);
+        Assert.False(result.RoundEnded);
     }
 }
