@@ -176,9 +176,11 @@ describe('WeaponShop Component', () => {
     });
   });
 
-  it('rolls back balance and shows error toast when purchaseAttack fails', async () => {
+  it('rolls back balance and shows error toast when purchaseAttack fails with 400 validation error', async () => {
     (weaponShopService.purchaseAttack as jest.Mock).mockRejectedValueOnce({
+      isAxiosError: true,
       response: {
+        status: 400,
         data: {
           message: 'Insufficient coins on server.',
         },
@@ -199,6 +201,34 @@ describe('WeaponShop Component', () => {
     await waitFor(() => {
       expect(mockRollback).toHaveBeenCalled();
       expect(mockNotify).toHaveBeenCalledWith('Insufficient coins on server.', 'error');
+    });
+  });
+
+  it('rolls back balance and shows generic fallback message when server throws 500 or unexpected error', async () => {
+    (weaponShopService.purchaseAttack as jest.Mock).mockRejectedValueOnce({
+      isAxiosError: true,
+      response: {
+        status: 500,
+        data: {
+          message: 'Internal Database Exception: fatal syntax error',
+        },
+      },
+    });
+
+    render(<WeaponShop matchId={10} teamId={2} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Throwing Knife')).toBeInTheDocument();
+    });
+
+    const buyButton = screen.getByTestId('buy-weapon-1');
+    fireEvent.click(buyButton);
+
+    expect(mockOptimisticSpend).toHaveBeenCalledWith(10);
+
+    await waitFor(() => {
+      expect(mockRollback).toHaveBeenCalled();
+      expect(mockNotify).toHaveBeenCalledWith('Attack purchase failed. Please try again.', 'error');
     });
   });
 

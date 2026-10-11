@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import axios from 'axios';
 import {
   Swords,
   Sword,
@@ -113,9 +114,12 @@ export const WeaponShop: React.FC<WeaponShopProps> = ({ matchId, teamId }) => {
         rollback();
         notify(response.message || 'Attack submission failed.', 'error');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       rollback();
-      const serverMessage = err?.response?.data?.message || err?.message || 'Attack purchase failed.';
+      let serverMessage = 'Attack purchase failed. Please try again.';
+      if (axios.isAxiosError(err) && err.response?.status === 400 && err.response?.data?.message) {
+        serverMessage = err.response.data.message;
+      }
       notify(serverMessage, 'error');
     } finally {
       setPurchasingWeaponId(null);
