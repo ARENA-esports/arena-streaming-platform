@@ -183,3 +183,29 @@ export interface ChatFrame {
   senderName?: string;
   [key: string]: any;
 }
+
+// Weapon Shop & Attack Types (SCRUM-119)
+export interface Weapon {
+  weaponId: number;
+  name: string;
+  description: string;
+  cost: number;
+  damage: number;
+  iconKey: string;
+}
+
+export interface AttackRequest {
+  weaponId: number;
+  matchId: number;
+  teamId: number;
+}
+
+export interface AttackResponse {
+  success: boolean;
+  attackId?: number;
+  coinsSpent: number;
+  currentBalance: number;
+  damageDealt: number;
+  message: string;
+}
+

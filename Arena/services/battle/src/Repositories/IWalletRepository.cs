@@ -8,4 +8,5 @@ public interface IWalletRepository
     Task<Wallet> GetOrCreateWalletAsync(int userId);
     Task<bool> TryAwardWatchTickAsync(int userId, int coins, DateTime currentTime, DateTime threshold);
     Task<AwardResult> ExecuteWatchTickAwardAsync(int userId, int coins, DateTime currentTime, DateTime threshold, int? streamId);
+    Task<bool> TryDeductCoinsAsync(int userId, int amount);
 }
