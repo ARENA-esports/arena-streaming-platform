@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
+
 export default defineConfig({
     plugins: [react()],
     resolve: {
@@ -37,6 +38,8 @@ export default defineConfig({
             },
             '/api/analytics': {
                 target: 'http://127.0.0.1:8084', // Analytics Service (SCRUM-125)
+                changeOrigin: true,
+            },
             '/ws/battle': {
                 target: 'http://127.0.0.1:8083', // Battle Economy Service WebSocket (SCRUM-121)
                 ws: true,

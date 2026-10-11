@@ -191,6 +191,7 @@ export interface StreamEngagementResponse {
   totalWatchTicks: number;
   uniqueViewers: number;
   lastEventAt: string | null;
+}
 // Weapon Shop & Attack Types (SCRUM-119)
 export interface Weapon {
   weaponId: number;
