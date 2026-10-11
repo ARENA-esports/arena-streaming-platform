@@ -184,6 +184,14 @@ export interface ChatFrame {
   [key: string]: any;
 }
 
+export interface StreamEngagementResponse {
+  streamId: number;
+  totalWatchSeconds: number;
+  totalCoinsEarned: number;
+  totalWatchTicks: number;
+  uniqueViewers: number;
+  lastEventAt: string | null;
+}
 // Weapon Shop & Attack Types (SCRUM-119)
 export interface Weapon {
   weaponId: number;

@@ -19,6 +19,7 @@ import ForbiddenView from '../views/ForbiddenView';
 import ProfileSettingsView from '../views/ProfileSettingsView';
 import TournamentsView from '../views/TournamentsView';
 import TeamsView from '../views/TeamsView';
+import ViewerEngagementDashboardView from '../views/ViewerEngagementDashboardView';
 
 export const AppRoutes: FC = () => {
   return (
@@ -31,6 +32,14 @@ export const AppRoutes: FC = () => {
         <Route path="/403" element={<ForbiddenView />} />
         
         {/* Protected Routes with Dashboard Layout */}
+        <Route
+          path="/organizer/analytics"
+          element={
+            <ProtectedRoute allowedRoles={['Organizer']}>
+              <ViewerEngagementDashboardView />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/teams"
           element={

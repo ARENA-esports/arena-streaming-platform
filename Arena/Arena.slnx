@@ -28,6 +28,13 @@
   <Folder Name="/services/user/tests/">
     <Project Path="services/user/tests/UserService.Tests.csproj" />
   </Folder>
+  <Folder Name="/services/analytics/" />
+  <Folder Name="/services/analytics/src/">
+    <Project Path="services/analytics/src/AnalyticsService.csproj" />
+  </Folder>
+  <Folder Name="/services/analytics/tests/">
+    <Project Path="services/analytics/tests/AnalyticsService.Tests.csproj" />
+  </Folder>
   <Folder Name="/shared/" />
   <Folder Name="/shared/eventContracts/" />
   <Folder Name="/shared/eventContracts/src/">

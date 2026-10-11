@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
+
 export default defineConfig({
     plugins: [react()],
     resolve: {
@@ -33,6 +34,10 @@ export default defineConfig({
             },
             '/api/wallet': {
                 target: 'http://127.0.0.1:8083', // Battle Economy Service (SCRUM-116)
+                changeOrigin: true,
+            },
+            '/api/analytics': {
+                target: 'http://127.0.0.1:8084', // Analytics Service (SCRUM-125)
                 changeOrigin: true,
             },
             '/ws/battle': {
