@@ -342,6 +342,114 @@ public class StreamServiceClientTests
         Assert.Equal("NotFound", result.Status);
     }
 
+    [Fact]
+    public async Task GetMatchAsync_WhenStatusIsLive_ReturnsLiveResult()
+    {
+        // Arrange
+        const int matchId = 10;
+        var json = "{\"matchId\":10,\"teamAId\":1,\"teamBId\":2,\"status\":\"Live\"}";
+        var handler = new SimpleHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(json, Encoding.UTF8, "application/json")
+        });
+        var client = CreateClient(handler);
+
+        // Act
+        var result = await client.GetMatchAsync(matchId);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.True(result.Found);
+        Assert.True(result.IsLive);
+        Assert.True(result.IsSuccess);
+        Assert.Equal(10, result.MatchId);
+        Assert.Equal(1, result.TeamAId);
+        Assert.Equal(2, result.TeamBId);
+        Assert.Equal("Live", result.Status);
+    }
+
+    [Fact]
+    public async Task GetMatchAsync_WhenStatusIsEnded_ReturnsNotLiveResult()
+    {
+        // Arrange
+        const int matchId = 10;
+        var json = "{\"matchId\":10,\"teamAId\":1,\"teamBId\":2,\"status\":\"Ended\"}";
+        var handler = new SimpleHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(json, Encoding.UTF8, "application/json")
+        });
+        var client = CreateClient(handler);
+
+        // Act
+        var result = await client.GetMatchAsync(matchId);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.True(result.Found);
+        Assert.False(result.IsLive);
+        Assert.True(result.IsSuccess);
+        Assert.Equal(10, result.MatchId);
+        Assert.Equal("Ended", result.Status);
+    }
+
+    [Fact]
+    public async Task GetMatchAsync_WhenNotFound404_ReturnsNotFoundResult()
+    {
+        // Arrange
+        const int matchId = 999;
+        var handler = new SimpleHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.NotFound));
+        var client = CreateClient(handler);
+
+        // Act
+        var result = await client.GetMatchAsync(matchId);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.False(result.Found);
+        Assert.False(result.IsLive);
+        Assert.False(result.IsSuccess);
+        Assert.Equal("NotFound", result.Status);
+        Assert.Contains("not found", result.ErrorMessage, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task GetMatchAsync_WhenServerError500_FailsSafely()
+    {
+        // Arrange
+        const int matchId = 10;
+        var handler = new SimpleHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.InternalServerError));
+        var client = CreateClient(handler);
+
+        // Act
+        var result = await client.GetMatchAsync(matchId);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.False(result.Found);
+        Assert.False(result.IsLive);
+        Assert.False(result.IsSuccess);
+        Assert.Equal("Unavailable", result.Status);
+    }
+
+    [Fact]
+    public async Task GetMatchAsync_WhenNetworkException_FailsSafely()
+    {
+        // Arrange
+        const int matchId = 10;
+        var handler = new ThrowingHttpMessageHandler(new HttpRequestException("Connection refused"));
+        var client = CreateClient(handler);
+
+        // Act
+        var result = await client.GetMatchAsync(matchId);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.False(result.Found);
+        Assert.False(result.IsLive);
+        Assert.False(result.IsSuccess);
+        Assert.Equal("Unavailable", result.Status);
+    }
+
     // Helper fake handlers
     private class SimpleHttpMessageHandler : HttpMessageHandler
     {

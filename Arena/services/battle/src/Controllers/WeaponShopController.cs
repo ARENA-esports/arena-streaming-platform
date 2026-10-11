@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using BattleEconomyService.DTOs;
 using BattleEconomyService.Services;
 
@@ -47,10 +48,13 @@ public class WeaponShopController : ControllerBase
     /// <response code="200">Attack purchased and submitted successfully.</response>
     /// <response code="400">Invalid request, insufficient coins, or weapon not found.</response>
     /// <response code="401">Missing, expired, or invalid JWT authentication token.</response>
+    /// <response code="429">Too many requests — rate limit exceeded.</response>
     [HttpPost("attack")]
+    [EnableRateLimiting("AttackRateLimiter")]
     [ProducesResponseType(typeof(AttackResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(AttackResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     public async Task<IActionResult> PurchaseAttack([FromBody] AttackRequest? request)
     {
         // 1. Resolve authenticated user ID from JWT claims

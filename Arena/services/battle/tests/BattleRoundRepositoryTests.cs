@@ -1,5 +1,7 @@
+using System.Text.Json;
 using Microsoft.Extensions.Configuration;
 using MySqlConnector;
+using BattleEconomyService.DTOs;
 using BattleEconomyService.Models;
 using BattleEconomyService.Repositories;
 using Xunit;
@@ -339,12 +341,14 @@ public class BattleRoundRepositoryTests
 
             // 2. Final bar state snapshot preserved
             Assert.NotNull(history[0].FinalBarState);
-            Assert.Contains("\"TeamId\":2", history[0].FinalBarState);
-            Assert.Contains("100", history[0].FinalBarState);
+            var round2Bars = JsonSerializer.Deserialize<List<BattleBarDto>>(history[0].FinalBarState, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            Assert.NotNull(round2Bars);
+            Assert.Contains(round2Bars, b => b.TeamId == 2 && b.TotalDamage == 100);
 
             Assert.NotNull(history[1].FinalBarState);
-            Assert.Contains("\"TeamId\":1", history[1].FinalBarState);
-            Assert.Contains("100", history[1].FinalBarState);
+            var round1Bars = JsonSerializer.Deserialize<List<BattleBarDto>>(history[1].FinalBarState, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            Assert.NotNull(round1Bars);
+            Assert.Contains(round1Bars, b => b.TeamId == 1 && b.TotalDamage == 100);
 
             // 3. Timestamps populated
             Assert.NotNull(history[0].EndedAt);

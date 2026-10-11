@@ -364,4 +364,15 @@ public class WeaponShopControllerTests
         // Assert
         Assert.IsType<BadRequestObjectResult>(result);
     }
+
+    [Fact]
+    public void PurchaseAttack_HasEnableRateLimitingAttribute()
+    {
+        var method = typeof(WeaponShopController).GetMethod(nameof(WeaponShopController.PurchaseAttack));
+        var attr = method?.GetCustomAttributes(typeof(Microsoft.AspNetCore.RateLimiting.EnableRateLimitingAttribute), inherit: true).FirstOrDefault()
+            as Microsoft.AspNetCore.RateLimiting.EnableRateLimitingAttribute;
+
+        Assert.NotNull(attr);
+        Assert.Equal("AttackRateLimiter", attr.PolicyName);
+    }
 }

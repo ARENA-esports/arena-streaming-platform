@@ -20,6 +20,7 @@ public class WeaponShopServiceTests
     private readonly Mock<IBattleBarRepository> _battleBarRepoMock;
     private readonly Mock<IBattleRoundRepository> _battleRoundRepoMock;
     private readonly Mock<IBattleWebSocketManager> _webSocketManagerMock;
+    private readonly Mock<IStreamServiceClient> _streamServiceClientMock;
     private readonly Mock<ILogger<WeaponShopService>> _loggerMock;
     private readonly WeaponShopService _service;
 
@@ -32,6 +33,7 @@ public class WeaponShopServiceTests
         _battleBarRepoMock = new Mock<IBattleBarRepository>();
         _battleRoundRepoMock = new Mock<IBattleRoundRepository>();
         _webSocketManagerMock = new Mock<IBattleWebSocketManager>();
+        _streamServiceClientMock = new Mock<IStreamServiceClient>();
         _loggerMock = new Mock<ILogger<WeaponShopService>>();
 
         _battleRoundRepoMock.Setup(r => r.GetOrCreateActiveRoundAsync(It.IsAny<int>(), It.IsAny<long>()))
@@ -44,6 +46,10 @@ public class WeaponShopServiceTests
                 RoundActive = true
             });
 
+        // Default match liveness: Live match with Team 1 and Team 2
+        _streamServiceClientMock.Setup(s => s.GetMatchAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((int matchId, CancellationToken _) => MatchDetailsResult.Live(matchId, 1, 2, "Live"));
+
         _service = new WeaponShopService(
             _weaponRepoMock.Object,
             _attackRepoMock.Object,
@@ -53,7 +59,8 @@ public class WeaponShopServiceTests
             _webSocketManagerMock.Object,
             _loggerMock.Object,
             _battleRoundRepoMock.Object,
-            Options.Create(new EconomyOptions { RoundTargetDamage = 100 }));
+            Options.Create(new EconomyOptions { RoundTargetDamage = 100 }),
+            _streamServiceClientMock.Object);
     }
 
     [Fact]
@@ -92,7 +99,7 @@ public class WeaponShopServiceTests
         // Assert
         Assert.False(result.Success);
         Assert.Contains("not found", result.Message, StringComparison.OrdinalIgnoreCase);
-        _walletRepoMock.Verify(w => w.TryDeductCoinsAsync(It.IsAny<int>(), It.IsAny<int>()), Times.Never);
+        _attackRepoMock.Verify(a => a.ExecuteAttackTransactionAsync(It.IsAny<AttackLog>(), It.IsAny<int>()), Times.Never);
         _battleBarRepoMock.Verify(b => b.ApplyDamageAtomicAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<int>()), Times.Never);
     }
 
@@ -110,8 +117,68 @@ public class WeaponShopServiceTests
         // Assert
         Assert.False(result.Success);
         Assert.Contains("available", result.Message, StringComparison.OrdinalIgnoreCase);
-        _walletRepoMock.Verify(w => w.TryDeductCoinsAsync(It.IsAny<int>(), It.IsAny<int>()), Times.Never);
+        _attackRepoMock.Verify(a => a.ExecuteAttackTransactionAsync(It.IsAny<AttackLog>(), It.IsAny<int>()), Times.Never);
         _battleBarRepoMock.Verify(b => b.ApplyDamageAtomicAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<int>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task PurchaseAttackAsync_MatchNotFound_ReturnsFailure()
+    {
+        // Arrange
+        var weapon = new Weapon { WeaponId = 1, Name = "Sword", Cost = 15, Damage = 2, IsActive = true };
+        _weaponRepoMock.Setup(r => r.GetByIdAsync(1)).ReturnsAsync(weapon);
+        _streamServiceClientMock.Setup(s => s.GetMatchAsync(404, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(MatchDetailsResult.NotFound(404));
+
+        var request = new AttackRequest { WeaponId = 1, MatchId = 404, TeamId = 1 };
+
+        // Act
+        var result = await _service.PurchaseAttackAsync(10, request);
+
+        // Assert
+        Assert.False(result.Success);
+        Assert.Equal("Match not found.", result.Message);
+        _attackRepoMock.Verify(a => a.ExecuteAttackTransactionAsync(It.IsAny<AttackLog>(), It.IsAny<int>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task PurchaseAttackAsync_MatchNotLive_ReturnsFailure()
+    {
+        // Arrange
+        var weapon = new Weapon { WeaponId = 1, Name = "Sword", Cost = 15, Damage = 2, IsActive = true };
+        _weaponRepoMock.Setup(r => r.GetByIdAsync(1)).ReturnsAsync(weapon);
+        _streamServiceClientMock.Setup(s => s.GetMatchAsync(101, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(MatchDetailsResult.NotLive(101, 1, 2, "Ended"));
+
+        var request = new AttackRequest { WeaponId = 1, MatchId = 101, TeamId = 1 };
+
+        // Act
+        var result = await _service.PurchaseAttackAsync(10, request);
+
+        // Assert
+        Assert.False(result.Success);
+        Assert.Equal("Match is not currently live.", result.Message);
+        _attackRepoMock.Verify(a => a.ExecuteAttackTransactionAsync(It.IsAny<AttackLog>(), It.IsAny<int>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task PurchaseAttackAsync_TeamNotParticipatingInMatch_ReturnsFailure()
+    {
+        // Arrange
+        var weapon = new Weapon { WeaponId = 1, Name = "Sword", Cost = 15, Damage = 2, IsActive = true };
+        _weaponRepoMock.Setup(r => r.GetByIdAsync(1)).ReturnsAsync(weapon);
+        _streamServiceClientMock.Setup(s => s.GetMatchAsync(101, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(MatchDetailsResult.Live(101, 1, 2, "Live"));
+
+        var request = new AttackRequest { WeaponId = 1, MatchId = 101, TeamId = 999 };
+
+        // Act
+        var result = await _service.PurchaseAttackAsync(10, request);
+
+        // Assert
+        Assert.False(result.Success);
+        Assert.Equal("Selected team is not participating in this match.", result.Message);
+        _attackRepoMock.Verify(a => a.ExecuteAttackTransactionAsync(It.IsAny<AttackLog>(), It.IsAny<int>()), Times.Never);
     }
 
     [Fact]
@@ -120,8 +187,8 @@ public class WeaponShopServiceTests
         // Arrange
         var weapon = new Weapon { WeaponId = 1, Name = "Hammer", Cost = 50, Damage = 6, IsActive = true };
         _weaponRepoMock.Setup(r => r.GetByIdAsync(1)).ReturnsAsync(weapon);
-        _walletRepoMock.Setup(w => w.TryDeductCoinsAsync(10, 50)).ReturnsAsync(false);
-        _walletRepoMock.Setup(w => w.GetByUserIdAsync(10)).ReturnsAsync(new Wallet { UserId = 10, Coins = 20 });
+        _attackRepoMock.Setup(a => a.ExecuteAttackTransactionAsync(It.IsAny<AttackLog>(), 50))
+            .ReturnsAsync(AtomicAttackResult.InsufficientCoins(20));
 
         var request = new AttackRequest { WeaponId = 1, MatchId = 1, TeamId = 2 };
 
@@ -132,7 +199,6 @@ public class WeaponShopServiceTests
         Assert.False(result.Success);
         Assert.Equal(20, result.CurrentBalance);
         Assert.Contains("Insufficient coins", result.Message, StringComparison.OrdinalIgnoreCase);
-        _attackRepoMock.Verify(a => a.RecordAttackAsync(It.IsAny<AttackLog>()), Times.Never);
         _battleBarRepoMock.Verify(b => b.ApplyDamageAtomicAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<int>()), Times.Never);
     }
 
@@ -142,9 +208,8 @@ public class WeaponShopServiceTests
         // Arrange
         var weapon = new Weapon { WeaponId = 1, Name = "Hammer", Cost = 50, Damage = 6, IsActive = true };
         _weaponRepoMock.Setup(r => r.GetByIdAsync(1)).ReturnsAsync(weapon);
-        _walletRepoMock.Setup(w => w.TryDeductCoinsAsync(10, 50)).ReturnsAsync(true);
-        _walletRepoMock.Setup(w => w.GetByUserIdAsync(10)).ReturnsAsync(new Wallet { WalletId = 77, UserId = 10, Coins = 50 });
-        _attackRepoMock.Setup(a => a.RecordAttackAsync(It.IsAny<AttackLog>())).ReturnsAsync(12345L);
+        _attackRepoMock.Setup(a => a.ExecuteAttackTransactionAsync(It.IsAny<AttackLog>(), 50))
+            .ReturnsAsync(AtomicAttackResult.Succeeded(12345L, 50, 77));
         _battleBarRepoMock.Setup(b => b.ApplyDamageAtomicAsync(101, 2, 6)).ReturnsAsync(106L);
         _battleBarRepoMock.Setup(b => b.GetBarsForMatchAsync(101))
             .ReturnsAsync(new List<BattleBar> { new() { MatchId = 101, TeamId = 2, TotalDamage = 106 } });
@@ -163,13 +228,13 @@ public class WeaponShopServiceTests
         Assert.Equal(106L, result.TeamTotalDamage);
         Assert.Contains("Hammer attack launched", result.Message);
 
-        _attackRepoMock.Verify(a => a.RecordAttackAsync(It.Is<AttackLog>(log =>
+        _attackRepoMock.Verify(a => a.ExecuteAttackTransactionAsync(It.Is<AttackLog>(log =>
             log.UserId == 10 &&
             log.WeaponId == 1 &&
             log.MatchId == 101 &&
             log.TeamId == 2 &&
             log.CoinsSpent == 50 &&
-            log.DamageDealt == 6)), Times.Once);
+            log.DamageDealt == 6), 50), Times.Once);
 
         _battleBarRepoMock.Verify(b => b.ApplyDamageAtomicAsync(101, 2, 6), Times.Once);
 
@@ -181,9 +246,6 @@ public class WeaponShopServiceTests
                 m.LatestAttack != null &&
                 m.LatestAttack.Damage == 6),
             It.IsAny<CancellationToken>()), Times.Once);
-
-        _coinTransactionRepoMock.Verify(c => c.RecordTransactionAsync(
-            10, 77, -50, "WEAPON_PURCHASE", null), Times.Once);
     }
 
     [Fact]
@@ -192,9 +254,8 @@ public class WeaponShopServiceTests
         // Arrange — WebSocket broadcast fails, but attack must still succeed (fault isolation)
         var weapon = new Weapon { WeaponId = 1, Name = "Hammer", Cost = 50, Damage = 6, IsActive = true };
         _weaponRepoMock.Setup(r => r.GetByIdAsync(1)).ReturnsAsync(weapon);
-        _walletRepoMock.Setup(w => w.TryDeductCoinsAsync(10, 50)).ReturnsAsync(true);
-        _walletRepoMock.Setup(w => w.GetByUserIdAsync(10)).ReturnsAsync(new Wallet { WalletId = 77, UserId = 10, Coins = 50 });
-        _attackRepoMock.Setup(a => a.RecordAttackAsync(It.IsAny<AttackLog>())).ReturnsAsync(12345L);
+        _attackRepoMock.Setup(a => a.ExecuteAttackTransactionAsync(It.IsAny<AttackLog>(), 50))
+            .ReturnsAsync(AtomicAttackResult.Succeeded(12345L, 50, 77));
         _battleBarRepoMock.Setup(b => b.ApplyDamageAtomicAsync(101, 2, 6)).ReturnsAsync(106L);
         _webSocketManagerMock.Setup(ws => ws.BroadcastToMatchAsync(It.IsAny<int>(), It.IsAny<BattleBarBroadcastMessage>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new Exception("Socket buffer overflow"));
@@ -216,9 +277,8 @@ public class WeaponShopServiceTests
         // Arrange — battle bar throws, but the attack and coin deduction should still succeed
         var weapon = new Weapon { WeaponId = 1, Name = "Knife", Cost = 10, Damage = 1, IsActive = true };
         _weaponRepoMock.Setup(r => r.GetByIdAsync(1)).ReturnsAsync(weapon);
-        _walletRepoMock.Setup(w => w.TryDeductCoinsAsync(10, 10)).ReturnsAsync(true);
-        _walletRepoMock.Setup(w => w.GetByUserIdAsync(10)).ReturnsAsync(new Wallet { WalletId = 77, UserId = 10, Coins = 90 });
-        _attackRepoMock.Setup(a => a.RecordAttackAsync(It.IsAny<AttackLog>())).ReturnsAsync(999L);
+        _attackRepoMock.Setup(a => a.ExecuteAttackTransactionAsync(It.IsAny<AttackLog>(), 10))
+            .ReturnsAsync(AtomicAttackResult.Succeeded(999L, 90, 77));
         _battleBarRepoMock.Setup(b => b.ApplyDamageAtomicAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<int>()))
             .ThrowsAsync(new Exception("DB connection dropped for battle bar"));
 
@@ -232,30 +292,6 @@ public class WeaponShopServiceTests
         Assert.Equal(999L, result.AttackId);
         Assert.Equal(90, result.CurrentBalance);
         Assert.Equal(0L, result.TeamTotalDamage);
-    }
-
-    [Fact]
-    public async Task PurchaseAttackAsync_TransactionAuditFails_StillReturnsSuccess()
-    {
-        // Arrange
-        var weapon = new Weapon { WeaponId = 1, Name = "Knife", Cost = 10, Damage = 1, IsActive = true };
-        _weaponRepoMock.Setup(r => r.GetByIdAsync(1)).ReturnsAsync(weapon);
-        _walletRepoMock.Setup(w => w.TryDeductCoinsAsync(10, 10)).ReturnsAsync(true);
-        _walletRepoMock.Setup(w => w.GetByUserIdAsync(10)).ReturnsAsync(new Wallet { WalletId = 77, UserId = 10, Coins = 90 });
-        _attackRepoMock.Setup(a => a.RecordAttackAsync(It.IsAny<AttackLog>())).ReturnsAsync(888L);
-        _battleBarRepoMock.Setup(b => b.ApplyDamageAtomicAsync(101, 2, 1)).ReturnsAsync(50L);
-        _coinTransactionRepoMock.Setup(c => c.RecordTransactionAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<int?>()))
-            .ThrowsAsync(new Exception("DB connection dropped for audit log"));
-
-        var request = new AttackRequest { WeaponId = 1, MatchId = 101, TeamId = 2 };
-
-        // Act
-        var result = await _service.PurchaseAttackAsync(10, request);
-
-        // Assert
-        Assert.True(result.Success);
-        Assert.Equal(888L, result.AttackId);
-        Assert.Equal(90, result.CurrentBalance);
     }
 
     [Fact]
@@ -285,9 +321,8 @@ public class WeaponShopServiceTests
         // Arrange
         var weapon = new Weapon { WeaponId = 2, Name = "Bow", Cost = 30, Damage = 15, IsActive = true };
         _weaponRepoMock.Setup(r => r.GetByIdAsync(2)).ReturnsAsync(weapon);
-        _walletRepoMock.Setup(w => w.TryDeductCoinsAsync(10, 30)).ReturnsAsync(true);
-        _walletRepoMock.Setup(w => w.GetByUserIdAsync(10)).ReturnsAsync(new Wallet { WalletId = 77, UserId = 10, Coins = 70 });
-        _attackRepoMock.Setup(a => a.RecordAttackAsync(It.IsAny<AttackLog>())).ReturnsAsync(500L);
+        _attackRepoMock.Setup(a => a.ExecuteAttackTransactionAsync(It.IsAny<AttackLog>(), 30))
+            .ReturnsAsync(AtomicAttackResult.Succeeded(500L, 70, 77));
         _battleBarRepoMock.Setup(b => b.ApplyDamageAtomicAsync(101, 1, 15)).ReturnsAsync(100L);
         _battleBarRepoMock.Setup(b => b.GetBarsForMatchAsync(101)).ReturnsAsync(new List<BattleBar>
         {
@@ -329,9 +364,8 @@ public class WeaponShopServiceTests
         // Arrange
         var weapon = new Weapon { WeaponId = 2, Name = "Bow", Cost = 30, Damage = 15, IsActive = true };
         _weaponRepoMock.Setup(r => r.GetByIdAsync(2)).ReturnsAsync(weapon);
-        _walletRepoMock.Setup(w => w.TryDeductCoinsAsync(10, 30)).ReturnsAsync(true);
-        _walletRepoMock.Setup(w => w.GetByUserIdAsync(10)).ReturnsAsync(new Wallet { WalletId = 77, UserId = 10, Coins = 70 });
-        _attackRepoMock.Setup(a => a.RecordAttackAsync(It.IsAny<AttackLog>())).ReturnsAsync(501L);
+        _attackRepoMock.Setup(a => a.ExecuteAttackTransactionAsync(It.IsAny<AttackLog>(), 30))
+            .ReturnsAsync(AtomicAttackResult.Succeeded(501L, 70, 77));
         _battleBarRepoMock.Setup(b => b.ApplyDamageAtomicAsync(101, 1, 15)).ReturnsAsync(100L);
         _battleBarRepoMock.Setup(b => b.GetBarsForMatchAsync(101)).ReturnsAsync(new List<BattleBar>
         {
@@ -367,9 +401,8 @@ public class WeaponShopServiceTests
         // Arrange
         var weapon = new Weapon { WeaponId = 1, Name = "Sword", Cost = 15, Damage = 5, IsActive = true };
         _weaponRepoMock.Setup(r => r.GetByIdAsync(1)).ReturnsAsync(weapon);
-        _walletRepoMock.Setup(w => w.TryDeductCoinsAsync(10, 15)).ReturnsAsync(true);
-        _walletRepoMock.Setup(w => w.GetByUserIdAsync(10)).ReturnsAsync(new Wallet { WalletId = 77, UserId = 10, Coins = 85 });
-        _attackRepoMock.Setup(a => a.RecordAttackAsync(It.IsAny<AttackLog>())).ReturnsAsync(502L);
+        _attackRepoMock.Setup(a => a.ExecuteAttackTransactionAsync(It.IsAny<AttackLog>(), 15))
+            .ReturnsAsync(AtomicAttackResult.Succeeded(502L, 85, 77));
         _battleBarRepoMock.Setup(b => b.ApplyDamageAtomicAsync(101, 1, 5)).ReturnsAsync(35L);
         _battleBarRepoMock.Setup(b => b.GetBarsForMatchAsync(101)).ReturnsAsync(new List<BattleBar>
         {
@@ -395,9 +428,8 @@ public class WeaponShopServiceTests
         // Arrange
         var weapon = new Weapon { WeaponId = 1, Name = "Sword", Cost = 15, Damage = 5, IsActive = true };
         _weaponRepoMock.Setup(r => r.GetByIdAsync(1)).ReturnsAsync(weapon);
-        _walletRepoMock.Setup(w => w.TryDeductCoinsAsync(10, 15)).ReturnsAsync(true);
-        _walletRepoMock.Setup(w => w.GetByUserIdAsync(10)).ReturnsAsync(new Wallet { WalletId = 77, UserId = 10, Coins = 85 });
-        _attackRepoMock.Setup(a => a.RecordAttackAsync(It.IsAny<AttackLog>())).ReturnsAsync(503L);
+        _attackRepoMock.Setup(a => a.ExecuteAttackTransactionAsync(It.IsAny<AttackLog>(), 15))
+            .ReturnsAsync(AtomicAttackResult.Succeeded(503L, 85, 77));
         _battleBarRepoMock.Setup(b => b.ApplyDamageAtomicAsync(101, 1, 5)).ReturnsAsync(50L);
 
         // Round repository throws an unexpected database exception

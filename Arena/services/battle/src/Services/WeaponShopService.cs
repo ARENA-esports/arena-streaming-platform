@@ -17,6 +17,7 @@ public class WeaponShopService : IWeaponShopService
     private readonly IBattleBarRepository _battleBarRepository;
     private readonly IBattleRoundRepository? _battleRoundRepository;
     private readonly IBattleWebSocketManager _webSocketManager;
+    private readonly IStreamServiceClient? _streamServiceClient;
     private readonly EconomyOptions _economyOptions;
     private readonly ILogger<WeaponShopService> _logger;
 
@@ -29,7 +30,8 @@ public class WeaponShopService : IWeaponShopService
         IBattleWebSocketManager webSocketManager,
         ILogger<WeaponShopService> logger,
         IBattleRoundRepository? battleRoundRepository = null,
-        IOptions<EconomyOptions>? economyOptions = null)
+        IOptions<EconomyOptions>? economyOptions = null,
+        IStreamServiceClient? streamServiceClient = null)
     {
         _weaponRepository = weaponRepository;
         _attackRepository = attackRepository;
@@ -40,6 +42,7 @@ public class WeaponShopService : IWeaponShopService
         _logger = logger;
         _battleRoundRepository = battleRoundRepository;
         _economyOptions = economyOptions?.Value ?? new EconomyOptions();
+        _streamServiceClient = streamServiceClient;
     }
 
     public async Task<List<WeaponDto>> GetWeaponsAsync()
@@ -71,22 +74,47 @@ public class WeaponShopService : IWeaponShopService
             };
         }
 
-        // 2. Atomic coin deduction — returns false if insufficient funds
-        var deducted = await _walletRepository.TryDeductCoinsAsync(userId, weapon.Cost);
-        if (!deducted)
+        // 2. Validate match existence, live status, and team participation via StreamService (Finding 2)
+        if (_streamServiceClient != null)
         {
-            var wallet = await _walletRepository.GetByUserIdAsync(userId);
-            _logger.LogInformation("Attack rejected for user {UserId}: insufficient coins (has {Balance}, needs {Cost}).",
-                userId, wallet?.Coins ?? 0, weapon.Cost);
-            return new AttackResponse
+            var matchResult = await _streamServiceClient.GetMatchAsync(request.MatchId);
+            if (!matchResult.Found)
             {
-                Success = false,
-                CurrentBalance = wallet?.Coins ?? 0,
-                Message = "Insufficient coins to purchase this weapon."
-            };
+                _logger.LogWarning("Attack rejected for user {UserId}: match {MatchId} not found.",
+                    userId, request.MatchId);
+                return new AttackResponse
+                {
+                    Success = false,
+                    Message = "Match not found."
+                };
+            }
+
+            if (!matchResult.IsLive)
+            {
+                _logger.LogWarning("Attack rejected for user {UserId}: match {MatchId} is not live (status: {Status}).",
+                    userId, request.MatchId, matchResult.Status);
+                return new AttackResponse
+                {
+                    Success = false,
+                    Message = "Match is not currently live."
+                };
+            }
+
+            if (request.TeamId != matchResult.TeamAId && request.TeamId != matchResult.TeamBId)
+            {
+                _logger.LogWarning(
+                    "Attack rejected for user {UserId}: team {TeamId} is not participating in match {MatchId} (teams: {TeamA}, {TeamB}).",
+                    userId, request.TeamId, request.MatchId, matchResult.TeamAId, matchResult.TeamBId);
+                return new AttackResponse
+                {
+                    Success = false,
+                    Message = "Selected team is not participating in this match."
+                };
+            }
         }
 
-        // 3. Record the attack
+        // 3. Atomic database operations via MySqlTransaction (Finding 1)
+        //    Executes Wallet Deduction -> Record Attack -> Record Transaction in a single transaction.
         var attackLog = new AttackLog
         {
             UserId = userId,
@@ -97,7 +125,21 @@ public class WeaponShopService : IWeaponShopService
             DamageDealt = weapon.Damage
         };
 
-        var attackId = await _attackRepository.RecordAttackAsync(attackLog);
+        var atomicResult = await _attackRepository.ExecuteAttackTransactionAsync(attackLog, weapon.Cost);
+        if (!atomicResult.Success)
+        {
+            _logger.LogInformation("Attack rejected for user {UserId}: {ErrorMessage}.",
+                userId, atomicResult.ErrorMessage);
+            return new AttackResponse
+            {
+                Success = false,
+                CurrentBalance = atomicResult.RemainingBalance,
+                Message = atomicResult.ErrorMessage ?? "Insufficient coins to purchase this weapon."
+            };
+        }
+
+        var attackId = atomicResult.AttackId;
+        var newBalance = atomicResult.RemainingBalance;
 
         // 4. Atomically update the battle bar (SCRUM-120)
         //    Uses INSERT ... ON DUPLICATE KEY UPDATE total_damage = total_damage + @Damage.
@@ -197,24 +239,6 @@ public class WeaponShopService : IWeaponShopService
         {
             _logger.LogError(ex, "Failed to broadcast battle bar update for match {MatchId}, attack {AttackId}.",
                 request.MatchId, attackId);
-        }
-
-        // 7. Retrieve updated balance
-        var updatedWallet = await _walletRepository.GetByUserIdAsync(userId);
-        var newBalance = updatedWallet?.Coins ?? 0;
-
-        // 8. Record coin transaction audit entry
-        if (updatedWallet != null)
-        {
-            try
-            {
-                await _coinTransactionRepository.RecordTransactionAsync(
-                    userId, updatedWallet.WalletId, -weapon.Cost, "WEAPON_PURCHASE", null);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to record coin transaction for user {UserId}, attack {AttackId}.", userId, attackId);
-            }
         }
 
         var attackMessage = roundEnded

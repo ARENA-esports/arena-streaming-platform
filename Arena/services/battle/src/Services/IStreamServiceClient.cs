@@ -13,4 +13,9 @@ public interface IStreamServiceClient
     /// Fails safely (returns non-live result) on network, timeout, or HTTP errors.
     /// </summary>
     Task<StreamLivenessResult> GetStreamLivenessAsync(int streamId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Queries StreamService for match status and participating teams (SCRUM-119 / Finding 2).
+    /// </summary>
+    Task<MatchDetailsResult> GetMatchAsync(int matchId, CancellationToken cancellationToken = default);
 }

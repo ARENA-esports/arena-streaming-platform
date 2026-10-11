@@ -82,4 +82,65 @@ public class StreamServiceClient : IStreamServiceClient
             return StreamLivenessResult.Failed(streamId, "Unexpected error calling StreamService.");
         }
     }
+
+    public async Task<MatchDetailsResult> GetMatchAsync(int matchId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var response = await _httpClient.GetAsync($"api/matches/{matchId}", cancellationToken);
+
+            if (response.StatusCode == HttpStatusCode.NotFound)
+            {
+                _logger.LogWarning("StreamService returned 404 Not Found for match {MatchId}", matchId);
+                return MatchDetailsResult.NotFound(matchId);
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogWarning(
+                    "StreamService returned HTTP status {StatusCode} for match {MatchId}",
+                    (int)response.StatusCode, matchId);
+                return MatchDetailsResult.Failed(matchId, $"StreamService returned HTTP {(int)response.StatusCode}.");
+            }
+
+            var matchResponse = await response.Content.ReadFromJsonAsync<MatchDetailsResponse>(cancellationToken);
+
+            if (matchResponse == null)
+            {
+                _logger.LogWarning("StreamService returned empty or invalid payload for match {MatchId}", matchId);
+                return MatchDetailsResult.Failed(matchId, "Empty or invalid response from StreamService.");
+            }
+
+            if (StreamLiveStatus.IsLive(matchResponse.Status))
+            {
+                _logger.LogInformation("Match {MatchId} confirmed live from StreamService.", matchId);
+                return MatchDetailsResult.Live(matchId, matchResponse.TeamAId, matchResponse.TeamBId, matchResponse.Status);
+            }
+
+            _logger.LogInformation(
+                "Match {MatchId} confirmed not live from StreamService (Status: {Status}).",
+                matchId, matchResponse.Status);
+            return MatchDetailsResult.NotLive(matchId, matchResponse.TeamAId, matchResponse.TeamBId, matchResponse.Status);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            _logger.LogWarning("StreamService request timed out for match {MatchId}", matchId);
+            return MatchDetailsResult.Failed(matchId, "StreamService request timed out.");
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogWarning("StreamService request was cancelled for match {MatchId}", matchId);
+            return MatchDetailsResult.Failed(matchId, "StreamService request was cancelled.");
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogWarning(ex, "Network error querying StreamService for match {MatchId}", matchId);
+            return MatchDetailsResult.Failed(matchId, "StreamService network error.");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error querying StreamService for match {MatchId}", matchId);
+            return MatchDetailsResult.Failed(matchId, "Unexpected error calling StreamService.");
+        }
+    }
 }

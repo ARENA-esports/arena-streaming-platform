@@ -1,7 +1,9 @@
 using System.Security.Claims;
 using System.Text;
+using System.Threading.RateLimiting;
 using DbUp;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
@@ -74,6 +76,28 @@ builder.Services.AddCors(options =>
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials();
+    });
+});
+
+// Configure rate limiting for attack endpoint (Finding 3)
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy("AttackRateLimiter", httpContext =>
+    {
+        var partitionKey = httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                        ?? httpContext.User.FindFirst("sub")?.Value
+                        ?? httpContext.Connection.RemoteIpAddress?.ToString()
+                        ?? "anonymous";
+
+        return RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: partitionKey,
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = builder.Environment.IsDevelopment() ? 100 : 30,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            });
     });
 });
 
@@ -201,6 +225,7 @@ app.UseWebSockets();
 
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 
 // Map real-time WebSocket endpoint for battle bar broadcasting (SCRUM-121)
 app.MapBattleWebSocket();
