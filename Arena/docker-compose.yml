@@ -11,7 +11,6 @@ services:
       - MYSQL_PASSWORD=arena_password
     volumes:
       - mysql-user-data:/var/lib/mysql
-      - ./services/user/src/migrations:/docker-entrypoint-initdb.d
     healthcheck:
       test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-prootpassword" ]
       interval: 5s
