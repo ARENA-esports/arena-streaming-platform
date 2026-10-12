@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Trophy, History, Clock, ShieldAlert } from 'lucide-react';
 import { weaponShopService } from '../../api/weaponShopService';
 import { BattleRoundHistoryDto } from '../../types';
@@ -8,6 +9,8 @@ interface RoundHistoryModalProps {
   isOpen: boolean;
   onClose: () => void;
   teamsMap?: Record<number, { name: string; color: string }>;
+  teamAId?: number | null;
+  teamBId?: number | null;
 }
 
 export const RoundHistoryModal: React.FC<RoundHistoryModalProps> = ({
@@ -15,6 +18,8 @@ export const RoundHistoryModal: React.FC<RoundHistoryModalProps> = ({
   isOpen,
   onClose,
   teamsMap,
+  teamAId,
+  teamBId,
 }) => {
   const [history, setHistory] = useState<BattleRoundHistoryDto[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -61,7 +66,34 @@ export const RoundHistoryModal: React.FC<RoundHistoryModalProps> = ({
 
   if (!isOpen) return null;
 
-  return (
+  const getTeamMeta = (teamId?: number | null) => {
+    if (!teamId) {
+      return { name: 'Undecided', color: '#A1A1AA' };
+    }
+
+    const key = Number(teamId);
+    if (teamsMap?.[key]) {
+      return teamsMap[key];
+    }
+    if ((teamsMap as any)?.[String(teamId)]) {
+      return (teamsMap as any)[String(teamId)];
+    }
+
+    if (teamAId && key === Number(teamAId)) {
+      return { name: `Team ${teamId}`, color: '#EF4444' };
+    }
+    if (teamBId && key === Number(teamBId)) {
+      return { name: `Team ${teamId}`, color: '#00B8FC' };
+    }
+
+    // Default fallback based on teamId
+    return {
+      name: `Team ${teamId}`,
+      color: key === 1 ? '#EF4444' : key === 2 ? '#00B8FC' : '#10B981',
+    };
+  };
+
+  const modalContent = (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in"
       onClick={onClose}
@@ -127,12 +159,9 @@ export const RoundHistoryModal: React.FC<RoundHistoryModalProps> = ({
             !error &&
             history.length > 0 &&
             history.map((round) => {
-              const winnerName = round.winningTeamId
-                ? teamsMap?.[round.winningTeamId]?.name || `Team ${round.winningTeamId}`
-                : 'Undecided';
-              const winnerColor = round.winningTeamId
-                ? teamsMap?.[round.winningTeamId]?.color || '#00B8FC'
-                : '#A1A1AA';
+              const winnerMeta = getTeamMeta(round.winningTeamId);
+              const winnerName = winnerMeta.name;
+              const winnerColor = winnerMeta.color;
 
               return (
                 <div
@@ -180,9 +209,9 @@ export const RoundHistoryModal: React.FC<RoundHistoryModalProps> = ({
                       </div>
                       <div className="grid grid-cols-2 gap-3">
                         {round.finalBarState.map((bar) => {
-                          const teamMeta = teamsMap?.[bar.teamId];
-                          const teamName = teamMeta?.name || `Team ${bar.teamId}`;
-                          const teamColor = teamMeta?.color || (bar.teamId === 1 ? '#EF4444' : '#00B8FC');
+                          const teamMeta = getTeamMeta(bar.teamId);
+                          const teamName = teamMeta.name;
+                          const teamColor = teamMeta.color;
                           const isWinner = bar.teamId === round.winningTeamId;
 
                           return (
@@ -232,6 +261,12 @@ export const RoundHistoryModal: React.FC<RoundHistoryModalProps> = ({
       </div>
     </div>
   );
+
+  if (typeof document !== 'undefined' && document.body) {
+    return createPortal(modalContent, document.body);
+  }
+
+  return modalContent;
 };
 
 export default RoundHistoryModal;

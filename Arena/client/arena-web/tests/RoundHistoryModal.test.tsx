@@ -110,4 +110,71 @@ describe('RoundHistoryModal Component', () => {
 
     expect(mockOnClose).toHaveBeenCalledTimes(1);
   });
+
+  test('renders modal as a portal directly in document.body when open', async () => {
+    mockGetRoundHistory.mockResolvedValueOnce([]);
+
+    const { container } = render(
+      <div data-testid="parent-container" style={{ overflow: 'hidden' }}>
+        <RoundHistoryModal matchId={1} isOpen={true} onClose={mockOnClose} />
+      </div>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('No Completed Rounds Yet')).toBeInTheDocument();
+    });
+
+    const modal = screen.getByTestId('round-history-modal');
+    // Modal is portaled directly into document.body, outside parent container
+    expect(document.body.contains(modal)).toBe(true);
+    expect(container.querySelector('[data-testid="round-history-modal"]')).toBeNull();
+  });
+
+  test('correctly maps custom team colors and names for Team Emerald and Team Shadow', async () => {
+    const mockData: BattleRoundHistoryDto[] = [
+      {
+        roundId: 201,
+        matchId: 101,
+        roundNumber: 1,
+        winningTeamId: 10,
+        targetDamage: 100,
+        finalBarState: [
+          { teamId: 10, totalDamage: 102 },
+          { teamId: 20, totalDamage: 0 },
+        ],
+        createdAt: '2026-10-12T01:00:00Z',
+        endedAt: '2026-10-12T01:05:00Z',
+      },
+    ];
+
+    mockGetRoundHistory.mockResolvedValueOnce(mockData);
+
+    const customTeamsMap = {
+      10: { name: 'Team Emerald', color: '#10B981' },
+      20: { name: 'Team Shadow', color: '#A855F7' },
+    };
+
+    render(
+      <RoundHistoryModal
+        matchId={101}
+        isOpen={true}
+        onClose={mockOnClose}
+        teamsMap={customTeamsMap}
+        teamAId={10}
+        teamBId={20}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Winner: Team Emerald')).toBeInTheDocument();
+      expect(screen.getByText('Team Emerald')).toBeInTheDocument();
+      expect(screen.getByText('Team Shadow')).toBeInTheDocument();
+    });
+
+    const emeraldName = screen.getByText('Team Emerald');
+    expect(emeraldName).toHaveStyle({ color: '#10B981' });
+
+    const shadowName = screen.getByText('Team Shadow');
+    expect(shadowName).toHaveStyle({ color: '#A855F7' });
+  });
 });

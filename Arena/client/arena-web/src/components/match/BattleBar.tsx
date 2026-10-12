@@ -209,6 +209,8 @@ export const BattleBar: React.FC<BattleBarProps> = ({
         isOpen={isHistoryOpen}
         onClose={() => setIsHistoryOpen(false)}
         teamsMap={teamsMap}
+        teamAId={teamA.id}
+        teamBId={teamB.id}
       />
     </div>
   );
