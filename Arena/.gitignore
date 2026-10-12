@@ -5,7 +5,8 @@
 **/TestResults/
 *.log
 *.trx
-*.trx
+.scannerwork/
+.sonar/
 
 ## Visual Studio / Roslyn / User Cache
 ## Visual Studio / Roslyn / User Cache
