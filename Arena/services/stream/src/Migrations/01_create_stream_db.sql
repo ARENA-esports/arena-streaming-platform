@@ -116,9 +116,9 @@ ON DUPLICATE KEY UPDATE
     color_hex = VALUES(color_hex),
     logo_url = VALUES(logo_url);
 
--- 2. Populate Scheduled Matches
+-- 2. Populate Scheduled & Live Matches
 INSERT INTO matches (match_id, tournament_id, team_a_id, team_b_id, scheduled_time, status) VALUES
-(1, 1, 1, 2, DATE_ADD(NOW(), INTERVAL 2 HOUR), 'Scheduled'),
+(1, 1, 1, 2, NOW(), 'Live'),
 (2, 1, 3, 4, DATE_ADD(NOW(), INTERVAL 5 HOUR), 'Scheduled'),
 (3, 1, 1, 3, DATE_ADD(NOW(), INTERVAL 1 DAY), 'Scheduled')
 ON DUPLICATE KEY UPDATE
@@ -139,7 +139,7 @@ INSERT INTO streams (
     status,
     viewer_count
 ) VALUES
-(101, 999, 1, 1, 'mock_twitch_channel_1', 'Twitch', 'Grand Finals - Team Crimson vs Team Cobalt', 'localhost', 'Scheduled', 0),
+(101, 999, 1, 1, 'mock_twitch_channel_1', 'Twitch', 'Grand Finals - Team Crimson vs Team Cobalt', 'localhost', 'Live', 0),
 (102, 998, 1, 2, 'mock_twitch_channel_2', 'Twitch', 'Semi Finals - Team Emerald vs Team Shadow', 'localhost', 'Scheduled', 0)
 ON DUPLICATE KEY UPDATE
     channel_name = VALUES(channel_name),

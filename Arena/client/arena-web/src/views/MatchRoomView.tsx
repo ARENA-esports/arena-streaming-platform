@@ -41,7 +41,7 @@ export const MatchRoomView: React.FC = () => {
   }, [status, matchId, resetPlayback]);
 
   // Heartbeat is active ONLY for authenticated viewers watching an active Live match with a valid stream
-  const isViewer = Boolean(user && user.role === 'Viewer');
+  const isViewer = Boolean(user && user.role?.toLowerCase() === 'viewer');
   const isLiveMatch = status === 'Live' && Boolean(match);
   const streamId = stream?.streamId ?? stream?.id;
   const hasValidStream = typeof streamId === 'number' && streamId > 0;
@@ -210,6 +210,10 @@ export const MatchRoomView: React.FC = () => {
             <StreamContainer
               apiChannelName={stream?.channelName}
               isPlaying={isPlaying}
+              isHeartbeatEligible={isHeartbeatEligible}
+              userRole={user?.role}
+              hasValidStream={hasValidStream}
+              isAuthenticated={Boolean(user)}
               onPlay={onPlay}
               onPause={onPause}
               onChannelChange={setActiveChannel}

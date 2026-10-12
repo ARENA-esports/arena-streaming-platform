@@ -1,5 +1,5 @@
 # Stage 1: Build static assets
-FROM node:20-alpine AS build
+FROM node:22-alpine AS build
 WORKDIR /app
 
 ARG VITE_USER_API_URL
@@ -18,10 +18,13 @@ ENV VITE_BATTLE_API_URL=$VITE_BATTLE_API_URL
 ENV VITE_ANALYTICS_API_URL=$VITE_ANALYTICS_API_URL
 ENV VITE_APP_DOMAIN=$VITE_APP_DOMAIN
 
-COPY package*.json ./
-RUN npm ci
 COPY . .
-RUN npm run build
+
+# If dist is already built on host, reuse it; otherwise install dependencies and build
+RUN if [ ! -f "dist/index.html" ]; then \
+      npm ci && \
+      npm run build; \
+    fi
 
 # Stage 2: Serve static assets via Nginx
 FROM nginx:alpine AS final

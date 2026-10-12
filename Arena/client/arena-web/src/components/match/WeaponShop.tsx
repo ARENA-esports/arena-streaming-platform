@@ -195,7 +195,7 @@ export const WeaponShop: React.FC<WeaponShopProps> = ({ matchId, teamId }) => {
       )}
 
       {!isLoading && !error && weapons.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
           {weapons.map((weapon) => {
             const hasEnoughCoins = balance >= weapon.cost;
             const hasSelectedTeam = teamId !== null && teamId > 0;
@@ -208,7 +208,7 @@ export const WeaponShop: React.FC<WeaponShopProps> = ({ matchId, teamId }) => {
               <div
                 key={weapon.weaponId}
                 data-testid={`weapon-card-${weapon.weaponId}`}
-                className={`relative flex flex-col justify-between p-3 rounded-xl border transition-all duration-200 ${
+                className={`relative flex flex-col justify-between p-2.5 sm:p-3 rounded-xl border transition-all duration-200 ${
                   isEffectActive
                     ? 'ring-2 ring-rose-500 bg-rose-500/10 border-rose-500/50 shadow-[0_0_15px_rgba(244,63,94,0.3)]'
                     : canAfford
@@ -226,20 +226,20 @@ export const WeaponShop: React.FC<WeaponShopProps> = ({ matchId, teamId }) => {
                 )}
 
                 {/* Top Info */}
-                <div className="flex items-start gap-2.5 mb-2">
-                  <div className="p-2 rounded-lg bg-[var(--line)]/40 shrink-0">
+                <div className="flex items-start gap-2 mb-2">
+                  <div className="p-1.5 sm:p-2 rounded-lg bg-[var(--line)]/40 shrink-0">
                     {getWeaponIcon(weapon.iconKey)}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center justify-between gap-1">
-                      <h4 className="text-sm font-bold text-arena-text truncate" title={weapon.name}>
+                    <div className="flex items-start justify-between gap-1.5">
+                      <h4 className="text-xs sm:text-sm font-bold text-arena-text leading-tight line-clamp-2 break-words" title={weapon.name}>
                         {weapon.name}
                       </h4>
-                      <span className="text-[10px] font-black uppercase px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-400 border border-rose-500/30 shrink-0">
+                      <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-400 border border-rose-500/30 shrink-0 whitespace-nowrap mt-0.5">
                         +{weapon.damage} DMG
                       </span>
                     </div>
-                    <p className="text-[11px] text-arena-textMuted line-clamp-2 mt-0.5">
+                    <p className="text-[11px] text-arena-textMuted line-clamp-2 mt-1 leading-normal">
                       {weapon.description}
                     </p>
                   </div>

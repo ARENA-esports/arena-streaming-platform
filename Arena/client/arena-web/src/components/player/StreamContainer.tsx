@@ -4,6 +4,10 @@ import { TwitchPlayer } from '../player/TwitchPlayer';
 interface StreamContainerProps {
     apiChannelName?: string;
     isPlaying?: boolean;
+    isHeartbeatEligible?: boolean;
+    userRole?: string;
+    hasValidStream?: boolean;
+    isAuthenticated?: boolean;
     onPlay?: () => void;
     onPause?: () => void;
     onChannelChange?: (channelName: string) => void;
@@ -11,6 +15,11 @@ interface StreamContainerProps {
 
 export const StreamContainer: React.FC<StreamContainerProps> = ({
     apiChannelName,
+    isPlaying = false,
+    isHeartbeatEligible,
+    userRole,
+    hasValidStream = true,
+    isAuthenticated = true,
     onPlay,
     onPause,
     onChannelChange,
@@ -103,6 +112,61 @@ export const StreamContainer: React.FC<StreamContainerProps> = ({
                         ))}
                     </div>
                 </div>
+
+                {/* Live Watching Status & Playback Controls */}
+                <div className="flex items-center gap-2">
+                    {isPlaying ? (
+                        (isHeartbeatEligible === true || isHeartbeatEligible === undefined) ? (
+                            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded text-[11px] font-mono font-semibold">
+                                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                                <span>LIVE WATCHING (+10 coins/min)</span>
+                            </div>
+                        ) : !isAuthenticated ? (
+                            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-sky-500/10 border border-sky-500/30 text-sky-400 rounded text-[11px] font-mono font-semibold">
+                                <span className="w-2 h-2 rounded-full bg-sky-400" />
+                                <span>STREAM PLAYING (Sign In to Earn)</span>
+                            </div>
+                        ) : userRole && userRole.toLowerCase() !== 'viewer' ? (
+                            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-amber-500/10 border border-amber-500/30 text-amber-400 rounded text-[11px] font-mono font-semibold" title="Only Viewer accounts are eligible for watch-time coin rewards">
+                                <span className="w-2 h-2 rounded-full bg-amber-400" />
+                                <span>STREAM PLAYING ({userRole.toUpperCase()})</span>
+                            </div>
+                        ) : !hasValidStream ? (
+                            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-amber-500/10 border border-amber-500/30 text-amber-400 rounded text-[11px] font-mono font-semibold">
+                                <span className="w-2 h-2 rounded-full bg-amber-400" />
+                                <span>STREAM PLAYING (No Match Stream)</span>
+                            </div>
+                        ) : (
+                            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-arena-bg border border-arena-border text-gray-300 rounded text-[11px] font-mono">
+                                <span className="w-2 h-2 rounded-full bg-gray-400" />
+                                <span>STREAM PLAYING</span>
+                            </div>
+                        )
+                    ) : (
+                        <div className="flex items-center gap-1.5 px-2.5 py-1 bg-arena-bg border border-arena-border text-gray-400 rounded text-[11px] font-mono">
+                            <span className="w-2 h-2 rounded-full bg-gray-500" />
+                            <span>STREAM PAUSED / OFFLINE</span>
+                        </div>
+                    )}
+
+                    {isPlaying ? (
+                        <button
+                            type="button"
+                            onClick={handleTwitchPause}
+                            className="px-3 py-1 bg-amber-500/20 border border-amber-500/40 text-amber-300 hover:bg-amber-500/30 font-semibold rounded text-xs transition-colors flex items-center gap-1"
+                        >
+                            ⏸ Pause
+                        </button>
+                    ) : (
+                        <button
+                            type="button"
+                            onClick={handleTwitchPlay}
+                            className="px-3 py-1 bg-emerald-500 text-black hover:bg-emerald-400 font-bold rounded text-xs transition-colors flex items-center gap-1 shadow-[0_0_12px_rgba(16,185,129,0.3)]"
+                        >
+                            ▶ Watch Stream
+                        </button>
+                    )}
+                </div>
             </div>
 
             {/* Embedded Player Tile */}
@@ -112,7 +176,23 @@ export const StreamContainer: React.FC<StreamContainerProps> = ({
                 onPause={handleTwitchPause}
             />
             <div className="flex justify-between items-center text-[10px] text-gray-400 px-1 mt-0.5">
-                <span>Earn +10 coins every minute while watching live matches</span>
+                <span>
+                    {isPlaying ? (
+                        (isHeartbeatEligible === true || isHeartbeatEligible === undefined) ? (
+                            <span className="text-emerald-400 font-medium">● Watch active — Earning +10 coins every minute</span>
+                        ) : !isAuthenticated ? (
+                            <span className="text-sky-400">Sign in with a Viewer account to earn watch-time coins</span>
+                        ) : userRole && userRole.toLowerCase() !== 'viewer' ? (
+                            <span className="text-amber-400">Viewing as {userRole} — Only Viewer accounts earn coin rewards</span>
+                        ) : !hasValidStream ? (
+                            <span className="text-amber-400">Match has no official broadcast linked — rewards inactive</span>
+                        ) : (
+                            <span className="text-gray-400">Playback active</span>
+                        )
+                    ) : (
+                        'Click "Watch Stream" or load live broadcast to begin earning coins'
+                    )}
+                </span>
                 <span>Seeing Error? Disable ad-blocker or tracking prevention for Twitch embed</span>
             </div>
         </div>

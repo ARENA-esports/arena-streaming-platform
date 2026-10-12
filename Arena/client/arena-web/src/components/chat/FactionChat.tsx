@@ -26,9 +26,9 @@ const StatusDot: React.FC<{ status: ConnectionStatus }> = ({ status }) => {
   };
   const { color, label } = config[status];
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="flex items-center gap-1.5 shrink-0" title={`Chat status: ${label}`}>
       <span className={`inline-block w-2 h-2 rounded-full ${color}`} />
-      <span className="text-xs text-arena-textMuted">{label}</span>
+      <span className="text-[11px] text-arena-textMuted hidden sm:inline">{label}</span>
     </div>
   );
 };
@@ -38,20 +38,21 @@ const ChatHeader: React.FC<{
   status: ConnectionStatus;
   activeTeam?: { name: string; color: string } | null;
 }> = ({ status, activeTeam }) => (
-  <div className="flex items-center justify-between px-4 py-3 border-b border-arena-border bg-arena-surface/90 backdrop-blur-sm">
-    <div className="flex items-center gap-2 min-w-0">
-      <MessageCircle size={16} className="text-arena-cyan shrink-0" />
-      <span className="text-sm font-bold uppercase tracking-wider text-arena-text truncate">
+  <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-arena-border bg-arena-surface/90 backdrop-blur-sm gap-2">
+    <div className="flex items-center gap-1.5 min-w-0">
+      <MessageCircle size={15} className="text-arena-cyan shrink-0" />
+      <span className="text-xs sm:text-sm font-bold uppercase tracking-wide text-arena-text shrink-0">
         Faction Chat
       </span>
       {activeTeam && (
         <span
-          className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider shrink-0"
+          className="text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wider truncate max-w-[85px] sm:max-w-[105px] shrink"
           style={{
             color: activeTeam.color,
             backgroundColor: `${activeTeam.color}15`,
             border: `1px solid ${activeTeam.color}40`,
           }}
+          title={activeTeam.name}
         >
           {activeTeam.name}
         </span>

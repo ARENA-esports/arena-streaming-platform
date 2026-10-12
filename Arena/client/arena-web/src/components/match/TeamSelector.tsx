@@ -97,7 +97,7 @@ export const TeamSelector: React.FC<TeamSelectorProps> = ({
         </span>
       </div>
 
-      <div className="grid grid-cols-2 gap-2.5 p-2.5 sm:p-3">
+      <div className="grid grid-cols-2 gap-2 p-2 sm:p-2.5">
         {[teamA, teamB].map((team) => {
           const isSelected = activeSelectedId === team.teamId;
           const hasImageError = imageErrors[team.teamId];
@@ -111,7 +111,7 @@ export const TeamSelector: React.FC<TeamSelectorProps> = ({
               type="button"
               onClick={() => handleSelect(team.teamId)}
               className={`
-                flex items-center gap-2.5 p-2.5 rounded-xl border-2 transition-all duration-200 cursor-pointer text-left min-w-0
+                flex items-center gap-2 p-2 sm:p-2.5 rounded-xl border-2 transition-all duration-200 cursor-pointer text-left min-w-0
                 ${
                   isSelected
                     ? 'shadow-md'
@@ -131,7 +131,7 @@ export const TeamSelector: React.FC<TeamSelectorProps> = ({
               title={team.name}
             >
               <div
-                className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden shadow-sm font-black text-sm text-white"
+                className="w-7.5 h-7.5 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden shadow-sm font-black text-xs text-white"
                 style={{ backgroundColor: teamColor }}
               >
                 {logoSrc ? (
@@ -148,7 +148,7 @@ export const TeamSelector: React.FC<TeamSelectorProps> = ({
 
               <div className="flex-1 min-w-0">
                 <p
-                  className="text-xs sm:text-sm font-bold truncate tracking-wide"
+                  className="text-xs font-bold leading-tight break-words line-clamp-2"
                   style={{ color: isSelected ? teamColor : undefined }}
                 >
                   {team.name}
@@ -166,7 +166,7 @@ export const TeamSelector: React.FC<TeamSelectorProps> = ({
                       Active
                     </span>
                   ) : (
-                    <span className="text-[10px] text-arena-textMuted truncate">
+                    <span className="text-[10px] text-arena-textMuted">
                       Select
                     </span>
                   )}
