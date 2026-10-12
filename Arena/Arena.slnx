@@ -36,8 +36,8 @@
     <Project Path="services/analytics/tests/AnalyticsService.Tests.csproj" />
   </Folder>
   <Folder Name="/shared/" />
-  <Folder Name="/shared/eventContracts/" />
-  <Folder Name="/shared/eventContracts/src/">
-    <Project Path="shared/eventContracts/src/EventContracts.csproj" />
+  <Folder Name="/shared/EventContracts/" />
+  <Folder Name="/shared/EventContracts/src/">
+    <Project Path="shared/EventContracts/src/EventContracts.csproj" />
   </Folder>
 </Solution>

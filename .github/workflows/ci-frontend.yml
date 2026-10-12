@@ -2,7 +2,7 @@ name: CI Frontend
 
 on:
   push:
-    branches: [dev]
+    branches: [dev, 'feat/**', 'feature/**']
   pull_request:
     branches: [main, dev]
   workflow_dispatch:
@@ -35,6 +35,9 @@ jobs:
       
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
@@ -46,6 +49,17 @@ jobs:
       
       - name: Lint
         run: npm run lint
+
+      - name: Run tests with coverage
+        run: npm run test:coverage
       
       - name: Build
         run: npm run build
+
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarcloud-github-action@383f7e52eae3ab0510c3cb0e7d9d150bbaeab838 # v3.1.0
+        with:
+          projectBaseDir: Arena/client/arena-web
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
