@@ -249,8 +249,35 @@ jobs:
       actions: read
       contents: read
       security-events: write
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: rootpassword
+          MYSQL_DATABASE: arena_battle_db
+          MYSQL_USER: arena
+          MYSQL_PASSWORD: arena_password
+        ports:
+          - 3310:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
     steps: 
       - uses: actions/checkout@v4
+
+      - name: Apply Database Migrations
+        run: |
+          until MYSQL_PWD=arena_password mysqladmin ping -h 127.0.0.1 -P 3310 -u arena --silent; do
+            echo "Waiting for MySQL to become ready..."
+            sleep 2
+          done
+          for file in Arena/services/battle/src/Migrations/*.sql; do
+            echo "Applying $file..."
+            MYSQL_PWD=arena_password mysql -h 127.0.0.1 -P 3310 -u arena arena_battle_db < "$file"
+          done
+
       - uses: actions/setup-dotnet@v4
         with: 
           dotnet-version: "10.0.x"
