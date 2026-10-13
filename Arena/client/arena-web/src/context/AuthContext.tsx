@@ -2,6 +2,28 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { UserProfile, LoginRequest, LoginResponse } from '../types';
 import { authService } from '../api/authService';
 
+export const getJwtRole = (jwtToken: string): string | null => {
+  try {
+    const parts = jwtToken.split('.');
+    if (parts.length < 2) return null;
+    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    const payload = JSON.parse(jsonPayload);
+    return (
+      payload.role ||
+      payload['http://schemas.microsoft.com/ws/2008/06/identity/claims/role'] ||
+      null
+    );
+  } catch {
+    return null;
+  }
+};
+
 interface AuthContextType {
   user: UserProfile | null;
   token: string | null;
@@ -10,6 +32,7 @@ interface AuthContextType {
   completeTwitchLogin: (code: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  setSessionToken: (newToken: string) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -19,14 +42,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [token, setToken] = useState<string | null>(localStorage.getItem('arena_access_token'));
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
+  const setSessionToken = (newToken: string) => {
+    localStorage.setItem('arena_access_token', newToken);
+    setToken(newToken);
+  };
+
   const refreshProfile = async () => {
     try {
       const profile = await authService.getMe();
       setUser(profile);
-    } catch (error) {
-      setUser(null);
-      setToken(null);
-      localStorage.removeItem('arena_access_token');
+
+      // Verify if token role matches database profile role.
+      // If user was promoted/demoted, synchronize token once silently.
+      const currentToken = localStorage.getItem('arena_access_token');
+      if (currentToken && profile) {
+        const tokenRole = getJwtRole(currentToken);
+        if (tokenRole && tokenRole !== profile.role) {
+          try {
+            const refreshRes = await authService.refresh();
+            if (refreshRes?.token) {
+              setSessionToken(refreshRes.token);
+            }
+          } catch {
+            // Silently continue if refresh endpoint is temporarily unreachable
+          }
+        }
+      }
+    } catch (error: any) {
+      if (error?.response?.status === 401) {
+        setUser(null);
+        setToken(null);
+        localStorage.removeItem('arena_access_token');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -78,7 +125,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, isLoading, login, completeTwitchLogin, logout, refreshProfile }}>
+    <AuthContext.Provider value={{ user, token, isLoading, login, completeTwitchLogin, logout, refreshProfile, setSessionToken }}>
       {children}
     </AuthContext.Provider>
   );

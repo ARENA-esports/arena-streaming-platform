@@ -75,7 +75,8 @@ apiClient.interceptors.response.use(
       error.response?.status === 401 &&
       !originalRequest._retry &&
       !reqUrl.includes('/auth/login') &&
-      !reqUrl.includes('/auth/twitch')
+      !reqUrl.includes('/auth/twitch') &&
+      !reqUrl.includes('/auth/refresh')
     ) {
       originalRequest._retry = true;
       try {
@@ -98,8 +99,6 @@ apiClient.interceptors.response.use(
 
         return apiClient(originalRequest);
       } catch (refreshError) {
-        localStorage.removeItem('arena_access_token');
-        window.location.href = '/login';
         return Promise.reject(refreshError);
       }
     }
