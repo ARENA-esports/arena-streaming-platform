@@ -21,16 +21,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const refreshProfile = async () => {
     try {
-      try {
-        const refreshRes = await authService.refresh();
-        if (refreshRes?.token) {
-          localStorage.setItem('arena_access_token', refreshRes.token);
-          setToken(refreshRes.token);
-        }
-      } catch {
-        // Continue to getMe if refresh cookie/header is unavailable
-      }
-
       const profile = await authService.getMe();
       setUser(profile);
     } catch (error) {

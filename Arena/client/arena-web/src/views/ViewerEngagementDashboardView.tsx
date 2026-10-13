@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { BarChart2, RefreshCw, Clock, Coins, Radio, Users, AlertCircle } from 'lucide-react';
 import { analyticsService } from '../api/analyticsService';
-import { authService } from '../api/authService';
 import { StreamEngagementResponse } from '../types';
 
 export const formatWatchTime = (totalSeconds: number): string => {
@@ -37,20 +36,7 @@ export const ViewerEngagementDashboardView: React.FC = () => {
     try {
       const response = await analyticsService.getStreamEngagement();
       setData(Array.isArray(response) ? response : []);
-    } catch (err: any) {
-      if (err?.response?.status === 403) {
-        try {
-          const refreshed = await authService.refresh();
-          if (refreshed?.token) {
-            localStorage.setItem('arena_access_token', refreshed.token);
-            const retryResponse = await analyticsService.getStreamEngagement();
-            setData(Array.isArray(retryResponse) ? retryResponse : []);
-            return;
-          }
-        } catch {
-          // Token refresh failed or caller not an Organizer
-        }
-      }
+    } catch (err) {
       setError('Failed to load viewer engagement analytics. Please try again.');
     } finally {
       setIsLoading(false);

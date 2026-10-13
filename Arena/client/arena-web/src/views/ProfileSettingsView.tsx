@@ -136,10 +136,7 @@ export const ProfileSettingsView: React.FC = () => {
     setSuccess('');
     try {
       await userService.changeRole(newRole);
-      const refreshRes = await authService.refresh();
-      if (refreshRes?.token) {
-        localStorage.setItem('arena_access_token', refreshRes.token);
-      }
+      await authService.refresh();
       await refreshProfile();
       setSuccess(`Successfully changed role to ${newRole}.`);
     } catch (err: any) {
