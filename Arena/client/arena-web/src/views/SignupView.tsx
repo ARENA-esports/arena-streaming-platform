@@ -45,7 +45,7 @@ export const SignupView: React.FC = () => {
 
   return (
     <AuthLayout title="Initialize Identity" subtitle="Register a new viewer account.">
-      <TwitchLoginButton />
+      <TwitchLoginButton label="Sign up with Twitch" />
       <form onSubmit={formik.handleSubmit} className="space-y-6">
         {serverError && (
           <div className="bg-arena-crimson/10 border border-arena-crimson text-arena-crimson p-3 rounded-sm text-sm text-center">

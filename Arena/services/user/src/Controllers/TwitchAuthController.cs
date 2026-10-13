@@ -29,16 +29,16 @@ public class TwitchAuthController : ControllerBase
     [HttpGet]
     public IActionResult ChallengeTwitch()
     {
-        var redirectUrl = Url.Action(nameof(Callback), "TwitchAuth");
+        var redirectUrl = Url.Action(nameof(Complete), "TwitchAuth");
         var properties = new AuthenticationProperties { RedirectUri = redirectUrl };
         return Challenge(properties, "Twitch");
     }
 
     /// <summary>
-    /// Handles callback redirect from Twitch.
+    /// Invoked after Twitch OAuth middleware completes authentication and signs in to "External" scheme.
     /// </summary>
-    [HttpGet("callback")]
-    public async Task<IActionResult> Callback()
+    [HttpGet("complete")]
+    public async Task<IActionResult> Complete()
     {
         var frontendBase = _configuration["ExternalAuth:FrontendBaseUrl"] ?? "http://localhost:5173";
         var authResult = await HttpContext.AuthenticateAsync("External");

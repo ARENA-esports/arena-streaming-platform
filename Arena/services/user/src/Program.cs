@@ -162,16 +162,25 @@ builder.Services.AddAuthentication(options =>
     .AddTwitch("Twitch", options =>
     {
         options.SignInScheme = "External";
-        options.ClientId = builder.Configuration["ExternalAuth:Twitch:ClientId"] 
-            ?? builder.Configuration["TWITCH_CLIENT_ID"] 
-            ?? "dummy_twitch_id";
-        options.ClientSecret = builder.Configuration["ExternalAuth:Twitch:ClientSecret"] 
-            ?? builder.Configuration["TWITCH_CLIENT_SECRET"] 
-            ?? "dummy_twitch_secret";
+        var twitchClientId = builder.Configuration["ExternalAuth:Twitch:ClientId"];
+        if (string.IsNullOrWhiteSpace(twitchClientId))
+            twitchClientId = builder.Configuration["TWITCH_CLIENT_ID"];
+        if (string.IsNullOrWhiteSpace(twitchClientId))
+            twitchClientId = "dummy_twitch_id";
+
+        var twitchClientSecret = builder.Configuration["ExternalAuth:Twitch:ClientSecret"];
+        if (string.IsNullOrWhiteSpace(twitchClientSecret))
+            twitchClientSecret = builder.Configuration["TWITCH_CLIENT_SECRET"];
+        if (string.IsNullOrWhiteSpace(twitchClientSecret))
+            twitchClientSecret = "dummy_twitch_secret";
+
+        options.ClientId = twitchClientId;
+        options.ClientSecret = twitchClientSecret;
         options.CallbackPath = "/api/auth/twitch/callback";
         options.Scope.Add("user:read:email"); // Crucial: required for Twitch to return user email
         options.SaveTokens = false;
 
+        options.CorrelationCookie.Path = "/";
         options.CorrelationCookie.SameSite = SameSiteMode.Lax;
         options.CorrelationCookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
 

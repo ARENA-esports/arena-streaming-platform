@@ -38,8 +38,14 @@ public class ExternalAuthService : IExternalAuthService
             ?? principal.FindFirst("preferred_username")?.Value
             ?? (email != null ? email.Split('@')[0] : "TwitchGamer");
 
-        var avatar = principal.FindFirst("picture")?.Value
+        var avatar = principal.FindFirst("urn:twitch:profileimageurl")?.Value
+            ?? principal.FindFirst("picture")?.Value
             ?? principal.FindFirst("avatar_url")?.Value;
+
+        var displayName = principal.FindFirst("urn:twitch:displayname")?.Value
+            ?? principal.FindFirst("name")?.Value
+            ?? principal.FindFirst(ClaimTypes.Name)?.Value
+            ?? username;
 
         _logger.LogInformation("Processing Twitch login for ID {TwitchUserId} ({Username})", twitchUserId, username);
 
@@ -59,6 +65,7 @@ public class ExternalAuthService : IExternalAuthService
             {
                 // Auto-link to existing email account
                 user = existingByEmail;
+                await _repository.LinkTwitchAccountAsync(user.UserId, twitchUserId);
             }
             else
             {
@@ -68,7 +75,8 @@ public class ExternalAuthService : IExternalAuthService
                     TwitchUserId = twitchUserId,
                     Username = username,
                     Email = email,
-                    AvatarUrl = avatar
+                    AvatarUrl = avatar,
+                    DisplayName = displayName
                 });
             }
         }

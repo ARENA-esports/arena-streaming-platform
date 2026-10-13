@@ -32,8 +32,8 @@ services:
       - JwtSettings__Issuer=Arena.UserService
       - JwtSettings__Audience=Arena.Platform
       - ExternalAuth__FrontendBaseUrl=http://localhost:5173
-      - TWITCH_CLIENT_ID=${TWITCH_CLIENT_ID}
-      - TWITCH_CLIENT_SECRET=${TWITCH_CLIENT_SECRET}
+      - TWITCH_CLIENT_ID=${TWITCH_CLIENT_ID:-dummy_twitch_id}
+      - TWITCH_CLIENT_SECRET=${TWITCH_CLIENT_SECRET:-dummy_twitch_secret}
     volumes:
       - user-dp-keys:/app/dataprotection-keys
     depends_on:

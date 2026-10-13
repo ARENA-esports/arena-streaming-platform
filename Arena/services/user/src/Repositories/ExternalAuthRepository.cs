@@ -44,6 +44,7 @@ public class ExternalAuthRepository : IExternalAuthRepository
                 Role = reader.GetString("role"),
                 EmailVerified = reader.GetBoolean("email_verified"),
                 AvatarUrl = reader.IsDBNull(reader.GetOrdinal("avatar_url")) ? null : reader.GetString("avatar_url"),
+                DisplayName = reader.IsDBNull(reader.GetOrdinal("display_name")) ? null : reader.GetString("display_name"),
                 CreatedAt = reader.GetDateTime("created_at"),
                 UpdatedAt = reader.GetDateTime("updated_at")
             };
@@ -74,16 +75,19 @@ public class ExternalAuthRepository : IExternalAuthRepository
                 if (counter > 10) uniqueUsername = $"User_{Guid.NewGuid().ToString("N")[..8]}";
             }
 
+            var displayName = string.IsNullOrWhiteSpace(info.DisplayName) ? uniqueUsername : info.DisplayName;
+
             // 2. Insert into users table
             const string insertUserSql = @"
-                INSERT INTO users (username, email, password_hash, role, email_verified, avatar_url)
-                VALUES (@username, @email, NULL, 'Viewer', TRUE, @avatarUrl);
+                INSERT INTO users (username, email, password_hash, role, email_verified, avatar_url, display_name)
+                VALUES (@username, @email, NULL, 'Viewer', TRUE, @avatarUrl, @displayName);
                 SELECT LAST_INSERT_ID();";
 
             using var userCmd = new MySqlCommand(insertUserSql, connection, transaction);
             userCmd.Parameters.AddWithValue("@username", uniqueUsername);
             userCmd.Parameters.AddWithValue("@email", info.Email);
             userCmd.Parameters.AddWithValue("@avatarUrl", (object?)info.AvatarUrl ?? DBNull.Value);
+            userCmd.Parameters.AddWithValue("@displayName", displayName);
 
             var userId = Convert.ToInt32(await userCmd.ExecuteScalarAsync());
 
@@ -106,7 +110,8 @@ public class ExternalAuthRepository : IExternalAuthRepository
                 Email = info.Email,
                 Role = "Viewer",
                 EmailVerified = true,
-                AvatarUrl = info.AvatarUrl
+                AvatarUrl = info.AvatarUrl,
+                DisplayName = displayName
             };
         }
         catch
@@ -136,23 +141,85 @@ public class ExternalAuthRepository : IExternalAuthRepository
     {
         using var connection = new MySqlConnection(_connectionString);
         await connection.OpenAsync();
+        using var transaction = await connection.BeginTransactionAsync();
+
+        try
+        {
+            const string selectSql = @"
+                SELECT user_id FROM external_login_codes
+                WHERE code_hash = @codeHash AND is_used = FALSE AND expires_at > UTC_TIMESTAMP()
+                LIMIT 1
+                FOR UPDATE;";
+
+            using var selectCmd = new MySqlCommand(selectSql, connection, transaction);
+            selectCmd.Parameters.AddWithValue("@codeHash", codeHash);
+
+            int? userId = null;
+            using (var reader = await selectCmd.ExecuteReaderAsync())
+            {
+                if (await reader.ReadAsync())
+                {
+                    userId = reader.GetInt32("user_id");
+                }
+            }
+
+            if (userId != null)
+            {
+                const string updateSql = @"
+                    UPDATE external_login_codes 
+                    SET is_used = TRUE 
+                    WHERE code_hash = @codeHash;";
+
+                using var updateCmd = new MySqlCommand(updateSql, connection, transaction);
+                updateCmd.Parameters.AddWithValue("@codeHash", codeHash);
+                await updateCmd.ExecuteNonQueryAsync();
+            }
+
+            await transaction.CommitAsync();
+            return userId;
+        }
+        catch
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
+    }
+
+    public async Task LinkTwitchAccountAsync(int userId, string twitchUserId)
+    {
+        using var connection = new MySqlConnection(_connectionString);
+        await connection.OpenAsync();
 
         const string sql = @"
-            SELECT user_id FROM external_login_codes
-            WHERE code_hash = @codeHash AND is_used = FALSE AND expires_at > UTC_TIMESTAMP()
-            LIMIT 1;
-            UPDATE external_login_codes SET is_used = TRUE WHERE code_hash = @codeHash;";
+            SELECT auth_provider_id FROM user_auth_providers
+            WHERE user_id = @userId AND provider = 'twitch'
+            LIMIT 1;";
 
-        using var cmd = new MySqlCommand(sql, connection);
-        cmd.Parameters.AddWithValue("@codeHash", codeHash);
+        using var checkCmd = new MySqlCommand(sql, connection);
+        checkCmd.Parameters.AddWithValue("@userId", userId);
+        var existing = await checkCmd.ExecuteScalarAsync();
 
-        using var reader = await cmd.ExecuteReaderAsync();
-        if (await reader.ReadAsync())
+        if (existing != null)
         {
-            return reader.GetInt32("user_id");
+            const string updateSql = @"
+                UPDATE user_auth_providers
+                SET provider_user_id = @twitchUserId, linked_at = CURRENT_TIMESTAMP
+                WHERE user_id = @userId AND provider = 'twitch';";
+            using var updateCmd = new MySqlCommand(updateSql, connection);
+            updateCmd.Parameters.AddWithValue("@userId", userId);
+            updateCmd.Parameters.AddWithValue("@twitchUserId", twitchUserId);
+            await updateCmd.ExecuteNonQueryAsync();
         }
-
-        return null;
+        else
+        {
+            const string insertSql = @"
+                INSERT INTO user_auth_providers (user_id, provider, provider_user_id)
+                VALUES (@userId, 'twitch', @twitchUserId);";
+            using var insertCmd = new MySqlCommand(insertSql, connection);
+            insertCmd.Parameters.AddWithValue("@userId", userId);
+            insertCmd.Parameters.AddWithValue("@twitchUserId", twitchUserId);
+            await insertCmd.ExecuteNonQueryAsync();
+        }
     }
 
     private static async Task<bool> UsernameExistsAsync(MySqlConnection conn, MySqlTransaction tx, string username)
