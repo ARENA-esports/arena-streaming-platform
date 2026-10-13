@@ -139,7 +139,7 @@ export const WeaponShop: React.FC<WeaponShopProps> = ({ matchId, teamId }) => {
           </div>
           <div>
             <h3 className="text-base font-black tracking-wide text-arena-text uppercase flex items-center gap-1.5">
-              Weapon Arsenal
+              Weapon Shop
               <Sparkles size={14} className="text-amber-400" />
             </h3>
             <p className="text-xs text-arena-textMuted">
@@ -208,13 +208,12 @@ export const WeaponShop: React.FC<WeaponShopProps> = ({ matchId, teamId }) => {
               <div
                 key={weapon.weaponId}
                 data-testid={`weapon-card-${weapon.weaponId}`}
-                className={`relative flex flex-col justify-between p-2.5 sm:p-3 rounded-xl border transition-all duration-200 ${
-                  isEffectActive
+                className={`relative flex flex-col justify-between p-2.5 sm:p-3 rounded-xl border transition-all duration-200 ${isEffectActive
                     ? 'ring-2 ring-rose-500 bg-rose-500/10 border-rose-500/50 shadow-[0_0_15px_rgba(244,63,94,0.3)]'
                     : canAfford
-                    ? 'bg-black/30 border-[var(--line)] hover:border-arena-cyan/50 hover:bg-black/40'
-                    : 'bg-black/20 border-[var(--line)]/50 opacity-60'
-                }`}
+                      ? 'bg-black/30 border-[var(--line)] hover:border-arena-cyan/50 hover:bg-black/40'
+                      : 'bg-black/20 border-[var(--line)]/50 opacity-60'
+                  }`}
               >
                 {/* Attack Particle / Feedback Animation Banner */}
                 {isEffectActive && (
@@ -260,16 +259,15 @@ export const WeaponShop: React.FC<WeaponShopProps> = ({ matchId, teamId }) => {
                       !hasSelectedTeam
                         ? 'Select a team first'
                         : !hasEnoughCoins
-                        ? 'Not enough coins'
-                        : isPurchasing
-                        ? 'Attacking...'
-                        : `Attack with ${weapon.name}`
+                          ? 'Not enough coins'
+                          : isPurchasing
+                            ? 'Attacking...'
+                            : `Attack with ${weapon.name}`
                     }
-                    className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider transition-all duration-200 flex items-center gap-1.5 ${
-                      canAfford && !isAnyPurchasing
+                    className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider transition-all duration-200 flex items-center gap-1.5 ${canAfford && !isAnyPurchasing
                         ? 'bg-gradient-to-r from-arena-cyan to-blue-500 text-black shadow-md shadow-arena-cyan/20 hover:scale-[1.02] hover:brightness-110 active:scale-[0.98]'
                         : 'bg-white/5 text-arena-textMuted cursor-not-allowed border border-white/5'
-                    }`}
+                      }`}
                   >
                     {isPurchasing ? (
                       <>

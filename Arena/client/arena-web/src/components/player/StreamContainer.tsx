@@ -17,7 +17,7 @@ export const StreamContainer: React.FC<StreamContainerProps> = ({
     apiChannelName,
     isPlaying = false,
     isHeartbeatEligible,
-    userRole,
+    userRole: _userRole,
     hasValidStream = true,
     isAuthenticated = true,
     onPlay,
@@ -126,11 +126,6 @@ export const StreamContainer: React.FC<StreamContainerProps> = ({
                                 <span className="w-2 h-2 rounded-full bg-sky-400" />
                                 <span>STREAM PLAYING (Sign In to Earn)</span>
                             </div>
-                        ) : userRole && userRole.toLowerCase() !== 'viewer' ? (
-                            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-amber-500/10 border border-amber-500/30 text-amber-400 rounded text-[11px] font-mono font-semibold" title="Only Viewer accounts are eligible for watch-time coin rewards">
-                                <span className="w-2 h-2 rounded-full bg-amber-400" />
-                                <span>STREAM PLAYING ({userRole.toUpperCase()})</span>
-                            </div>
                         ) : !hasValidStream ? (
                             <div className="flex items-center gap-1.5 px-2.5 py-1 bg-amber-500/10 border border-amber-500/30 text-amber-400 rounded text-[11px] font-mono font-semibold">
                                 <span className="w-2 h-2 rounded-full bg-amber-400" />
@@ -181,9 +176,7 @@ export const StreamContainer: React.FC<StreamContainerProps> = ({
                         (isHeartbeatEligible === true || isHeartbeatEligible === undefined) ? (
                             <span className="text-emerald-400 font-medium">● Watch active — Earning +10 coins every minute</span>
                         ) : !isAuthenticated ? (
-                            <span className="text-sky-400">Sign in with a Viewer account to earn watch-time coins</span>
-                        ) : userRole && userRole.toLowerCase() !== 'viewer' ? (
-                            <span className="text-amber-400">Viewing as {userRole} — Only Viewer accounts earn coin rewards</span>
+                            <span className="text-sky-400">Sign in to earn watch-time coins</span>
                         ) : !hasValidStream ? (
                             <span className="text-amber-400">Match has no official broadcast linked — rewards inactive</span>
                         ) : (
