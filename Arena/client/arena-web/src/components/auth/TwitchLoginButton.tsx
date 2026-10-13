@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { getUserApiBase } from '../../api/client';
 
 interface TwitchLoginButtonProps {
   label?: string;
@@ -11,8 +12,9 @@ export const TwitchLoginButton: React.FC<TwitchLoginButtonProps> = ({
 
   const handleTwitchClick = () => {
     setLoading(true);
-    // Initiate full-page browser challenge
-    window.location.href = '/api/auth/twitch';
+    // Initiate full-page browser challenge against User Service
+    const base = getUserApiBase();
+    window.location.href = `${base}/auth/twitch`;
   };
 
   return (
