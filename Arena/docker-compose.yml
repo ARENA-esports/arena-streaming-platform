@@ -5,14 +5,14 @@ services:
     ports:
       - "3307:3306"
     environment:
-      - MYSQL_ROOT_PASSWORD=rootpassword
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
       - MYSQL_DATABASE=arena_user_db
       - MYSQL_USER=arena
-      - MYSQL_PASSWORD=arena_password
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
     volumes:
       - mysql-user-data:/var/lib/mysql
     healthcheck:
-      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-prootpassword" ]
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD}" ]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -27,10 +27,15 @@ services:
       - "5168:8080"
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
-      - ConnectionStrings__UserDb=Server=mysql-user;Port=3306;Database=arena_user_db;Uid=arena;Pwd=arena_password;
+      - ConnectionStrings__UserDb=Server=mysql-user;Port=3306;Database=arena_user_db;Uid=arena;Pwd=${MYSQL_PASSWORD};
       - JwtSettings__Secret=${JWT_SECRET}
       - JwtSettings__Issuer=Arena.UserService
       - JwtSettings__Audience=Arena.Platform
+      - ExternalAuth__FrontendBaseUrl=http://localhost:5173
+      - TWITCH_CLIENT_ID=${TWITCH_CLIENT_ID}
+      - TWITCH_CLIENT_SECRET=${TWITCH_CLIENT_SECRET}
+    volumes:
+      - user-dp-keys:/app/dataprotection-keys
     depends_on:
       mysql-user:
         condition: service_healthy
@@ -45,7 +50,7 @@ services:
       - "5167:8080"
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
-      - ConnectionStrings__DefaultConnection=Server=mysql;Port=3306;Database=arena_stream_db;Uid=root;Pwd=rootpassword;AllowUserVariables=True;
+      - ConnectionStrings__DefaultConnection=Server=mysql;Port=3306;Database=arena_stream_db;Uid=root;Pwd=${MYSQL_ROOT_PASSWORD};AllowUserVariables=True;
       - JwtSettings__Secret=${JWT_SECRET}
       - JwtSettings__Issuer=Arena.UserService
       - JwtSettings__Audience=Arena.Platform
@@ -57,7 +62,7 @@ services:
     image: mysql:8.0
     container_name: arena-mysql
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: arena_stream_db
     ports:
       - "3309:3306"
@@ -65,7 +70,7 @@ services:
       - mysql-stream-data:/var/lib/mysql
       - ./services/stream/src/Migrations/01_create_stream_db.sql:/docker-entrypoint-initdb.d/01_create_stream_db.sql
     healthcheck:
-      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-prootpassword" ]
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD}" ]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -76,15 +81,15 @@ services:
     ports:
       - "3308:3306"
     environment:
-      - MYSQL_ROOT_PASSWORD=rootpassword
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
       - MYSQL_DATABASE=arena_tournament_db
       - MYSQL_USER=arena
-      - MYSQL_PASSWORD=arena_password
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
     volumes:
       - mysql-tournament-data:/var/lib/mysql
       - ./services/tournament/src/Migrations:/docker-entrypoint-initdb.d
     healthcheck:
-      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-prootpassword" ]
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD}" ]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -99,7 +104,7 @@ services:
       - "8082:8080"
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
-      - ConnectionStrings__DefaultConnection=Server=mysql-tournament;Port=3306;Database=arena_tournament_db;Uid=root;Pwd=rootpassword;AllowUserVariables=True;
+      - ConnectionStrings__DefaultConnection=Server=mysql-tournament;Port=3306;Database=arena_tournament_db;Uid=root;Pwd=${MYSQL_ROOT_PASSWORD};AllowUserVariables=True;
       - JwtSettings__Secret=${JWT_SECRET}
       - JwtSettings__Issuer=Arena.UserService
       - JwtSettings__Audience=Arena.Platform
@@ -113,15 +118,15 @@ services:
     ports:
       - "3310:3306"
     environment:
-      - MYSQL_ROOT_PASSWORD=rootpassword
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
       - MYSQL_DATABASE=arena_battle_db
       - MYSQL_USER=arena
-      - MYSQL_PASSWORD=arena_password
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
     volumes:
       - mysql-battle-data:/var/lib/mysql
       - ./services/battle/src/Migrations:/docker-entrypoint-initdb.d
     healthcheck:
-      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-prootpassword" ]
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD}" ]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -164,7 +169,7 @@ services:
       - "8083:8080"
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
-      - ConnectionStrings__DefaultConnection=Server=mysql-battle;Port=3306;Database=arena_battle_db;Uid=root;Pwd=rootpassword;AllowUserVariables=True;
+      - ConnectionStrings__DefaultConnection=Server=mysql-battle;Port=3306;Database=arena_battle_db;Uid=root;Pwd=${MYSQL_ROOT_PASSWORD};AllowUserVariables=True;
       - JwtSettings__Secret=${JWT_SECRET}
       - JwtSettings__Issuer=Arena.UserService
       - JwtSettings__Audience=Arena.Platform
@@ -192,7 +197,7 @@ services:
       - "5170:8080"
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
-      - ConnectionStrings__ChatDb=Server=mysql;Port=3306;Database=arena_chat_db;Uid=root;Pwd=${MYSQL_ROOT_PASSWORD:-rootpassword};AllowUserVariables=True;
+      - ConnectionStrings__ChatDb=Server=mysql;Port=3306;Database=arena_chat_db;Uid=root;Pwd=${MYSQL_ROOT_PASSWORD};AllowUserVariables=True;
       - JwtSettings__Secret=${JWT_SECRET}
       - JwtSettings__Issuer=Arena.UserService
       - JwtSettings__Audience=Arena.Platform
@@ -213,15 +218,15 @@ services:
     ports:
       - "3311:3306"
     environment:
-      - MYSQL_ROOT_PASSWORD=rootpassword
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
       - MYSQL_DATABASE=arena_analytics_db
       - MYSQL_USER=arena
-      - MYSQL_PASSWORD=arena_password
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
     volumes:
       - mysql-analytics-data:/var/lib/mysql
       - ./services/analytics/src/Migrations:/docker-entrypoint-initdb.d
     healthcheck:
-      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-prootpassword" ]
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD}" ]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -237,7 +242,7 @@ services:
       - "8084:8080"
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
-      - ConnectionStrings__DefaultConnection=Server=mysql-analytics;Port=3306;Database=arena_analytics_db;Uid=root;Pwd=rootpassword;AllowUserVariables=True;
+      - ConnectionStrings__DefaultConnection=Server=mysql-analytics;Port=3306;Database=arena_analytics_db;Uid=root;Pwd=${MYSQL_ROOT_PASSWORD};AllowUserVariables=True;
       - JwtSettings__Secret=${JWT_SECRET}
       - JwtSettings__Issuer=Arena.UserService
       - JwtSettings__Audience=Arena.Platform
@@ -289,3 +294,6 @@ volumes:
   mysql-battle-data:
   mysql-analytics-data:
   kafka-data:
+  # Persists ASP.NET Data Protection XML keys for the user service so that
+  # Twitch OAuth correlation cookies can be decrypted after container restarts.
+  user-dp-keys:

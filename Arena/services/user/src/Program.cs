@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using System.Threading.RateLimiting;
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.AspNetCore.RateLimiting;
@@ -25,6 +26,14 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddOpenApi();
+
+// hard: Persist Data Protection keys to a mounted volume so ASP.NET can decrypt
+// correlation cookies across container restarts. Without this, every restart
+// regenerates keys, making Twitch OAuth correlation cookies unreadable and
+// causing "The oauth state was missing or invalid" on the callback.
+builder.Services.AddDataProtection()
+    .PersistKeysToFileSystem(new DirectoryInfo("/app/dataprotection-keys"))
+    .SetApplicationName("ArenaUserService");
 
 // Problem Details for RFC 7807 standardized error responses
 builder.Services.AddProblemDetails();
@@ -86,6 +95,8 @@ builder.Services.AddScoped<IEmailVerificationRepository, EmailVerificationReposi
 builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IUserService, UserProfileService>();
+builder.Services.AddScoped<IExternalAuthRepository, ExternalAuthRepository>();
+builder.Services.AddScoped<IExternalAuthService, ExternalAuthService>();
 
 // // hard: migrated from symmetric hmac to rs256 asymmetric cryptography to prevent microservice key confusion attacks
 // var pub
@@ -97,7 +108,11 @@ var jwtIssuer = builder.Configuration["JwtSettings:Issuer"]
 var jwtAudience = builder.Configuration["JwtSettings:Audience"]
     ?? "Arena.Platform";
 
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+builder.Services.AddAuthentication(options =>
+    {
+        options.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
+        options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+    })
     .AddJwtBearer(options =>
     {
         options.TokenValidationParameters = new TokenValidationParameters
@@ -136,6 +151,37 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                     context.Fail("Token has been revoked.");
                 }
             }
+        };
+    }).AddCookie("External", options =>
+    {
+        options.Cookie.Name = "arena_twitch_auth";
+        options.Cookie.SameSite = SameSiteMode.Lax; // Lax allows cross-site redirect returns
+        options.Cookie.HttpOnly = true;
+        options.ExpireTimeSpan = TimeSpan.FromMinutes(5);
+    })
+    .AddTwitch("Twitch", options =>
+    {
+        options.SignInScheme = "External";
+        options.ClientId = builder.Configuration["ExternalAuth:Twitch:ClientId"] 
+            ?? builder.Configuration["TWITCH_CLIENT_ID"] 
+            ?? "dummy_twitch_id";
+        options.ClientSecret = builder.Configuration["ExternalAuth:Twitch:ClientSecret"] 
+            ?? builder.Configuration["TWITCH_CLIENT_SECRET"] 
+            ?? "dummy_twitch_secret";
+        options.CallbackPath = "/api/auth/twitch/callback";
+        options.Scope.Add("user:read:email"); // Crucial: required for Twitch to return user email
+        options.SaveTokens = false;
+
+        options.CorrelationCookie.SameSite = SameSiteMode.Lax;
+        options.CorrelationCookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+
+        options.Events.OnRemoteFailure = context =>
+        {
+            var frontendBase = builder.Configuration["ExternalAuth:FrontendBaseUrl"] ?? "http://localhost:5173";
+            var errorMsg = context.Failure?.Message ?? "Authentication failed with Twitch.";
+            context.Response.Redirect($"{frontendBase}/auth/callback?error={Uri.EscapeDataString(errorMsg)}");
+            context.HandleResponse();
+            return Task.CompletedTask;
         };
     });
 
@@ -179,8 +225,15 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
-app.UseForwardedHeaders();
-app.UseHttpsRedirection();
+var forwardedOptions = new ForwardedHeadersOptions
+{
+    ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor
+                     | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto
+                     | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedHost
+};
+forwardedOptions.KnownIPNetworks.Clear();
+forwardedOptions.KnownProxies.Clear();
+app.UseForwardedHeaders(forwardedOptions);
 //hard: Rate limiter pipeline placed prior to routing to drop abusive floods at the ingress boundary
 app.UseRateLimiter();
 // CORS must run before Authentication and Authorization

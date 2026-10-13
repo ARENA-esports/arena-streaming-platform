@@ -39,5 +39,9 @@ export const authService = {
   refresh: async () => {
     const response = await apiClient.post<LoginResponse>('/Auth/refresh');
     return response.data;
+  },
+  exchangeTwitchCode: async (code: string): Promise<LoginResponse> => {
+    const response = await apiClient.post<LoginResponse>('/Auth/twitch/exchange', { code });
+    return response.data;
   }
 };

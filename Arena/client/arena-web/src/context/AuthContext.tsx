@@ -7,6 +7,7 @@ interface AuthContextType {
   token: string | null;
   isLoading: boolean;
   login: (data: LoginRequest) => Promise<void>;
+  completeTwitchLogin: (code: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
@@ -51,6 +52,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   };
 
+  const completeTwitchLogin = async (code: string) => {
+    const res = await authService.exchangeTwitchCode(code);
+    localStorage.setItem('arena_access_token', res.token);
+    setToken(res.token);
+    setUser({
+      userId: res.userId,
+      username: res.username,
+      email: res.email,
+      role: res.role,
+    });
+  };
+
   const logout = async () => {
     try {
       if (token) await authService.logout();
@@ -65,7 +78,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, isLoading, login, logout, refreshProfile }}>
+    <AuthContext.Provider value={{ user, token, isLoading, login, completeTwitchLogin, logout, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );

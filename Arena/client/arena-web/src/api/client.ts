@@ -12,7 +12,8 @@ export const apiClient = axios.create({
 
 apiClient.interceptors.request.use((config) => {
   // Dynamically set baseURL based on the requested endpoint
-  if (config.url?.startsWith('/Auth') || config.url?.startsWith('/Users')) {
+  const lowerUrl = config.url?.toLowerCase() || '';
+  if (lowerUrl.startsWith('/auth') || lowerUrl.startsWith('/users')) {
     config.baseURL = import.meta.env.VITE_USER_API_URL || '/api';
   } else if (config.url?.startsWith('/tournaments') || config.url?.startsWith('/teams')) {
     config.baseURL = '/api';
@@ -50,7 +51,13 @@ apiClient.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
     //hard: Prevent recursive retry loops on failed authentication
-    if (error.response?.status === 401 && !originalRequest._retry && !originalRequest.url?.includes('/Auth/login')) {
+    const reqUrl = originalRequest?.url?.toLowerCase() || '';
+    if (
+      error.response?.status === 401 &&
+      !originalRequest._retry &&
+      !reqUrl.includes('/auth/login') &&
+      !reqUrl.includes('/auth/twitch')
+    ) {
       originalRequest._retry = true;
       try {
         const { data } = await axios.post<LoginResponse>(
