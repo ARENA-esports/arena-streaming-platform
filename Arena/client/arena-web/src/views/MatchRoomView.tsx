@@ -20,6 +20,7 @@ import FactionChat from '../components/chat/FactionChat';
 import { ScheduledView } from '../components/match/ScheduledView';
 import { EndedView } from '../components/match/EndedView';
 import { CancelledView } from '../components/match/CancelledView';
+import { Video } from 'lucide-react';
 
 export const MatchRoomView: React.FC = () => {
   const { matchId } = useParams<{ matchId: string }>();
@@ -40,12 +41,12 @@ export const MatchRoomView: React.FC = () => {
     }
   }, [status, matchId, resetPlayback]);
 
-  // Heartbeat is active ONLY for authenticated viewers watching an active Live match with a valid stream
-  const isViewer = Boolean(user && user.role?.toLowerCase() === 'viewer');
+  // Heartbeat is active for authenticated users (Viewers, Organizers, Streamers) watching an active Live match with a valid stream
+  const isAuthenticated = Boolean(user);
   const isLiveMatch = status === 'Live' && Boolean(match);
   const streamId = stream?.streamId ?? stream?.id;
   const hasValidStream = typeof streamId === 'number' && streamId > 0;
-  const isHeartbeatEligible = isViewer && isLiveMatch && hasValidStream && isPlaying;
+  const isHeartbeatEligible = isAuthenticated && isLiveMatch && hasValidStream && isPlaying;
 
   useWatchHeartbeat({
     streamId,
@@ -182,22 +183,37 @@ export const MatchRoomView: React.FC = () => {
           </div>
         </div>
 
-        {user?.role === 'Organizer' && (
-          <div className="flex items-center space-x-4">
-            <Button
-              variant="secondary"
-              size="md"
-              onClick={() => setIsEditModalOpen(true)}
-            >
-              EDIT
-            </Button>
-            <Button
-              variant="danger"
-              size="md"
-              onClick={() => setIsDeleteModalOpen(true)}
-            >
-              DELETE
-            </Button>
+        {(user?.role === 'Organizer' || user?.role === 'Streamer') && (
+          <div className="flex items-center space-x-3">
+            {!hasValidStream && (
+              <Button
+                variant="primary"
+                size="md"
+                onClick={() => navigate(`/streamer/matches/${match.matchId}/link`)}
+                className="flex items-center gap-1.5"
+              >
+                <Video size={16} />
+                LINK STREAM
+              </Button>
+            )}
+            {user?.role === 'Organizer' && (
+              <>
+                <Button
+                  variant="secondary"
+                  size="md"
+                  onClick={() => setIsEditModalOpen(true)}
+                >
+                  EDIT
+                </Button>
+                <Button
+                  variant="danger"
+                  size="md"
+                  onClick={() => setIsDeleteModalOpen(true)}
+                >
+                  DELETE
+                </Button>
+              </>
+            )}
           </div>
         )}
       </div>

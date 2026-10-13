@@ -1,6 +1,17 @@
 import axios from 'axios';
 import { LoginResponse } from '../types';
 
+export function normalizeBaseUrl(envUrl?: string): string {
+  if (!envUrl) return '/api';
+  const trimmed = envUrl.trim().replace(/\/+$/, '');
+  if (!trimmed) return '/api';
+  return trimmed.endsWith('/api') ? trimmed : `${trimmed}/api`;
+}
+
+export function getUserApiBase(): string {
+  return normalizeBaseUrl(import.meta.env.VITE_USER_API_URL);
+}
+
 export const apiClient = axios.create({
   baseURL: '/api', // Default fallback, dynamically overridden in interceptor
   headers: {
@@ -12,23 +23,32 @@ export const apiClient = axios.create({
 
 apiClient.interceptors.request.use((config) => {
   // Dynamically set baseURL based on the requested endpoint
-  if (config.url?.startsWith('/Auth') || config.url?.startsWith('/Users')) {
-    config.baseURL = import.meta.env.VITE_USER_API_URL || '/api';
-  } else if (config.url?.startsWith('/tournaments') || config.url?.startsWith('/teams')) {
-    config.baseURL = '/api';
-  } else if (config.url?.startsWith('/economy')) {
-    config.baseURL = import.meta.env.VITE_ECONOMY_API_URL || '/api';
-  } else if (config.url?.startsWith('/api/economy')) {
-    config.baseURL = import.meta.env.VITE_ECONOMY_API_URL || '';
-  } else if (config.url?.startsWith('/wallet')) {
-    // SCRUM-116: wallet balance lives in the Battle/Economy service
-    config.baseURL = import.meta.env.VITE_ECONOMY_API_URL || '/api';
-  } else if (config.url?.startsWith('/analytics')) {
-    config.baseURL = import.meta.env.VITE_ANALYTICS_API_URL || '/api';
-  } else if (config.url?.startsWith('/api/analytics')) {
-    config.baseURL = import.meta.env.VITE_ANALYTICS_API_URL || '';
+  const url = config.url || '';
+  const lowerUrl = url.toLowerCase();
+  const cleanPath = lowerUrl.startsWith('/api/') ? lowerUrl.substring(4) : lowerUrl;
+
+  let selectedBase = '/api';
+
+  if (cleanPath.startsWith('/auth') || cleanPath.startsWith('/users')) {
+    selectedBase = normalizeBaseUrl(import.meta.env.VITE_USER_API_URL);
+  } else if (cleanPath.startsWith('/tournaments') || cleanPath.startsWith('/teams')) {
+    selectedBase = normalizeBaseUrl(import.meta.env.VITE_TOURNAMENT_API_URL);
+  } else if (cleanPath.startsWith('/economy') || cleanPath.startsWith('/wallet')) {
+    // Battle/Economy service (supports either VITE_BATTLE_API_URL or VITE_ECONOMY_API_URL)
+    selectedBase = normalizeBaseUrl(import.meta.env.VITE_BATTLE_API_URL || import.meta.env.VITE_ECONOMY_API_URL);
+  } else if (cleanPath.startsWith('/analytics')) {
+    selectedBase = normalizeBaseUrl(import.meta.env.VITE_ANALYTICS_API_URL);
+  } else if (cleanPath.startsWith('/chat')) {
+    selectedBase = normalizeBaseUrl(import.meta.env.VITE_CHAT_API_URL);
   } else {
-    config.baseURL = import.meta.env.VITE_STREAM_API_URL || '/api';
+    selectedBase = normalizeBaseUrl(import.meta.env.VITE_STREAM_API_URL);
+  }
+
+  config.baseURL = selectedBase;
+
+  // If the baseURL already includes '/api' and url also starts with '/api/', strip redundant prefix
+  if (config.baseURL.endsWith('/api') && lowerUrl.startsWith('/api/')) {
+    config.url = url.substring(4);
   }
 
   //hard: Dual-mode fallback: attach Bearer token from localStorage if present so Swagger/dev flows continue uninterrupted
@@ -50,14 +70,21 @@ apiClient.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
     //hard: Prevent recursive retry loops on failed authentication
-    if (error.response?.status === 401 && !originalRequest._retry && !originalRequest.url?.includes('/Auth/login')) {
+    const reqUrl = originalRequest?.url?.toLowerCase() || '';
+    if (
+      error.response?.status === 401 &&
+      !originalRequest._retry &&
+      !reqUrl.includes('/auth/login') &&
+      !reqUrl.includes('/auth/twitch') &&
+      !reqUrl.includes('/auth/refresh')
+    ) {
       originalRequest._retry = true;
       try {
         const { data } = await axios.post<LoginResponse>(
           '/Auth/refresh',
           {},
           {
-            baseURL: import.meta.env.VITE_USER_API_URL || '/api',
+            baseURL: getUserApiBase(),
             withCredentials: true, //hard: Refresh token request transmits HttpOnly session cookies
             headers: {
               Authorization: `Bearer ${localStorage.getItem('arena_access_token')}`,
@@ -72,8 +99,6 @@ apiClient.interceptors.response.use(
 
         return apiClient(originalRequest);
       } catch (refreshError) {
-        localStorage.removeItem('arena_access_token');
-        window.location.href = '/login';
         return Promise.reject(refreshError);
       }
     }

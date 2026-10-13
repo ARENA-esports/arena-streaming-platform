@@ -5,6 +5,7 @@ import * as Yup from 'yup';
 import AuthLayout from '../components/layout/AuthLayout';
 import Button from '../components/common/Button';
 import { useAuth } from '../context/AuthContext';
+import { TwitchLoginButton } from '../components/auth/TwitchLoginButton';
 
 export const LoginView: React.FC = () => {
   const { login } = useAuth();
@@ -38,6 +39,7 @@ export const LoginView: React.FC = () => {
 
   return (
     <AuthLayout title="Authenticate" subtitle="Enter your credentials to access the Arena.">
+      <TwitchLoginButton />
       <form onSubmit={formik.handleSubmit} className="space-y-6">
         {serverError && (
           <div className="bg-arena-crimson/10 border border-arena-crimson text-arena-crimson p-3 rounded-sm text-sm text-center">

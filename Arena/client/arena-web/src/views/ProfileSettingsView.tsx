@@ -5,7 +5,7 @@ import { authService } from '../api/authService';
 import { Camera, Upload, Image as ImageIcon } from 'lucide-react';
 
 export const ProfileSettingsView: React.FC = () => {
-  const { user, refreshProfile, logout } = useAuth();
+  const { user, refreshProfile, logout, setSessionToken } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -136,7 +136,14 @@ export const ProfileSettingsView: React.FC = () => {
     setSuccess('');
     try {
       await userService.changeRole(newRole);
-      await authService.refresh();
+      try {
+        const refreshRes = await authService.refresh();
+        if (refreshRes?.token) {
+          setSessionToken(refreshRes.token);
+        }
+      } catch (tokenErr) {
+        console.warn('Could not immediately refresh session token:', tokenErr);
+      }
       await refreshProfile();
       setSuccess(`Successfully changed role to ${newRole}.`);
     } catch (err: any) {

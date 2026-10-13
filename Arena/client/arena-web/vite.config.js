@@ -12,7 +12,11 @@ export default defineConfig({
         port: 5173,
         proxy: {
             '/api/Auth': {
-                target: 'http://127.0.0.1:5168', // User Service
+                target: 'http://127.0.0.1:5168', // User Service (auth API calls)
+                changeOrigin: true,
+            },
+            '/api/auth': {
+                target: 'http://127.0.0.1:5168', // User Service (Twitch OAuth redirect)
                 changeOrigin: true,
             },
             '/api/tournaments': {

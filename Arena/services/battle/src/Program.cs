@@ -43,7 +43,26 @@ builder.Services.AddScoped<IBattleRoundRepository, BattleRoundRepository>();
 builder.Services.AddHttpClient<IStreamServiceClient, StreamServiceClient>((sp, client) =>
 {
     var options = sp.GetRequiredService<IOptions<StreamServiceOptions>>().Value;
-    var baseUrl = options.BaseUrl.TrimEnd('/') + "/";
+    var rawUrl = options.BaseUrl;
+    var config = sp.GetRequiredService<IConfiguration>();
+    var env = sp.GetRequiredService<IWebHostEnvironment>();
+
+    var configuredUrl = config["StreamService:BaseUrl"]
+                     ?? config["StreamService__BaseUrl"]
+                     ?? config["STREAM_SERVICE_URL"];
+
+    if (!string.IsNullOrWhiteSpace(configuredUrl))
+    {
+        rawUrl = configuredUrl;
+    }
+    else if (string.IsNullOrWhiteSpace(rawUrl) || rawUrl.Contains("localhost"))
+    {
+        rawUrl = env.IsDevelopment()
+            ? "http://localhost:5167"
+            : "https://arena-stream-staging.azurewebsites.net";
+    }
+
+    var baseUrl = rawUrl.TrimEnd('/') + "/";
     client.BaseAddress = new Uri(baseUrl);
     client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
 })

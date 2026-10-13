@@ -108,7 +108,18 @@ export function useWatchHeartbeat(
         const payload: WatchTickRequest | undefined =
           numericStreamId !== undefined ? { streamId: numericStreamId } : undefined;
 
-        const response = await economyService.recordWatchTick(payload);
+        let response: WatchTickResponse;
+        try {
+          response = await economyService.recordWatchTick(payload);
+        } catch (initialErr: any) {
+          // If streamId was rejected (e.g. stream not live or cross-service resolution), fall back to contract without streamId
+          if (payload?.streamId !== undefined && initialErr?.response?.status === 400) {
+            response = await economyService.recordWatchTick();
+          } else {
+            throw initialErr;
+          }
+        }
+
         if (!shouldRunHeartbeatRef.current) {
           return;
         }

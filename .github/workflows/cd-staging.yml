@@ -42,7 +42,7 @@ jobs:
 
   deploy-user-staging:
     needs: detect-changes
-    if: needs.detect-changes.outputs.user == 'true'
+    if: needs.detect-changes.outputs.user == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     concurrency:
       group: deploy-arena-user-staging
@@ -86,7 +86,7 @@ jobs:
 
   deploy-stream-staging:
     needs: detect-changes
-    if: needs.detect-changes.outputs.stream == 'true'
+    if: needs.detect-changes.outputs.stream == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     concurrency:
       group: deploy-arena-stream-staging
@@ -130,7 +130,7 @@ jobs:
 
   deploy-tournament-staging:
     needs: detect-changes
-    if: needs.detect-changes.outputs.tournament == 'true'
+    if: needs.detect-changes.outputs.tournament == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     concurrency:
       group: deploy-arena-tournament-staging
@@ -174,7 +174,7 @@ jobs:
 
   deploy-chat-staging:
     needs: detect-changes
-    if: needs.detect-changes.outputs.chat == 'true'
+    if: needs.detect-changes.outputs.chat == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     concurrency:
       group: deploy-arena-chat-staging
@@ -218,7 +218,7 @@ jobs:
 
   deploy-battle-staging:
     needs: detect-changes
-    if: needs.detect-changes.outputs.battle == 'true'
+    if: needs.detect-changes.outputs.battle == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     concurrency:
       group: deploy-arena-battle-staging
@@ -262,7 +262,7 @@ jobs:
 
   deploy-analytics-staging:
     needs: detect-changes
-    if: needs.detect-changes.outputs.analytics == 'true'
+    if: needs.detect-changes.outputs.analytics == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     concurrency:
       group: deploy-arena-analytics-staging

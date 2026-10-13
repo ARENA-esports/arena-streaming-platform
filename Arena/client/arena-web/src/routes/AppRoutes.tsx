@@ -13,6 +13,7 @@ import LoginView from '../views/LoginView';
 import SignupView from '../views/SignupView';
 import ForgotPasswordView from '../views/ForgotPasswordView';
 import ResetPasswordView from '../views/ResetPasswordView';
+import OAuthCallbackView from '../views/OAuthCallbackView';
 import ScheduleMatchView from '../views/ScheduleMatchView';
 import LinkStreamView from '../views/LinkStreamView';
 import ForbiddenView from '../views/ForbiddenView';
@@ -94,6 +95,7 @@ export const AppRoutes: FC = () => {
       {/* Auth Routes without Dashboard Layout */}
       <Route path="/login" element={<LoginView />} />
       <Route path="/signup" element={<SignupView />} />
+      <Route path="/auth/callback" element={<OAuthCallbackView />} />
       <Route path="/forgot-password" element={<ForgotPasswordView />} />
       <Route path="/reset-password" element={<ResetPasswordView />} />
     </Routes>
