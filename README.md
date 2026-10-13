@@ -209,5 +209,5 @@ The platform utilizes automated GitHub Actions pipelines targeting staging and p
 ---
 
 <div align="center">
-  <sub>Built with passion for esports by the ARENA Engineering Team.</sub>
+  <sub>Built with passion for esports by the ARENA Team.</sub>
 </div>
