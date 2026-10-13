@@ -43,9 +43,12 @@ export const StreamContainer: React.FC<StreamContainerProps> = ({
             : initialChannel;
         setDevChannel(nextChannel);
         setInputVal(nextChannel);
-        onChannelChange?.(nextChannel);
-        onPause?.();
-    }, [apiChannelName, isMockOrEmpty, envOverrideChannel, onChannelChange, onPause]);
+        if (isMockOrEmpty) {
+            onPlay?.();
+        } else {
+            onPause?.();
+        }
+    }, [apiChannelName, isMockOrEmpty, envOverrideChannel, onChannelChange, onPause, onPlay]);
 
     const handleSelectChannel = (channel: string) => {
         const trimmed = channel.trim();
