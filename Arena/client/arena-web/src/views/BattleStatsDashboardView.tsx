@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { analyticsService } from '../api/analyticsService';
+import { authService } from '../api/authService';
 import {
   StreamTeamBattleResponse,
   StreamRoundOutcomeResponse,
@@ -59,7 +60,32 @@ export const BattleStatsDashboardView: React.FC = () => {
       } else {
         setStreamDashboard(null);
       }
-    } catch (err) {
+    } catch (err: any) {
+      if (err?.response?.status === 403) {
+        try {
+          const refreshed = await authService.refresh();
+          if (refreshed?.token) {
+            localStorage.setItem('arena_access_token', refreshed.token);
+            const retrySummaries = await analyticsService.getAllBattleSummaries();
+            const summaryList = Array.isArray(retrySummaries) ? retrySummaries : [];
+            setAllSummaries(summaryList);
+
+            let streamToUse = targetStreamId;
+            if (streamToUse === undefined) {
+              streamToUse = summaryList.length > 0 ? summaryList[0].streamId : 'all';
+              setSelectedStreamId(streamToUse);
+            }
+
+            if (typeof streamToUse === 'number') {
+              const retryDashboard = await analyticsService.getStreamBattleDashboard(streamToUse);
+              setStreamDashboard(retryDashboard || null);
+            }
+            return;
+          }
+        } catch {
+          // Token refresh failed or caller not an Organizer
+        }
+      }
       setError('Failed to load battle analytics data. Please try again.');
     } finally {
       setIsLoading(false);
@@ -77,7 +103,20 @@ export const BattleStatsDashboardView: React.FC = () => {
       try {
         const dashboard = await analyticsService.getStreamBattleDashboard(streamId);
         setStreamDashboard(dashboard || null);
-      } catch (err) {
+      } catch (err: any) {
+        if (err?.response?.status === 403) {
+          try {
+            const refreshed = await authService.refresh();
+            if (refreshed?.token) {
+              localStorage.setItem('arena_access_token', refreshed.token);
+              const retryDashboard = await analyticsService.getStreamBattleDashboard(streamId);
+              setStreamDashboard(retryDashboard || null);
+              return;
+            }
+          } catch {
+            // refresh failed
+          }
+        }
         setError('Failed to load battle analytics data. Please try again.');
       } finally {
         setIsLoading(false);
