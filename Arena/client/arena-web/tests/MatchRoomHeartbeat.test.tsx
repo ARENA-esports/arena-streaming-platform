@@ -234,7 +234,7 @@ describe('MatchRoomView — Watch Heartbeat Integration', () => {
     expect(mockRecordWatchTick).toHaveBeenCalledTimes(2);
   });
 
-  it('does not activate heartbeat for non-viewers (e.g. Organizer or Streamer)', async () => {
+  it('activates heartbeat for user with Organizer role', async () => {
     mockUseAuth.mockReturnValue({
       user: {
         userId: 2,
@@ -270,7 +270,6 @@ describe('MatchRoomView — Watch Heartbeat Integration', () => {
 
     const { getByTestId } = renderMatchRoom('101');
 
-    // Even if player begins playback
     act(() => {
       fireEvent.click(getByTestId('stream-play-btn'));
     });
@@ -279,10 +278,10 @@ describe('MatchRoomView — Watch Heartbeat Integration', () => {
       jest.advanceTimersByTime(60000 * 3);
     });
 
-    expect(mockRecordWatchTick).not.toHaveBeenCalled();
+    expect(mockRecordWatchTick).toHaveBeenCalled();
   });
 
-  it('does not activate heartbeat for user with Streamer role', async () => {
+  it('activates heartbeat for user with Streamer role', async () => {
     mockUseAuth.mockReturnValue({
       user: {
         userId: 3,
@@ -325,7 +324,7 @@ describe('MatchRoomView — Watch Heartbeat Integration', () => {
       jest.advanceTimersByTime(60000 * 3);
     });
 
-    expect(mockRecordWatchTick).not.toHaveBeenCalled();
+    expect(mockRecordWatchTick).toHaveBeenCalled();
   });
 
   it('does not activate heartbeat for user with Admin role', async () => {
