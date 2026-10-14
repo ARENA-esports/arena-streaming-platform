@@ -21,6 +21,7 @@ import { ScheduledView } from '../components/match/ScheduledView';
 import { EndedView } from '../components/match/EndedView';
 import { CancelledView } from '../components/match/CancelledView';
 import { Video } from 'lucide-react';
+import { matchService } from '../api/matchService';
 
 export const MatchRoomView: React.FC = () => {
   const { matchId } = useParams<{ matchId: string }>();
@@ -32,6 +33,7 @@ export const MatchRoomView: React.FC = () => {
 
   const { status, match, stream, error, refetch } = useMatchStatus(matchId);
   const { isPlaying, onPlay, onPause, resetPlayback } = useTwitchPlayback();
+  const [activeChannel, setActiveChannel] = useState<string>('');
 
   // Reset playback state if the match status leaves 'Live' or match changes
   useEffect(() => {
@@ -45,7 +47,9 @@ export const MatchRoomView: React.FC = () => {
   const isAuthenticated = Boolean(user);
   const isLiveMatch = status === 'Live' && Boolean(match);
   const streamId = stream?.streamId ?? stream?.id;
-  const hasValidStream = typeof streamId === 'number' && streamId > 0;
+  const hasLinkedStream = typeof streamId === 'number' && streamId > 0;
+  const hasActiveStream = Boolean(activeChannel && activeChannel.trim() !== '' && !activeChannel.startsWith('mock_'));
+  const hasValidStream = hasLinkedStream || hasActiveStream;
   const isHeartbeatEligible = isAuthenticated && isLiveMatch && hasValidStream && isPlaying;
 
   useWatchHeartbeat({
@@ -101,7 +105,64 @@ export const MatchRoomView: React.FC = () => {
   const [activeTab, setActiveTab] = useState('team');
   const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
   const [teamsData, setTeamsData] = useState<{ teamA: any; teamB: any } | null>(null);
-  const [activeChannel, setActiveChannel] = useState<string>('');
+
+  // Keep activeChannel in sync when match stream loads
+  useEffect(() => {
+    if (stream?.channelName && !activeChannel) {
+      setActiveChannel(stream.channelName);
+    }
+  }, [stream?.channelName, activeChannel]);
+
+  // When a channel is selected or loaded, auto-link or update for Organizer/Streamer
+  const handleChannelChange = useCallback(
+    async (newChannel: string) => {
+      const trimmed = newChannel.trim();
+      if (!trimmed) return;
+      setActiveChannel(trimmed);
+
+      if (match && (user?.role === 'Organizer' || user?.role === 'Streamer')) {
+        try {
+          if (!hasLinkedStream) {
+            await matchService.linkStream(match.matchId, {
+              channelName: trimmed,
+              embedParentDomain: window.location.hostname,
+            });
+            notify(`Stream broadcast linked: ${trimmed}`, 'success');
+            if (refetch) await refetch();
+          } else if (stream && stream.channelName.toLowerCase() !== trimmed.toLowerCase()) {
+            const sId = stream.streamId ?? stream.id;
+            if (sId) {
+              await matchService.updateStream(sId, {
+                channelName: trimmed,
+                embedParentDomain: window.location.hostname,
+              });
+              notify(`Stream broadcast updated: ${trimmed}`, 'success');
+              if (refetch) await refetch();
+            }
+          }
+        } catch (err: any) {
+          console.warn('Auto-link stream error:', err);
+          if (err.response?.status === 409) {
+            try {
+              const currentStream = await matchService.getMatchStream(match.matchId);
+              const sId = currentStream?.streamId ?? currentStream?.id;
+              if (sId) {
+                await matchService.updateStream(sId, {
+                  channelName: trimmed,
+                  embedParentDomain: window.location.hostname,
+                });
+                notify(`Stream broadcast updated: ${trimmed}`, 'success');
+                if (refetch) await refetch();
+              }
+            } catch (fallbackErr) {
+              console.warn('Stream update fallback error:', fallbackErr);
+            }
+          }
+        }
+      }
+    },
+    [match, user?.role, hasLinkedStream, stream, notify, refetch]
+  );
 
   const handleTeamsLoaded = useCallback((teamA: any, teamB: any) => {
     setTeamsData({ teamA, teamB });
@@ -185,7 +246,7 @@ export const MatchRoomView: React.FC = () => {
 
         {(user?.role === 'Organizer' || user?.role === 'Streamer') && (
           <div className="flex items-center space-x-3">
-            {!hasValidStream && (
+            {!hasLinkedStream && (
               <Button
                 variant="primary"
                 size="md"
@@ -232,7 +293,7 @@ export const MatchRoomView: React.FC = () => {
               isAuthenticated={Boolean(user)}
               onPlay={onPlay}
               onPause={onPause}
-              onChannelChange={setActiveChannel}
+              onChannelChange={handleChannelChange}
             />
           )}
           {status === 'Ended' && <EndedView match={match} />}

@@ -21,6 +21,15 @@ export const matchService = {
     const response = await apiClient.post<StreamResponse>(`/matches/${matchId}/streams`, data);
     return response.data;
   },
+  updateStream: async (streamId: number, data: { channelName: string; platform?: string; streamTitle?: string; embedParentDomain: string }) => {
+    const response = await apiClient.put<StreamResponse>(`/streams/${streamId}`, {
+      channelName: data.channelName,
+      platform: data.platform || 'Twitch',
+      streamTitle: data.streamTitle || 'Arena Live Match Broadcast',
+      embedParentDomain: data.embedParentDomain
+    });
+    return response.data;
+  },
   getMatchStream: async (matchId: number) => {
     // For Twitch iframes, we can pass the current host domain as parent
     const response = await apiClient.get<StreamResponse>(`/matches/${matchId}/stream`, {

@@ -16,27 +16,10 @@ export interface UseFactionChatOptions {
   activeChannel?: string | null;
 }
 
-const getStoredStreamMessages = (key: string): ChatMessage[] => {
-  try {
-    const raw = localStorage.getItem(`arena_stream_chat_${key}`);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-};
-
-const saveStoredStreamMessages = (key: string, msgs: ChatMessage[]) => {
-  try {
-    localStorage.setItem(`arena_stream_chat_${key}`, JSON.stringify(msgs.slice(-MAX_MESSAGES)));
-  } catch {
-    // ignore quota error
-  }
-};
-
 /**
  * Custom hook for managing a unified dual-faction WebSocket connection to Arena chat.
  * Connects to both teams in a match, merges incoming history and live messages into a
- * single timeline, sorts them chronologically, and cleans up / resets when switching streams.
+ * single timeline, sorts them chronologically, and updates dynamically.
  */
 export function useFactionChat(
   teamIdOrOptions: number | null | UseFactionChatOptions,
@@ -52,33 +35,36 @@ export function useFactionChat(
           activeSendTeamId: legacyActiveSendTeamId ?? (teamIdOrOptions as number | null),
         };
 
-  const { matchId, teamAId, teamBId, activeSendTeamId, teamsMap, activeChannel } = options;
+  const { matchId, teamAId, teamBId, activeSendTeamId, teamsMap } = options;
 
-  const normalizedChannel = (activeChannel || '').trim().toLowerCase();
-  const streamKey = `m${matchId ?? '0'}_${normalizedChannel || 'default'}`;
-
-  const [messages, setMessages] = useState<ChatMessage[]>(() => getStoredStreamMessages(streamKey));
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('disconnected');
   const [error, setError] = useState<string | null>(null);
-
-  const currentStreamKeyRef = useRef(streamKey);
-  currentStreamKeyRef.current = streamKey;
 
   const wsMapRef = useRef<Map<number, WebSocket>>(new Map());
   const reconnectDelayRef = useRef(INITIAL_RECONNECT_DELAY);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mountedRef = useRef(true);
 
-  // When stream changes, wipe or restore the chat history for this specific stream
+  // Clean up any stale localStorage chat caches from prior versions
   useEffect(() => {
-    const cached = getStoredStreamMessages(streamKey);
-    setMessages(cached);
-  }, [streamKey]);
+    try {
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith('arena_stream_chat_')) {
+          keysToRemove.push(k);
+        }
+      }
+      keysToRemove.forEach((k) => localStorage.removeItem(k));
+    } catch {
+      // ignore
+    }
+  }, []);
 
   // Helper to deduplicate messages by messageId and sort chronologically ascending
   const mergeMessages = useCallback(
-    (newMsgs: ChatMessage[], targetKey?: string) => {
-      const key = targetKey || currentStreamKeyRef.current;
+    (newMsgs: ChatMessage[]) => {
       setMessages((prev) => {
         const map = new Map<number, ChatMessage>();
         for (const m of prev) {
@@ -98,9 +84,7 @@ export function useFactionChat(
         const sorted = Array.from(map.values()).sort(
           (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
         );
-        const result = sorted.slice(-MAX_MESSAGES);
-        saveStoredStreamMessages(key, result);
-        return result;
+        return sorted.slice(-MAX_MESSAGES);
       });
     },
     [teamsMap, teamAId]
@@ -145,19 +129,12 @@ export function useFactionChat(
           switch (frame.type) {
             case 'history': {
               if (Array.isArray(frame.messages)) {
-                const key = currentStreamKeyRef.current;
-                const cached = getStoredStreamMessages(key);
-                const isDefault = key.endsWith('_default') || key.endsWith('_arena_streams');
-                // Only hydrate backend generic history on the default channel when there is no local cache yet
-                if (isDefault && cached.length === 0) {
-                  mergeMessages(frame.messages, key);
-                }
+                mergeMessages(frame.messages);
               }
               break;
             }
             case 'message': {
-              const key = currentStreamKeyRef.current;
-              mergeMessages([frame as unknown as ChatMessage], key);
+              mergeMessages([frame as unknown as ChatMessage]);
               break;
             }
             case 'error': {
@@ -218,7 +195,7 @@ export function useFactionChat(
   // Clean up old sockets, wipe/restore stream messages, connect to new stream's teams!
   useEffect(() => {
     mountedRef.current = true;
-    setMessages(getStoredStreamMessages(streamKey));
+    setMessages([]);
     setError(null);
 
     if (reconnectTimerRef.current) {
